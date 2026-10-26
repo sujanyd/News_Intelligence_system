@@ -1,119 +1,204 @@
-# News Intelligence System
+# News Bias and Framing Analysis System
 
-A modern, AI-powered News Intelligence and Event Analysis platform designed for automated news aggregation, event clustering, semantic analysis, and real-time summarization.
-
----
-
-## 📌 Overview
-
-The **News Intelligence System** continuously ingests articles from multiple news sources, eliminates duplicate coverage, groups unfolding stories into unified events, and generates concise, actionable summaries. By applying advanced Natural Language Processing (NLP) and Large Language Models (LLMs), it enables analysts and users to quickly cut through the noise and stay informed on critical developments.
+A modern, scalable backend system built with **FastAPI** and **PostgreSQL** to analyze news articles for political bias, sentiment framing, narrative divergence, and coverage disparity across media publishers.
 
 ---
 
-## ✨ Key Features
+## 📌 1. Project Overview
 
-- **Multi-Source News Ingestion**: Automated collection from RSS feeds, news APIs, and web sources.
-- **Semantic Event Clustering**: Groups related news articles covering the same unfolding event using vector embeddings and similarity metrics.
-- **AI-Powered Summarization**: Generates high-level executive summaries and key bullet-point takeaways.
-- **Sentiment & Bias Tracking**: Evaluates article tone, sentiment shifts, and perspective divergence across publishers.
-- **Named Entity Recognition (NER)**: Automatically extracts key individuals, organizations, locations, and geopolitical entities.
-- **Real-Time Intelligence Dashboard**: Interactive interface for browsing breaking events, trending topics, and topic timelines.
+The **News Bias and Framing Analysis System** is designed to help readers and researchers understand how different media outlets report on the same events. By analyzing news text, headlines, and tone, the system identifies:
+- **Political Bias**: Leaning and ideological slant.
+- **Framing & Narrative Tactics**: Emphasis on particular perspectives (e.g., economic vs. humanitarian framing).
+- **Sentiment & Tone**: Objective reporting vs. emotionally charged language.
+- **Coverage Comparison**: How various sources contrast when covering the same breaking story.
 
----
-
-## 🏗️ Architecture & Pipeline
-
-```mermaid
-flowchart LR
-    A[News Ingestion<br>RSS / APIs / Web] --> B[Preprocessing & Clean-up]
-    B --> C[Embedding & Vectorization]
-    C --> D[Clustering & Deduplication]
-    D --> E[LLM Summarization & Entity Extraction]
-    E --> F[Intelligence Dashboard & API]
-```
+This repository hosts the backend REST API, data pipelines, database models, and analysis services.
 
 ---
 
-## 📁 Project Structure
+## 🛠️ 2. Technology Stack
+
+- **Backend Framework**: [FastAPI](https://fastapi.tiangolo.com/) (High-performance Python web framework)
+- **ASGI Server**: [Uvicorn](https://www.uvicorn.org/) (Lightning-fast ASGI web server)
+- **Data Validation & Settings**: [Pydantic v2](https://docs.pydantic.dev/) & [Pydantic-Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
+- **Database ORM**: [SQLAlchemy 2.0](https://www.sqlalchemy.org/) (PostgreSQL-ready session and model architecture)
+- **Database Driver**: [psycopg2-binary](https://www.psycopg.org/) (PostgreSQL adapter for Python)
+- **Testing**: [pytest](https://docs.pytest.org/) & [HTTPX](https://www.python-httpx.org/) (Automated endpoint testing)
+- **Version Control**: Git & GitHub
+
+---
+
+## 📂 3. Project Directory Structure
+
+The project is structured according to FastAPI best practices to keep code modular, readable, and easy to maintain:
 
 ```text
-news_intelligence_system/
-├── data/               # Raw and processed news datasets / cache
-├── pipeline/           # News ingestion, scraping, and preprocessing
-├── models/             # Clustering, embeddings, and NLP/LLM modules
-├── api/                # Backend REST API (FastAPI / Flask)
-├── web/                # Frontend dashboard / visualization UI
-├── tests/              # Unit and integration test suites
-├── requirements.txt    # Python dependencies
-├── .env.example        # Environment variable configuration template
-└── README.md           # Project documentation
+news_intellegence_AP_project/
+├── app/
+│   ├── __init__.py              # Marks app as a Python package
+│   ├── main.py                  # Application entry point & FastAPI instance
+│   │
+│   ├── api/                     # API routing layer
+│   │   ├── __init__.py
+│   │   └── v1/
+│   │       ├── __init__.py
+│   │       ├── router.py        # Central v1 router combining all sub-routers
+│   │       └── endpoints/
+│   │           ├── __init__.py
+│   │           └── health.py    # Health check endpoint (GET /health)
+│   │
+│   ├── core/                    # Application configuration
+│   │   ├── __init__.py
+│   │   └── config.py            # Environment settings loaded via Pydantic
+│   │
+│   ├── db/                      # Database integration (PostgreSQL ready)
+│   │   ├── __init__.py
+│   │   ├── base.py              # SQLAlchemy DeclarativeBase
+│   │   └── session.py           # Engine creation & get_db session dependency
+│   │
+│   ├── models/                  # SQLAlchemy ORM models (database tables)
+│   │   ├── __init__.py
+│   │   └── base.py
+│   │
+│   ├── schemas/                 # Pydantic schemas (request/response validation)
+│   │   ├── __init__.py
+│   │   └── health.py            # HealthCheckResponse schema
+│   │
+│   └── services/                # Business logic & analysis algorithms
+│       └── __init__.py          # News scraping, bias classification, framing logic
+│
+├── tests/                       # Automated test suite
+│   ├── __init__.py
+│   ├── conftest.py              # Pytest fixtures (TestClient setup)
+│   └── test_health.py           # Health-check endpoint unit tests
+│
+├── .env.example                 # Template for required environment variables
+├── .gitignore                   # Excludes virtual envs, secrets, and cache files
+├── requirements.txt             # Python project dependencies
+└── README.md                    # Project documentation & setup instructions
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🔍 4. Purpose of Important Files Explained
 
-### Prerequisites
-
-- Python 3.10+
-- `pip` / `virtualenv`
-- Git
-
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/sujanyd/News_Intelligence_system.git
-   cd News_Intelligence_system
-   ```
-
-2. **Create and activate a virtual environment:**
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
-
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Set up environment variables:**
-   ```bash
-   cp .env.example .env
-   # Add your API keys and configuration
-   ```
+| File / Folder | Purpose in Simple Terms |
+| :--- | :--- |
+| `app/main.py` | The starting point of the application. It creates the FastAPI app, configures CORS middleware, mounts routers, and defines the root endpoint. |
+| `app/core/config.py` | Reads settings from your `.env` file (like database URL and app name) and makes them safely accessible with default values. |
+| `app/api/v1/` | Contains API endpoints grouped by feature. If you add news article routes later, they will be placed here. |
+| `app/schemas/` | Defines what input and output data looks like using Pydantic. It automatically validates incoming requests and formats API responses. |
+| `app/db/session.py` | Prepares the connection to PostgreSQL. Provides `get_db()` which gives each API request a database session and closes it when done. |
+| `app/models/` | Defines Python classes that map to PostgreSQL tables (like `Article`, `Publisher`, and `BiasScore`). |
+| `app/services/` | Contains the core algorithms (e.g. sentiment score calculations, framing classification, and news fetching) kept separate from the API routes. |
+| `tests/test_health.py` | Automated tests verifying that the server starts and the health-check endpoint responds correctly with HTTP 200. |
 
 ---
 
-## ⚙️ Configuration
+## 🚀 5. Getting Started (Local Setup)
 
-Create a `.env` file in the root directory:
+Follow these simple steps in your terminal to set up and run the backend locally:
 
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/sujanyd/News_Intelligence_system.git
+cd News_Intelligence_system
+```
+
+### Step 2: Create and Activate a Virtual Environment
+
+It is recommended to use Python 3.10, 3.11, or 3.12:
+
+**On macOS / Linux:**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+**On Windows (PowerShell):**
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+### Step 3: Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Step 4: Configure Environment Variables
+
+Copy the example environment file to create your local `.env`:
+
+```bash
+cp .env.example .env
+```
+
+The default values in `.env` are configured for local development:
 ```env
-# API Keys & Endpoints
-NEWS_API_KEY=your_news_api_key_here
-OPENAI_API_KEY=your_openai_api_key_here
-
-# App Settings
-ENVIRONMENT=development
-LOG_LEVEL=INFO
+PROJECT_NAME="News Bias and Framing Analysis System"
+API_V1_PREFIX="/api/v1"
+ENVIRONMENT="development"
+DEBUG=True
+HOST="0.0.0.0"
+PORT=8000
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/news_bias_db"
 ```
 
 ---
 
-## 🤝 Contributing
+## 💻 6. Running the Server
 
-Contributions are welcome! Please feel free to submit a Pull Request or open an Issue for suggestions and feature requests.
+Start the FastAPI application with live auto-reload enabled:
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Once running, you can access:
+- **Root Welcome Endpoint**: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+- **Health Check Endpoint**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+- **Interactive Swagger Documentation**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **Alternative ReDoc Documentation**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
 ---
 
-## 📄 License
+## 🧪 7. Running Automated Tests
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Run the test suite using `pytest`:
+
+```bash
+pytest -v
+```
+
+Expected output:
+```text
+tests/test_health.py::test_health_check_endpoint PASSED
+tests/test_health.py::test_versioned_health_check_endpoint PASSED
+tests/test_health.py::test_root_endpoint PASSED
+========================= 3 passed in 0.02s =========================
+```
+
+---
+
+## 🗄️ 8. PostgreSQL Integration (Ready for Next Steps)
+
+The database layer in `app/db/session.py` is initialized with SQLAlchemy:
+- It safely reads `DATABASE_URL` from `.env`.
+- SQLAlchemy does not connect over the network until queries are issued, allowing local development and testing to run smoothly without requiring an active PostgreSQL database right now.
+- In the next commit, database migrations (Alembic) and ORM models (`Article`, `BiasAnalysis`, etc.) can be plugged directly into `app/models/` and `app/db/base.py`.
+
+---
+
+## 📋 9. Git Commands for this Commit
+
+To commit and push these changes:
+
+```bash
+git status
+git add .
+git commit -m "chore: initialize FastAPI backend and project structure"
+git push origin main
+```
