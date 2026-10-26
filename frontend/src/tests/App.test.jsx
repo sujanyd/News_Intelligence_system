@@ -4,58 +4,76 @@ import React from 'react'
 import App from '../App'
 import { API_BASE_URL, getApiEndpoint } from '../api/config'
 
-describe('News Bias and Framing Analysis System - Frontend Tests', () => {
-  it('renders the application header and project title', () => {
+describe('News Bias and Framing Analysis System - Dashboard & Navigation Tests', () => {
+  it('renders the application layout and project title in header', () => {
     render(<App />)
     const titleElements = screen.getAllByText(/News Bias and Framing Analysis System/i)
     expect(titleElements.length).toBeGreaterThan(0)
   })
 
-  it('renders all primary navigation placeholders', () => {
+  it('renders all 5 primary navigation items in sidebar', () => {
     const { container } = render(<App />)
     expect(container.querySelector('#nav-dashboard')).toBeDefined()
     expect(container.querySelector('#nav-articles')).toBeDefined()
+    expect(container.querySelector('#nav-sources')).toBeDefined()
     expect(container.querySelector('#nav-comparisons')).toBeDefined()
     expect(container.querySelector('#nav-reports')).toBeDefined()
   })
 
-  it('navigates between views when navigation links are clicked', () => {
+  it('renders the 4 required metric placeholder cards on Dashboard', () => {
+    render(<App />)
+    expect(screen.getByText('Total articles')).toBeDefined()
+    expect(screen.getByText('News sources')).toBeDefined()
+    expect(screen.getByText('Stories and events')).toBeDefined()
+    expect(screen.getByText('Comparisons completed')).toBeDefined()
+  })
+
+  it('renders recent articles section with an informative empty state', () => {
+    render(<App />)
+    expect(screen.getByText('Recent Articles')).toBeDefined()
+    expect(screen.getByText('No articles collected yet')).toBeDefined()
+    expect(screen.getByText(/Articles will appear here after backend integration/i)).toBeDefined()
+  })
+
+  it('navigates seamlessly across all views when sidebar links are clicked', () => {
     const { container } = render(<App />)
-    
+
     // Initial page is Dashboard
     expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeDefined()
 
     // Navigate to Articles
-    const articlesBtn = container.querySelector('#nav-articles')
-    fireEvent.click(articlesBtn)
+    fireEvent.click(container.querySelector('#nav-articles'))
     expect(screen.getByRole('heading', { level: 1, name: 'Articles' })).toBeDefined()
 
+    // Navigate to Sources
+    fireEvent.click(container.querySelector('#nav-sources'))
+    expect(screen.getByRole('heading', { level: 1, name: 'News Sources' })).toBeDefined()
+
     // Navigate to Comparisons
-    const comparisonsBtn = container.querySelector('#nav-comparisons')
-    fireEvent.click(comparisonsBtn)
+    fireEvent.click(container.querySelector('#nav-comparisons'))
     expect(screen.getByRole('heading', { level: 1, name: 'Comparisons' })).toBeDefined()
 
     // Navigate to Reports
-    const reportsBtn = container.querySelector('#nav-reports')
-    fireEvent.click(reportsBtn)
+    fireEvent.click(container.querySelector('#nav-reports'))
     expect(screen.getByRole('heading', { level: 1, name: 'Reports' })).toBeDefined()
 
     // Navigate back to Dashboard
-    const dashboardBtn = container.querySelector('#nav-dashboard')
-    fireEvent.click(dashboardBtn)
+    fireEvent.click(container.querySelector('#nav-dashboard'))
     expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeDefined()
   })
 
-  it('toggles mobile menu when hamburger button is clicked', () => {
+  it('toggles mobile sidebar drawer when hamburger button is clicked', () => {
     const { container } = render(<App />)
     const toggleBtn = screen.getByLabelText('Toggle navigation menu')
-    const mobileNav = container.querySelector('.mobile-nav')
-    
-    expect(mobileNav.classList.contains('open')).toBe(false)
+    const sidebar = container.querySelector('.app-sidebar')
+
+    expect(sidebar.classList.contains('mobile-open')).toBe(false)
     fireEvent.click(toggleBtn)
-    expect(mobileNav.classList.contains('open')).toBe(true)
-    fireEvent.click(toggleBtn)
-    expect(mobileNav.classList.contains('open')).toBe(false)
+    expect(sidebar.classList.contains('mobile-open')).toBe(true)
+
+    const closeBtn = screen.getByLabelText('Close navigation sidebar')
+    fireEvent.click(closeBtn)
+    expect(sidebar.classList.contains('mobile-open')).toBe(false)
   })
 
   it('displays the configured API base URL', () => {

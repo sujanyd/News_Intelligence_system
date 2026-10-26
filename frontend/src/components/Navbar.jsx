@@ -3,15 +3,18 @@ import { API_BASE_URL } from '../api/config'
 import StatusBadge from './StatusBadge'
 
 /**
- * Navigation Bar Component
+ * Top Navbar Component (Alternative / Responsive Navigation Shell)
  * 
- * Displays the project title: "News Bias and Framing Analysis System",
- * navigation placeholders for Dashboard, Articles, Comparisons, and Reports,
- * API status indicator, and a mobile-friendly toggle.
+ * Provides navigation items for:
+ * - Dashboard
+ * - Articles
+ * - Sources
+ * - Comparisons
+ * - Reports
  * 
  * @param {Object} props
- * @param {string} props.activeTab - Currently active page/tab id
- * @param {(tab: string) => void} props.onSelectTab - Callback when a navigation tab is clicked
+ * @param {string} props.activeTab - Currently active tab id
+ * @param {(tab: string) => void} props.onSelectTab - Tab selection handler
  */
 export function Navbar({ activeTab, onSelectTab }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -19,6 +22,7 @@ export function Navbar({ activeTab, onSelectTab }) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'articles', label: 'Articles', icon: '📰' },
+    { id: 'sources', label: 'Sources', icon: '📡' },
     { id: 'comparisons', label: 'Comparisons', icon: '⚖️' },
     { id: 'reports', label: 'Reports', icon: '📈' },
   ]

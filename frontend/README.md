@@ -16,20 +16,25 @@ frontend/
 │   │
 │   ├── components/         # Reusable UI components
 │   │   ├── Card.jsx        # Standardized content card container
+│   │   ├── EmptyState.jsx  # Reusable empty state with icon and description
 │   │   ├── Footer.jsx      # Application footer with backend indicator
-│   │   ├── Navbar.jsx      # Top navigation header with responsive mobile drawer
+│   │   ├── Header.jsx      # Top app header with breadcrumbs and mobile toggle
+│   │   ├── MetricCard.jsx  # Metric KPI cards with placeholder tags
+│   │   ├── Navbar.jsx      # Navigation bar
 │   │   ├── PageHeader.jsx  # Page title, subtitle, and action badge layout
+│   │   ├── Sidebar.jsx     # Desktop sidebar and mobile slide-out drawer
 │   │   └── StatusBadge.jsx # Dynamic status badges (primary, success, warning, info)
 │   │
 │   ├── pages/              # View pages corresponding to navigation tabs
-│   │   ├── Dashboard.jsx   # System overview & pipeline status placeholder
-│   │   ├── Articles.jsx    # Article intelligence stream placeholder
+│   │   ├── Dashboard.jsx   # Metrics, recent articles empty state & pipeline overview
+│   │   ├── Articles.jsx    # Ingested news stream & filter placeholder
+│   │   ├── Sources.jsx     # Monitored publisher catalog placeholder
 │   │   ├── Comparisons.jsx # Cross-publisher framing comparison placeholder
 │   │   └── Reports.jsx     # Analytical bias distribution reports placeholder
 │   │
 │   ├── styles/             # Application styling system
 │   │   ├── index.css       # Design tokens, color palette, typography & reset
-│   │   └── App.css         # Responsive layout, navigation, and component styles
+│   │   └── App.css         # Responsive layout, grid, and navigation styling
 │   │
 │   ├── tests/              # Verification & unit tests
 │   │   ├── setup.js        # Vitest & React Testing Library setup
@@ -109,10 +114,12 @@ npm run test:watch
 
 The test suite verifies:
 1. Application header and project title rendering (**News Bias and Framing Analysis System**).
-2. All primary navigation links (**Dashboard**, **Articles**, **Comparisons**, **Reports**).
-3. Tab navigation and dynamic view switching.
-4. Mobile menu drawer toggling.
-5. Environment variable resolution and API endpoint formatting.
+2. All 5 primary navigation links (**Dashboard**, **Articles**, **Sources**, **Comparisons**, **Reports**).
+3. The 4 metric KPI cards (**Total articles**, **News sources**, **Stories and events**, **Comparisons completed**).
+4. Recent articles section empty state behavior.
+5. Tab navigation and dynamic view switching.
+6. Mobile menu drawer toggling.
+7. Environment variable resolution and API endpoint formatting.
 
 ---
 
@@ -137,4 +144,4 @@ npm run preview
 The frontend is prepared for seamless integration with the FastAPI backend:
 - `src/api/config.js` manages `VITE_API_BASE_URL`.
 - `src/api/client.js` provides `apiGet` and `apiPost` helpers.
-- In future milestones, backend endpoints (such as `GET /api/v1/articles` or `GET /api/v1/comparisons`) will be wired into the corresponding pages without altering the layout architecture.
+- In future milestones, backend endpoints (such as `GET /api/v1/articles` or `GET /api/v1/sources`) will be wired into the corresponding pages without altering the layout architecture.
