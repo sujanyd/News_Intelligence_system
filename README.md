@@ -66,6 +66,11 @@ news_intellegence_AP_project/
 │   │
 │   └── services/                # Business logic & analysis algorithms
 │       └── __init__.py          # News scraping, bias classification, framing logic
+├── frontend/                    # React + Vite frontend user interface
+│   ├── src/                     # Source files (components, pages, api, styles, tests)
+│   ├── .env.example             # Frontend environment template (VITE_API_BASE_URL)
+│   ├── package.json             # Frontend dependencies and scripts
+│   └── README.md                # Frontend setup and documentation
 │
 ├── tests/                       # Automated test suite
 │   ├── __init__.py
@@ -91,6 +96,7 @@ news_intellegence_AP_project/
 | `app/db/session.py` | Prepares the connection to PostgreSQL. Provides `get_db()` which gives each API request a database session and closes it when done. |
 | `app/models/` | Defines Python classes that map to PostgreSQL tables (like `Article`, `Publisher`, and `BiasScore`). |
 | `app/services/` | Contains the core algorithms (e.g. sentiment score calculations, framing classification, and news fetching) kept separate from the API routes. |
+| `frontend/` | React + Vite web interface with modular navigation (Dashboard, Articles, Comparisons, Reports) and configurable API client. |
 | `tests/test_health.py` | Automated tests verifying that the server starts and the health-check endpoint responds correctly with HTTP 200. |
 
 ---
@@ -192,13 +198,59 @@ The database layer in `app/db/session.py` is initialized with SQLAlchemy:
 
 ---
 
-## 📋 9. Git Commands for this Commit
+## 💻 9. Frontend Setup (React + Vite)
+
+The frontend is a lightweight, responsive React single-page application built with Vite.
+
+### Prerequisites
+- Node.js 18+ (Node 20+ recommended)
+- npm 9+
+
+### Quickstart
+
+1. **Navigate to the frontend directory:**
+   ```bash
+   cd frontend
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Configure the backend API URL:**
+   ```bash
+   cp .env.example .env
+   # VITE_API_BASE_URL defaults to http://localhost:8000
+   ```
+
+4. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+5. **Run automated frontend tests:**
+   ```bash
+   npm test
+   ```
+
+6. **Build for production:**
+   ```bash
+   npm run build
+   ```
+
+For detailed component documentation, check [frontend/README.md](frontend/README.md).
+
+---
+
+## 📋 10. Git Commands for this Commit
 
 To commit and push these changes:
 
 ```bash
 git status
 git add .
-git commit -m "chore: initialize FastAPI backend and project structure"
+git commit -m "chore: initialize React frontend and project repository"
 git push origin main
 ```
