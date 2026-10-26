@@ -61,3 +61,8 @@ frontend/dist-ssr/
 *.local
 frontend/.env.local
 frontend/.env.*.local
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3

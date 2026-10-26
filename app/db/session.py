@@ -10,13 +10,20 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from app.core.config import settings
 
-# Create SQLAlchemy engine connected to PostgreSQL
+# Configure engine arguments based on dialect
+engine_kwargs = {}
+if settings.DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    engine_kwargs["pool_pre_ping"] = True
+
+# Create SQLAlchemy engine
 # SQLAlchemy does not establish a network connection until a query is executed,
 # which allows the application to start up safely even before the DB is provisioned.
 engine = create_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
-    pool_pre_ping=True,
+    **engine_kwargs,
 )
 
 # SessionLocal is a session factory

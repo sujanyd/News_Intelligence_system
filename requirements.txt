@@ -9,7 +9,9 @@ python-dotenv>=1.0.1
 
 # Database & ORM (PostgreSQL ready)
 sqlalchemy>=2.0.28,<3.0.0
+alembic>=1.13.0,<2.0.0
 psycopg2-binary>=2.9.9
+psycopg[binary]>=3.1.18
 
 # Testing
 pytest>=8.1.0
