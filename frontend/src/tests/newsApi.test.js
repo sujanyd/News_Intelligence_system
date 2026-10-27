@@ -37,43 +37,112 @@ describe('newsApi in live mode', () => {
     vi.resetModules()
   })
 
-  // Load a fresh copy of newsApi with mock mode turned off
-  async function loadLiveApi() {
+  // Load a fresh copy of newsApi that talks to the (pretend) real backend
+  async function loadLiveApi(prefix = '/api') {
     vi.stubEnv('VITE_USE_MOCK_DATA', 'false')
+    vi.stubEnv('VITE_API_PREFIX', prefix)
     vi.resetModules()
     return import('../api/newsApi')
   }
 
-  it('calls the backend for articles instead of using mock data', async () => {
-    const fakeFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
+  // Replace fetch() with one that always answers with this JSON
+  function stubFetchJson(status, body) {
+    const fakeFetch = vi.fn().mockResolvedValue({
+      ok: status >= 200 && status < 300,
+      status,
+      text: async () => JSON.stringify(body),
+    })
     vi.stubGlobal('fetch', fakeFetch)
+    return fakeFetch
+  }
 
+  it('is in live mode and uses the planned paths', async () => {
     const api = await loadLiveApi()
     expect(api.USE_MOCK_DATA).toBe(false)
-
-    const articles = await api.fetchArticles()
-    expect(articles).toEqual([])
-    expect(fakeFetch.mock.calls[0][0]).toMatch(/\/api\/v1\/articles$/)
+    expect(api.ENDPOINTS.sources).toBe('/api/sources')
+    expect(api.ENDPOINTS.article(5)).toBe('/api/articles/5')
   })
 
-  it('sends a POST request when adding a source', async () => {
-    const savedSource = { id: 9, name: 'Valley News', base_url: 'https://valleynews.example' }
-    const fakeFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => savedSource })
-    vi.stubGlobal('fetch', fakeFetch)
+  it('uses the prefix from VITE_API_PREFIX', async () => {
+    const api = await loadLiveApi('/api/v1')
+    expect(api.ENDPOINTS.articles).toBe('/api/v1/articles')
+  })
 
+  it('sends limit, offset and source_id when loading articles', async () => {
+    const fakeFetch = stubFetchJson(200, [{ id: 1, title: 'A', source_id: 3, content: 'x' }])
     const api = await loadLiveApi()
-    const result = await api.createSource({ name: 'Valley News', base_url: 'https://valleynews.example' })
 
-    expect(result).toEqual(savedSource)
+    const result = await api.fetchArticles({ limit: 6, offset: 5, sourceId: '3' })
+
+    expect(fakeFetch.mock.calls[0][0]).toBe(
+      'http://backend.test/api/articles?limit=6&offset=5&source_id=3'
+    )
+    expect(result.total).toBeNull()
+    expect(result.articles[0].contentStatus).toBe('available')
+  })
+
+  it('reads the total when the backend sends { items, total }', async () => {
+    stubFetchJson(200, { items: [{ id: 1, title: 'A' }], total: 40 })
+    const api = await loadLiveApi()
+
+    const result = await api.fetchArticles({ limit: 6, offset: 0 })
+    expect(result.total).toBe(40)
+  })
+
+  it('loads one article and one source by id', async () => {
+    const fakeFetch = stubFetchJson(200, { id: 9, title: 'Nine', name: 'Nine' })
+    const api = await loadLiveApi()
+
+    await api.fetchArticle(9)
+    await api.fetchSource(9)
+
+    expect(fakeFetch.mock.calls[0][0]).toBe('http://backend.test/api/articles/9')
+    expect(fakeFetch.mock.calls[1][0]).toBe('http://backend.test/api/sources/9')
+  })
+
+  it('creates a source with POST /api/sources', async () => {
+    const fakeFetch = stubFetchJson(201, { id: 9, name: 'Valley News', base_url: 'https://valleynews.example' })
+    const api = await loadLiveApi()
+
+    const saved = await api.createSource({ name: 'Valley News', base_url: 'https://valleynews.example' })
+
+    expect(saved.id).toBe(9)
     const [url, options] = fakeFetch.mock.calls[0]
-    expect(url).toMatch(/\/api\/v1\/sources$/)
+    expect(url).toBe('http://backend.test/api/sources')
     expect(options.method).toBe('POST')
+    expect(JSON.parse(options.body)).toEqual({ name: 'Valley News', base_url: 'https://valleynews.example' })
   })
 
-  it('throws an error when the backend answers with an error status', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, statusText: 'Server Error' }))
-
+  it('creates an article with POST /api/articles', async () => {
+    const fakeFetch = stubFetchJson(201, { id: 50, title: 'Manual article', content: 'Text' })
     const api = await loadLiveApi()
-    await expect(api.fetchSources()).rejects.toThrow('500')
+
+    const saved = await api.createArticle({ title: 'Manual article', source_id: 1, url: 'https://a.example', content: 'Text' })
+
+    expect(saved.id).toBe(50)
+    expect(fakeFetch.mock.calls[0][0]).toBe('http://backend.test/api/articles')
+  })
+
+  it('rejects a malformed sources reply instead of showing wrong data', async () => {
+    stubFetchJson(200, { sources: 'not a list' })
+    const api = await loadLiveApi()
+
+    await expect(api.fetchSources()).rejects.toThrow('unexpected format')
+  })
+
+  it('explains when a route does not exist in the backend yet', async () => {
+    stubFetchJson(404, { detail: 'Not Found' })
+    const api = await loadLiveApi()
+
+    await expect(api.fetchSources()).rejects.toThrow(
+      'The backend has no route /api/sources (HTTP 404)'
+    )
+  })
+
+  it('passes other backend errors on unchanged', async () => {
+    stubFetchJson(404, { detail: 'Article not found' })
+    const api = await loadLiveApi()
+
+    await expect(api.fetchArticle(999)).rejects.toThrow('Article not found (HTTP 404)')
   })
 })

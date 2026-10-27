@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import React from 'react'
 import Sources from '../pages/Sources'
-import { fetchSources, resetMockData } from '../api/newsApi'
+import { fetchSources } from '../api/newsApi'
+import { resetMockData } from '../mocks/mockApi'
 
 // Keep the real API functions, but let single tests replace fetchSources
 vi.mock('../api/newsApi', async (importOriginal) => {
@@ -70,7 +71,7 @@ describe('Sources page', () => {
 
     fillAndSubmitForm('Daily Ledger', 'https://another.example')
 
-    expect(await screen.findByText('A source with this name already exists.')).toBeDefined()
+    expect(await screen.findByText(/A source with this name already exists/)).toBeDefined()
   })
 
   it('shows an empty state when there are no sources', async () => {

@@ -1,15 +1,14 @@
 /**
- * MOCK DATA (sample data for building the screens)
+ * MOCK DATA (sample data, NOT from the backend)
  *
- * The backend does not have article or source endpoints yet, so the
- * Articles and Sources pages use this sample data instead.
+ * Only used when VITE_USE_MOCK_DATA=true in frontend/.env, and by the tests.
+ * The pages then show a yellow "Mock data" badge.
  *
  * All names and links below are made up. Every website uses the ".example"
  * ending, which is reserved for examples and never points to a real site.
  *
- * The shape of each object matches docs in frontend/API_CONTRACT.md.
- * When the real API is ready, set VITE_USE_MOCK_DATA=false in .env and
- * this file is no longer used.
+ * Each object has the same fields as the database models
+ * (app/models/news_source.py and app/models/article.py).
  */
 
 export const MOCK_SOURCES = [
@@ -49,7 +48,6 @@ export const MOCK_ARTICLES = [
   {
     id: 101,
     source_id: 1,
-    source_name: 'Daily Ledger',
     title: 'City council approves new budget for public transport',
     url: 'https://dailyledger.example/news/transport-budget',
     published_at: '2026-10-26T08:30:00Z',
@@ -60,7 +58,6 @@ export const MOCK_ARTICLES = [
   {
     id: 102,
     source_id: 2,
-    source_name: 'Global Wire',
     title: 'Transport budget passes after long council debate',
     url: 'https://globalwire.example/stories/council-transport-vote',
     published_at: '2026-10-26T09:10:00Z',
@@ -71,7 +68,6 @@ export const MOCK_ARTICLES = [
   {
     id: 103,
     source_id: 3,
-    source_name: 'Metro Times',
     title: 'Commuters react to planned bus route changes',
     url: 'https://metrotimes.example/local/bus-route-changes',
     published_at: '2026-10-25T17:45:00Z',
@@ -81,7 +77,6 @@ export const MOCK_ARTICLES = [
   {
     id: 104,
     source_id: 4,
-    source_name: 'The Civic Post',
     title: 'Heavy rain expected across the region this weekend',
     url: 'https://civicpost.example/weather/weekend-rain',
     published_at: '2026-10-25T06:00:00Z',
@@ -92,7 +87,6 @@ export const MOCK_ARTICLES = [
   {
     id: 105,
     source_id: 5,
-    source_name: 'Coastal Herald',
     title: 'Fishing communities prepare for weekend storm',
     url: 'https://coastalherald.example/coast/storm-preparations',
     published_at: '2026-10-25T07:20:00Z',
@@ -103,7 +97,6 @@ export const MOCK_ARTICLES = [
   {
     id: 106,
     source_id: 1,
-    source_name: 'Daily Ledger',
     title: 'University announces new scholarship for first-generation students',
     url: 'https://dailyledger.example/education/new-scholarship',
     published_at: '2026-10-24T11:00:00Z',
@@ -114,7 +107,6 @@ export const MOCK_ARTICLES = [
   {
     id: 107,
     source_id: 2,
-    source_name: 'Global Wire',
     title: 'Electric car sales rise for the third month in a row',
     url: 'https://globalwire.example/business/electric-car-sales',
     published_at: '2026-10-24T13:40:00Z',
@@ -125,7 +117,6 @@ export const MOCK_ARTICLES = [
   {
     id: 108,
     source_id: 3,
-    source_name: 'Metro Times',
     title: 'Local library extends weekend opening hours',
     url: 'https://metrotimes.example/community/library-hours',
     published_at: null,
@@ -136,7 +127,6 @@ export const MOCK_ARTICLES = [
   {
     id: 109,
     source_id: 4,
-    source_name: 'The Civic Post',
     title: 'Hospital opens new emergency wing',
     url: 'https://civicpost.example/health/emergency-wing',
     published_at: '2026-10-23T09:30:00Z',
@@ -146,7 +136,6 @@ export const MOCK_ARTICLES = [
   {
     id: 110,
     source_id: 5,
-    source_name: 'Coastal Herald',
     title: 'Beach clean-up drive collects two tonnes of plastic',
     url: 'https://coastalherald.example/environment/beach-cleanup',
     published_at: '2026-10-22T15:00:00Z',
@@ -157,7 +146,6 @@ export const MOCK_ARTICLES = [
   {
     id: 111,
     source_id: 1,
-    source_name: 'Daily Ledger',
     title: 'Food prices remain steady despite fuel cost increase',
     url: 'https://dailyledger.example/economy/food-prices',
     published_at: '2026-10-21T10:20:00Z',
@@ -168,7 +156,6 @@ export const MOCK_ARTICLES = [
   {
     id: 112,
     source_id: 2,
-    source_name: 'Global Wire',
     title: 'Fuel costs push up delivery charges, retailers say',
     url: 'https://globalwire.example/business/delivery-charges',
     published_at: '2026-10-21T12:05:00Z',

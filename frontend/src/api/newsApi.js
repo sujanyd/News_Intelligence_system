@@ -1,101 +1,108 @@
 /**
  * News API Module
  *
- * All article and source data for the pages comes through the functions in
- * this file. The pages never call fetch() themselves, so connecting the real
- * backend later only needs changes here, not in the UI.
+ * Every article and source request goes through the functions in this file.
+ * The pages never call fetch() themselves.
  *
  * Two modes:
- * - Mock mode (default): returns sample data from src/mocks/mockData.js.
- * - Live mode: calls the FastAPI backend. Turn it on with
- *   VITE_USE_MOCK_DATA=false in the .env file.
+ * - Live mode (default): calls the FastAPI backend at VITE_API_BASE_URL.
+ * - Mock mode: VITE_USE_MOCK_DATA=true uses the pretend backend in
+ *   src/mocks/mockApi.js. The pages then show a "Mock data" badge.
+ *
+ * In both modes the reply is checked by normalize.js before the pages use it.
  */
 
 import { apiGet, apiPost } from './client'
-import { MOCK_ARTICLES, MOCK_SOURCES } from '../mocks/mockData'
+import { API_PREFIX } from './config'
+import { toArticle, toList, toSource } from './normalize'
+import * as mockApi from '../mocks/mockApi'
 
-// Mock mode is on unless .env says VITE_USE_MOCK_DATA=false
-export const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA !== 'false'
+// Mock mode only when .env says exactly VITE_USE_MOCK_DATA=true
+export const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true'
 
-// PROPOSED endpoints. These do NOT exist in the backend yet.
-// They must be confirmed with Person A (see frontend/API_CONTRACT.md).
+// PLANNED routes. Not confirmed by the backend yet (see API_CONTRACT.md).
 export const ENDPOINTS = {
-  articles: '/api/v1/articles',
-  sources: '/api/v1/sources',
-}
-
-// Small pause in mock mode so we can see the loading state (none in tests)
-const MOCK_DELAY_MS = import.meta.env.MODE === 'test' ? 0 : 500
-
-// Copies of the sample data, so adding a source does not change the original list
-let mockSources = [...MOCK_SOURCES]
-let mockArticles = [...MOCK_ARTICLES]
-
-function wait(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+  sources: `${API_PREFIX}/sources`,
+  source: (id) => `${API_PREFIX}/sources/${encodeURIComponent(id)}`,
+  articles: `${API_PREFIX}/articles`,
+  article: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}`,
 }
 
 /**
- * Puts the sample data back to how it started. Used by the tests.
- */
-export function resetMockData() {
-  mockSources = [...MOCK_SOURCES]
-  mockArticles = [...MOCK_ARTICLES]
-}
-
-/**
- * Gets the list of articles.
- *
- * @returns {Promise<Array>} list of article objects
- */
-export async function fetchArticles() {
-  if (USE_MOCK_DATA) {
-    await wait(MOCK_DELAY_MS)
-    return [...mockArticles]
-  }
-  return apiGet(ENDPOINTS.articles)
-}
-
-/**
- * Gets the list of news sources.
- *
- * @returns {Promise<Array>} list of source objects
+ * Gets all news sources.
+ * @returns {Promise<Array>} list of sources
  */
 export async function fetchSources() {
-  if (USE_MOCK_DATA) {
-    await wait(MOCK_DELAY_MS)
-    return [...mockSources]
-  }
-  return apiGet(ENDPOINTS.sources)
+  const data = USE_MOCK_DATA ? await mockApi.getSources() : await apiGet(ENDPOINTS.sources)
+  return toList(data, 'source').items.map(toSource)
 }
 
 /**
- * Adds a new news source.
- *
+ * Gets one news source by its id.
+ */
+export async function fetchSource(sourceId) {
+  const data = USE_MOCK_DATA
+    ? await mockApi.getSource(sourceId)
+    : await apiGet(ENDPOINTS.source(sourceId))
+  return toSource(data)
+}
+
+/**
+ * Saves a new news source.
  * @param {{ name: string, base_url: string }} newSource
  * @returns {Promise<Object>} the saved source (with its new id)
  */
 export async function createSource(newSource) {
-  if (USE_MOCK_DATA) {
-    await wait(MOCK_DELAY_MS)
+  const data = USE_MOCK_DATA
+    ? await mockApi.postSource(newSource)
+    : await apiPost(ENDPOINTS.sources, newSource)
+  return toSource(data)
+}
 
-    // Source names must be unique (same rule as the database)
-    const nameTaken = mockSources.some(
-      (source) => source.name.toLowerCase() === newSource.name.toLowerCase()
-    )
-    if (nameTaken) {
-      throw new Error('A source with this name already exists.')
-    }
+/**
+ * Gets one page of articles.
+ *
+ * @param {Object} [options]
+ * @param {number} [options.limit] - How many articles to get
+ * @param {number} [options.offset] - How many articles to skip first
+ * @param {number | string} [options.sourceId] - Only articles from this source
+ * @returns {Promise<{ articles: Array, total: number | null }>}
+ *   total is null when the backend does not say how many there are in all
+ */
+export async function fetchArticles({ limit, offset, sourceId } = {}) {
+  const query = { limit, offset, source_id: sourceId }
+  const data = USE_MOCK_DATA
+    ? await mockApi.getArticles(query)
+    : await apiGet(ENDPOINTS.articles, query)
+  const list = toList(data, 'article')
+  return { articles: list.items.map(toArticle), total: list.total }
+}
 
-    const biggestId = Math.max(0, ...mockSources.map((source) => source.id))
-    const savedSource = {
-      id: biggestId + 1,
-      name: newSource.name,
-      base_url: newSource.base_url,
-      created_at: new Date().toISOString(),
-    }
-    mockSources = [...mockSources, savedSource]
-    return savedSource
-  }
-  return apiPost(ENDPOINTS.sources, newSource)
+/**
+ * Gets one article by its id (with its full content).
+ */
+export async function fetchArticle(articleId) {
+  const data = USE_MOCK_DATA
+    ? await mockApi.getArticle(articleId)
+    : await apiGet(ENDPOINTS.article(articleId))
+  return toArticle(data)
+}
+
+/**
+ * Saves a new article (manual entry). Required fields still to be confirmed
+ * with Person A; the database needs source_id, title, content and url.
+ */
+export async function createArticle(newArticle) {
+  const data = USE_MOCK_DATA
+    ? await mockApi.postArticle(newArticle)
+    : await apiPost(ENDPOINTS.articles, newArticle)
+  return toArticle(data)
+}
+
+/**
+ * Asks the backend if it is running (GET /health). This route already exists.
+ * Always uses the real backend, even in mock mode.
+ */
+export async function checkBackendHealth() {
+  return apiGet('/health')
 }

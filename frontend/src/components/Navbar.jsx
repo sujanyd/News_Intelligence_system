@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { API_BASE_URL } from '../api/config'
+import { API_BASE_URL_LABEL } from '../api/config'
 import StatusBadge from './StatusBadge'
 
 /**
@@ -69,7 +69,7 @@ export function Navbar({ activeTab, onSelectTab }) {
         {/* Right side items */}
         <div className="nav-right-items">
           <StatusBadge variant="info" className="api-status-badge">
-            API: {API_BASE_URL}
+            API: {API_BASE_URL_LABEL}
           </StatusBadge>
 
           {/* Mobile menu toggle button */}

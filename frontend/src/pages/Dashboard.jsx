@@ -4,7 +4,7 @@ import Card from '../components/Card'
 import StatusBadge from '../components/StatusBadge'
 import MetricCard from '../components/MetricCard'
 import EmptyState from '../components/EmptyState'
-import { API_BASE_URL } from '../api/config'
+import { checkBackendHealth } from '../api/newsApi'
 
 /**
  * Dashboard Page Component
@@ -20,21 +20,11 @@ export function Dashboard() {
     setIsCheckingBackend(true)
     setCheckResult(null)
     try {
-      // Attempt connection to the FastAPI health endpoint without inventing new routes
-      const response = await fetch(`${API_BASE_URL.replace(/\/+$/, '')}/health`, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-      })
-      if (response.ok) {
-        setCheckResult({ success: true, message: 'FastAPI Backend is reachable and healthy!' })
-      } else {
-        setCheckResult({ success: false, message: `Backend responded with HTTP ${response.status}.` })
-      }
-    } catch {
-      setCheckResult({
-        success: false,
-        message: `Could not reach ${API_BASE_URL}. Ensure FastAPI is running on port 8000.`,
-      })
+      // Uses the existing GET /health route through the shared API client
+      await checkBackendHealth()
+      setCheckResult({ success: true, message: 'FastAPI Backend is reachable and healthy!' })
+    } catch (error) {
+      setCheckResult({ success: false, message: error.message })
     } finally {
       setIsCheckingBackend(false)
     }

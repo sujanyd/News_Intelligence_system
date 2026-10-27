@@ -1,67 +1,81 @@
-# Frontend ↔ Backend Data Contract (Articles and Sources)
+# Frontend ↔ Backend Contract (Articles and Sources)
 
-**Status: PROPOSED. Not built in the backend yet.**
+## Integration status (checked 27 Oct 2026)
 
-The backend currently has only `GET /health`. The Articles and Sources pages
-run on mock data (`src/mocks/mockData.js`) until the endpoints below exist.
-This file is for agreeing on the data shapes with Person A (backend).
+| What | Status |
+| ---- | ------ |
+| Frontend reaches the backend (`GET /health`) | ✅ Works (tested in the browser against the real FastAPI app) |
+| CORS for the Vite dev server | ✅ Works (`allow_origins=["*"]` in `app/main.py`) |
+| `GET /api/sources`, `POST /api/sources`, `GET /api/sources/{id}` | ❌ **Not built**: backend returns 404 |
+| `GET /api/articles` (+ `source_id`, `limit`, `offset`), `GET /api/articles/{id}`, `POST /api/articles` | ❌ **Not built**: backend returns 404 |
 
-The field names follow the existing database models in
-`app/models/article.py` and `app/models/news_source.py`.
+**Real integration is not complete.** The frontend client is ready and tested
+against these planned routes, but it has not yet talked to working article or
+source endpoints. Until then, run the frontend with `VITE_USE_MOCK_DATA=true`
+to see the screens with sample data.
 
-## Where the frontend calls the API
+## Questions for Person A (backend)
 
-All calls are in `src/api/newsApi.js`. The pages never call `fetch` directly.
+1. **Path prefix**: the plan says `/api/...`, but `app/core/config.py` uses
+   `API_V1_PREFIX="/api/v1"`. Which one will the routes use?
+   (Frontend setting: `VITE_API_PREFIX`, no code change needed.)
+2. **List format**: will `GET /api/articles` return a plain array, or
+   `{"items": [...], "total": 42}`? The frontend accepts both; with `total`
+   it can show "Page 2 of 9".
+3. **Article list fields**: will each article include `source_name`? If not,
+   the frontend looks the name up from `GET /api/sources`.
+   Will the list include `content`? If not, the table shows "Not in list"
+   and the full text is loaded from `GET /api/articles/{id}`.
+4. **Errors**: will errors use FastAPI's default `{"detail": ...}`?
+   What status for a duplicate source name? (Frontend expects `409`.)
+5. **Required fields**:
+   - Create source: `name`, `base_url`?
+   - Create article: `source_id`, `title`, `content`, `url` (all `NOT NULL`
+     in the model), plus optional `published_at` and `event_id`?
+6. **Limits**: is there a maximum `limit`? The frontend asks for 6 at a time.
+7. **CORS**: keep `allow_origins=["*"]` for development; for deployment,
+   list the real frontend address instead.
 
-| Function          | Method | Proposed path       |
-| ----------------- | ------ | ------------------- |
-| `fetchArticles()` | GET    | `/api/v1/articles`  |
-| `fetchSources()`  | GET    | `/api/v1/sources`   |
-| `createSource()`  | POST   | `/api/v1/sources`   |
+## How the frontend calls the API
 
-If Person A picks different paths, only `ENDPOINTS` in `newsApi.js` needs to change.
+All calls are in `src/api/newsApi.js` and go through `src/api/client.js`.
+Pages never call `fetch` directly.
 
-## Source object
+| Function            | Method | Path (with `VITE_API_PREFIX=/api`)               |
+| ------------------- | ------ | ------------------------------------------------ |
+| `fetchSources()`    | GET    | `/api/sources`                                   |
+| `fetchSource(id)`   | GET    | `/api/sources/{source_id}`                       |
+| `createSource()`    | POST   | `/api/sources`                                   |
+| `fetchArticles()`   | GET    | `/api/articles?limit=6&offset=0&source_id=3`     |
+| `fetchArticle(id)`  | GET    | `/api/articles/{article_id}`                     |
+| `createArticle()`   | POST   | `/api/articles`                                  |
+| `checkBackendHealth()` | GET | `/health` (exists today)                         |
+
+Pagination: the page shows 5 articles. It asks for `limit=6`, and if 6 come
+back it knows there is a next page. `offset = (page - 1) × 5`.
+
+## Expected shapes
+
+Field names follow `app/models/news_source.py` and `app/models/article.py`.
+Every reply is checked by `src/api/normalize.js`; anything that does not
+match is shown as an error, never as made-up data.
+
+### Source
 
 ```json
-{
-  "id": 1,
-  "name": "Daily Ledger",
-  "base_url": "https://dailyledger.example",
-  "created_at": "2026-10-01T09:00:00Z"
-}
+{ "id": 1, "name": "Daily Ledger", "base_url": "https://dailyledger.example", "created_at": "2026-10-01T09:00:00Z" }
 ```
 
-| Field        | Type            | Notes                                   |
-| ------------ | --------------- | --------------------------------------- |
-| `id`         | integer         | Primary key                             |
-| `name`       | string (≤ 255)  | Required, must be unique                |
-| `base_url`   | string (≤ 512)  | Required, starts with `http://` or `https://` |
-| `created_at` | ISO 8601 string | Set by the server                       |
+Required by the frontend: `id`, `name`. Optional: `base_url`, `created_at`.
 
-### `GET /api/v1/sources`
+POST body: `{ "name": "...", "base_url": "https://..." }`
 
-Returns a JSON **array** of source objects.
-
-### `POST /api/v1/sources`
-
-Request body:
-
-```json
-{ "name": "Daily Ledger", "base_url": "https://dailyledger.example" }
-```
-
-- Success: `201`, returns the saved source object.
-- Name already used: `409`.
-- Missing or invalid field: `422` (FastAPI default).
-
-## Article object
+### Article
 
 ```json
 {
   "id": 101,
   "source_id": 1,
-  "source_name": "Daily Ledger",
   "title": "City council approves new budget for public transport",
   "url": "https://dailyledger.example/news/transport-budget",
   "published_at": "2026-10-26T08:30:00Z",
@@ -70,31 +84,20 @@ Request body:
 }
 ```
 
-| Field          | Type                    | Notes                                              |
-| -------------- | ----------------------- | -------------------------------------------------- |
-| `id`           | integer                 | Primary key                                        |
-| `source_id`    | integer                 | Used by the source filter                          |
-| `source_name`  | string                  | **Extra field** (from the joined source), shown in the table |
-| `title`        | string                  | Used by the title search                           |
-| `url`          | string                  | Link to the original article                       |
-| `published_at` | ISO 8601 string or null | Shown as "Not available" when null                 |
-| `retrieved_at` | ISO 8601 string         | When our pipeline fetched it                       |
-| `content`      | string or null          | Empty or null is shown as "Missing" content        |
+Required by the frontend: `id`, `title`. Optional: everything else
+(`source_name` too, if the backend wants to add it).
 
-### `GET /api/v1/articles`
+## Error handling in the frontend
 
-Returns a JSON **array** of article objects, newest first.
+| Situation | What the user sees |
+| --------- | ------------------ |
+| Backend off, wrong address, or CORS blocked | "Could not reach the backend at …" + Try again |
+| No answer after 10 seconds | "The backend took too long to respond." |
+| Route does not exist (FastAPI `{"detail":"Not Found"}`) | "The backend has no route /api/… (HTTP 404) …" |
+| Other error with `{"detail": ...}` | The `detail` text and the status code |
+| Error without JSON (e.g. HTML 500 page) | "The backend returned an error (HTTP 500)." |
+| Success but broken JSON or wrong shape | "…unexpected format" / "not valid JSON" |
 
-For now the frontend does search, source filtering and pagination itself.
-If the article list becomes large, we can add query parameters later
-(for example `?search=&source_id=&page=&page_size=`), agreed with Person A.
+## Not covered
 
-## Errors
-
-Any non-2xx response is shown on the page as an error message with a
-"Try again" button. No other error format is assumed.
-
-## Not covered here
-
-Semantic matching, AI analysis and comparison reports are not part of this
-contract yet.
+Semantic matching, AI analysis and comparison reports.

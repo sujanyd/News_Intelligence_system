@@ -999,3 +999,9 @@
     flex-shrink: 0;
   }
 }
+
+/* Small warning text under a form field */
+.form-hint {
+  font-size: 0.75rem;
+  color: var(--color-warning);
+}

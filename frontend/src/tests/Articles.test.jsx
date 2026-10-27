@@ -2,39 +2,50 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import React from 'react'
 import Articles from '../pages/Articles'
-import { fetchArticles, resetMockData } from '../api/newsApi'
+import { fetchArticles, fetchSources } from '../api/newsApi'
+import { resetMockData } from '../mocks/mockApi'
 
-// Keep the real API functions, but let single tests replace fetchArticles
-// (for example to pretend the server is down)
+// The page uses the pretend backend (mock mode is on in tests).
+// Single tests can replace these functions, for example to pretend the server is down.
 vi.mock('../api/newsApi', async (importOriginal) => {
   const realModule = await importOriginal()
-  return { ...realModule, fetchArticles: vi.fn(realModule.fetchArticles) }
+  return {
+    ...realModule,
+    fetchArticles: vi.fn(realModule.fetchArticles),
+    fetchSources: vi.fn(realModule.fetchSources),
+  }
 })
+
+const FIRST_TITLE = 'City council approves new budget for public transport'
 
 describe('Articles page', () => {
   beforeEach(() => {
     resetMockData()
+    vi.clearAllMocks()
   })
 
   it('shows a loading message first, then the articles table', async () => {
     render(<Articles />)
     expect(screen.getByText('Loading articles...')).toBeDefined()
 
-    expect(
-      await screen.findByText('City council approves new budget for public transport')
-    ).toBeDefined()
+    expect(await screen.findByText(FIRST_TITLE)).toBeDefined()
     expect(screen.queryByText('Loading articles...')).toBeNull()
   })
 
-  it('shows title, source, published time and content availability', async () => {
+  it('asks the API for one page (limit and offset)', async () => {
     render(<Articles />)
-    await screen.findByText('City council approves new budget for public transport')
+    await screen.findByRole('table')
 
-    const table = screen.getByRole('table', { name: 'List of articles' })
-    expect(within(table).getByText('Title')).toBeDefined()
-    expect(within(table).getByText('Source')).toBeDefined()
-    expect(within(table).getByText('Published')).toBeDefined()
-    expect(within(table).getByText('Content')).toBeDefined()
+    // 5 per page, plus 1 extra to find out if there is a next page
+    expect(fetchArticles).toHaveBeenCalledWith({ limit: 6, offset: 0, sourceId: undefined })
+  })
+
+  it('shows title, source name, published time and content availability', async () => {
+    render(<Articles />)
+    const table = await screen.findByRole('table', { name: 'List of articles' })
+
+    // The source name comes from the sources list (articles only have source_id)
+    expect(within(table).getAllByText('Daily Ledger').length).toBeGreaterThan(0)
     expect(within(table).getAllByText('Available').length).toBeGreaterThan(0)
     expect(within(table).getAllByText('Missing').length).toBeGreaterThan(0)
   })
@@ -45,87 +56,101 @@ describe('Articles page', () => {
     await screen.findByRole('table')
   })
 
-  it('shows 5 articles per page and moves to the next page', async () => {
+  it('loads the next page from the API', async () => {
     render(<Articles />)
     await screen.findByRole('table')
-
-    expect(screen.getByText('Page 1 of 3')).toBeDefined()
     expect(screen.getAllByRole('button', { name: /View details/ }).length).toBe(5)
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    expect(screen.getByText('Page 2 of 3')).toBeDefined()
-    expect(screen.getByText('University announces new scholarship for first-generation students')).toBeDefined()
+
+    expect(
+      await screen.findByText('University announces new scholarship for first-generation students')
+    ).toBeDefined()
+    expect(fetchArticles).toHaveBeenLastCalledWith({ limit: 6, offset: 5, sourceId: undefined })
+    expect(screen.getByText('Page 2')).toBeDefined()
   })
 
-  it('filters articles by the search text', async () => {
+  it('disables "Next" on the last page', async () => {
     render(<Articles />)
     await screen.findByRole('table')
 
-    fireEvent.change(screen.getByLabelText('Search by title'), { target: { value: 'storm' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await screen.findByText('Page 2')
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await screen.findByText('Page 3')
 
-    expect(screen.getByText('Fishing communities prepare for weekend storm')).toBeDefined()
-    expect(screen.queryByText('City council approves new budget for public transport')).toBeNull()
-    expect(screen.getByText('Showing 1 of 1 articles')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Next' }).disabled).toBe(true)
   })
 
-  it('filters articles by source', async () => {
+  it('filters by source using the API', async () => {
     render(<Articles />)
     await screen.findByRole('table')
 
     fireEvent.change(screen.getByLabelText('Source'), { target: { value: '3' } })
 
-    const table = screen.getByRole('table')
-    const sourceCells = within(table).getAllByText('Metro Times')
-    expect(sourceCells.length).toBe(2)
+    const table = await screen.findByRole('table')
+    expect(fetchArticles).toHaveBeenLastCalledWith({ limit: 6, offset: 0, sourceId: '3' })
+    expect(within(table).getAllByText('Metro Times').length).toBe(2)
     expect(within(table).queryByText('Daily Ledger')).toBeNull()
   })
 
-  it('shows a "no match" message and can clear the filters', async () => {
+  it('searches the titles on the current page', async () => {
     render(<Articles />)
     await screen.findByRole('table')
 
-    fireEvent.change(screen.getByLabelText('Search by title'), { target: { value: 'zzz' } })
-    expect(screen.getByText('No articles match your filters')).toBeDefined()
+    fireEvent.change(screen.getByLabelText('Search titles on this page'), {
+      target: { value: 'storm' },
+    })
+    expect(screen.getByText('Fishing communities prepare for weekend storm')).toBeDefined()
+    expect(screen.queryByText(FIRST_TITLE)).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
-    expect(screen.getByText('Page 1 of 3')).toBeDefined()
+    fireEvent.change(screen.getByLabelText('Search titles on this page'), {
+      target: { value: 'zzz' },
+    })
+    expect(screen.getByText('No articles on this page match your search')).toBeDefined()
   })
 
-  it('shows the details of an article when "View" is clicked', async () => {
+  it('loads and shows an article when "View" is clicked', async () => {
     render(<Articles />)
     await screen.findByRole('table')
 
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'View details for City council approves new budget for public transport',
-      })
-    )
+    fireEvent.click(screen.getByRole('button', { name: `View details for ${FIRST_TITLE}` }))
 
     const details = screen.getByRole('region', { name: 'Article details' })
-    expect(within(details).getByText(/The city council voted on Monday/)).toBeDefined()
+    expect(within(details).getByText('Loading article...')).toBeDefined()
+    expect(await within(details).findByText(/The city council voted on Monday/)).toBeDefined()
 
     fireEvent.click(within(details).getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('region', { name: 'Article details' })).toBeNull()
   })
 
   it('shows an empty state when there are no articles', async () => {
-    fetchArticles.mockResolvedValueOnce([])
+    fetchArticles.mockResolvedValueOnce({ articles: [], total: null })
     render(<Articles />)
 
     expect(await screen.findByText('No articles collected yet')).toBeDefined()
   })
 
-  it('shows an error message and can try again', async () => {
-    fetchArticles.mockRejectedValueOnce(new Error('Server is not responding'))
+  it('shows the error from the API and can try again', async () => {
+    fetchArticles.mockRejectedValueOnce(new Error('Could not reach the backend at http://backend.test.'))
     render(<Articles />)
 
-    expect(await screen.findByText('Server is not responding')).toBeDefined()
+    expect(await screen.findByText(/Could not reach the backend/)).toBeDefined()
     expect(screen.getByRole('alert')).toBeDefined()
+    expect(screen.queryByRole('table')).toBeNull()
 
-    // The second call uses the normal mock data again
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(
-      await screen.findByText('City council approves new budget for public transport')
-    ).toBeDefined()
+    expect(await screen.findByText(FIRST_TITLE)).toBeDefined()
+  })
+
+  it('still shows articles when the sources cannot be loaded', async () => {
+    fetchSources.mockRejectedValueOnce(new Error('Sources route missing'))
+    render(<Articles />)
+
+    expect(await screen.findByText(FIRST_TITLE)).toBeDefined()
+    expect(screen.getByText('Source filter unavailable: Sources route missing')).toBeDefined()
+    expect(screen.getByLabelText('Source').disabled).toBe(true)
+    // Without names, the source id is shown instead
+    expect(screen.getAllByText('Source #1').length).toBeGreaterThan(0)
   })
 })

@@ -1,5 +1,5 @@
 import React from 'react'
-import { API_BASE_URL } from '../api/config'
+import { API_BASE_URL_LABEL } from '../api/config'
 
 /**
  * Application Footer Component
@@ -15,7 +15,7 @@ export function Footer() {
         </div>
         <div className="footer-right">
           <span>Configured Backend:</span>
-          <span className="code-pill">{API_BASE_URL}</span>
+          <span className="code-pill">{API_BASE_URL_LABEL}</span>
         </div>
       </div>
     </footer>

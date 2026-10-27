@@ -11,9 +11,10 @@ frontend/
 ├── public/                 # Static assets and icons
 ├── src/
 │   ├── api/                # API client configuration & request utilities
-│   │   ├── client.js       # Reusable GET/POST wrappers (no hardcoded URLs)
-│   │   ├── config.js       # Centralized API base URL config (VITE_API_BASE_URL)
-│   │   └── newsApi.js      # Article & source calls (mock or live mode)
+│   │   ├── client.js       # One request helper: timeouts, readable errors, JSON checks
+│   │   ├── config.js       # VITE_API_BASE_URL and VITE_API_PREFIX settings
+│   │   ├── newsApi.js      # Article & source calls (live or mock mode)
+│   │   └── normalize.js    # Checks backend replies before pages use them
 │   │
 │   ├── components/         # Reusable UI components
 │   │   ├── AddSourceForm.jsx  # Form to add a news source (with validation)
@@ -35,7 +36,8 @@ frontend/
 │   │   └── StatusBadge.jsx # Dynamic status badges (primary, success, warning, info)
 │   │
 │   ├── mocks/
-│   │   └── mockData.js     # Sample sources & articles (used until the backend is ready)
+│   │   ├── mockApi.js      # Pretend backend (only when VITE_USE_MOCK_DATA=true, and in tests)
+│   │   └── mockData.js     # Sample sources & articles for the pretend backend
 │   │
 │   ├── utils/
 │   │   ├── formatDate.js   # Readable dates ("Not available" when missing)
@@ -57,6 +59,8 @@ frontend/
 │   │   ├── App.test.jsx    # Rendering, navigation & API configuration tests
 │   │   ├── Articles.test.jsx # Articles page tests
 │   │   ├── Sources.test.jsx  # Sources page & form tests
+│   │   ├── client.test.js    # API client: URLs, errors, timeouts, network failures
+│   │   ├── normalize.test.js # Checking of backend replies
 │   │   └── newsApi.test.js   # Validation, date and live-API tests
 │   │
 │   ├── App.jsx             # Main layout & navigation state manager
@@ -90,26 +94,30 @@ npm install
 
 ### 2. Configure Environment Variables
 
-The frontend connects to the FastAPI backend using `VITE_API_BASE_URL`.
-
 A template is provided in `.env.example`:
 
 ```bash
 cp .env.example .env
 ```
 
-Contents of `.env`:
-```env
-# Backend API Base URL (FastAPI)
-VITE_API_BASE_URL=http://localhost:8000
+| Variable | Example | What it does |
+| -------- | ------- | ------------ |
+| `VITE_API_BASE_URL` | `http://localhost:8000` | Address of the FastAPI backend. **Required**: there is no default, so the app shows "Not configured" if it is missing. |
+| `VITE_API_PREFIX` | `/api` | Path before `/sources` and `/articles`. Use `/api/v1` if the backend puts the routes under its versioned prefix. |
+| `VITE_USE_MOCK_DATA` | `false` | `true` shows sample data from `src/mocks/` (yellow **Mock data** badge). `false` calls the real backend (green **Live API** badge). |
 
-# Use sample (mock) data for Articles and Sources
-VITE_USE_MOCK_DATA=true
-```
+> **Security**: Vite copies every `VITE_` variable into the browser code, where anyone can read it. Never put passwords, database URLs or API keys in `frontend/.env`.
 
-> **Note**: Change this URL if your FastAPI backend runs on a different host or port. The frontend reads this variable through `src/api/config.js` and does not hardcode URLs anywhere in the UI.
+> Restart `npm run dev` after changing `.env`.
 
-> **Mock data**: The backend does not have article or source endpoints yet, so the Articles and Sources pages show sample data from `src/mocks/mockData.js` and display a yellow **Mock data** badge. When the endpoints described in [`API_CONTRACT.md`](API_CONTRACT.md) are ready, set `VITE_USE_MOCK_DATA=false` and the pages call the backend instead (badge changes to **Live API**).
+### Connecting to the backend
+
+1. Start the backend from the project root (see the main README), so it runs at `http://localhost:8000`.
+2. In `frontend/.env`, set `VITE_API_BASE_URL=http://localhost:8000` and `VITE_USE_MOCK_DATA=false`.
+3. Start the frontend and click **Check Backend Connection** on the Dashboard. It calls `GET /health`.
+4. If the backend runs on another computer or port, change `VITE_API_BASE_URL` to match. The backend must allow the frontend's address in its CORS settings (`app/main.py`).
+
+> **Current status**: the backend does not have the article and source routes yet, so in live mode those pages show a clear "no route" error. Use `VITE_USE_MOCK_DATA=true` to work on the screens until the routes are ready. See [`API_CONTRACT.md`](API_CONTRACT.md).
 
 ### 3. Start Development Server
 
@@ -147,7 +155,11 @@ The test suite verifies:
 7. Environment variable resolution and API endpoint formatting.
 8. Articles page: loading, table columns, search, source filter, pagination, details view, empty and error states.
 9. Sources page: source list, required-field validation, adding a source, duplicate names, empty and error states.
-10. Live mode: `newsApi.js` calls the backend paths instead of using mock data.
+10. Live mode: `newsApi.js` calls the right backend paths with `limit`, `offset` and `source_id`.
+11. API client: backend error messages, network failures, timeouts, non-JSON replies and a missing backend URL.
+12. Reply checking: broken or unexpected replies become errors instead of wrong data.
+
+The tests never call a real server: page tests use the pretend backend in `src/mocks/`, and API tests replace `fetch` with a fake one. Test settings are fixed in `vite.config.js`, so your own `.env` does not change the results.
 
 ---
 
@@ -170,7 +182,8 @@ npm run preview
 ## 🔗 Backend Integration Plan
 
 The frontend is prepared for seamless integration with the FastAPI backend:
-- `src/api/config.js` manages `VITE_API_BASE_URL`.
-- `src/api/client.js` provides `apiGet` and `apiPost` helpers.
+- `src/api/config.js` reads `VITE_API_BASE_URL` and `VITE_API_PREFIX`.
+- `src/api/client.js` sends every request, with a 10-second timeout and readable error messages.
+- `src/api/normalize.js` checks every reply before the pages use it.
 - `src/api/newsApi.js` holds every article and source call. Pages never call `fetch` directly.
-- The proposed endpoints (`GET /api/v1/articles`, `GET /api/v1/sources`, `POST /api/v1/sources`) and their data shapes are documented in [`API_CONTRACT.md`](API_CONTRACT.md) for agreement with the backend team. They are not implemented in the backend yet.
+- The planned endpoints (`/api/sources`, `/api/sources/{id}`, `/api/articles`, `/api/articles/{id}`), the open questions for the backend team, and the current status are in [`API_CONTRACT.md`](API_CONTRACT.md).

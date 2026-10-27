@@ -1,5 +1,5 @@
 import React from 'react'
-import { API_BASE_URL } from '../api/config'
+import { API_BASE_URL_LABEL } from '../api/config'
 import StatusBadge from './StatusBadge'
 
 /**
@@ -58,7 +58,7 @@ export function Header({ activeTab, onToggleMobileMenu }) {
 
       <div className="header-right">
         <StatusBadge variant="info" className="header-api-badge">
-          API: {API_BASE_URL}
+          API: {API_BASE_URL_LABEL}
         </StatusBadge>
       </div>
     </header>

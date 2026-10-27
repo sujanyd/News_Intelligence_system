@@ -1,5 +1,5 @@
 import React from 'react'
-import { API_BASE_URL } from '../api/config'
+import { API_BASE_URL_LABEL } from '../api/config'
 import StatusBadge from './StatusBadge'
 
 /**
@@ -156,7 +156,7 @@ export function Sidebar({ activeTab, onSelectTab, isMobileOpen = false, onCloseM
         <div className="sidebar-footer">
           <div className="sidebar-api-card">
             <span className="api-card-label">Backend Target</span>
-            <div className="api-card-val code-pill">{API_BASE_URL}</div>
+            <div className="api-card-val code-pill">{API_BASE_URL_LABEL}</div>
             <StatusBadge variant="info">FastAPI Ready</StatusBadge>
           </div>
         </div>

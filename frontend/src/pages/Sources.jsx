@@ -97,7 +97,9 @@ export function Sources() {
       <div className="sources-layout">
         <Card
           title="Configured Sources"
-          subtitle={isLoading ? 'Loading...' : `${sources.length} sources`}
+          subtitle={
+            isLoading ? 'Loading...' : errorMessage ? 'Not loaded' : `${sources.length} sources`
+          }
         >
           {renderSourceList()}
         </Card>
