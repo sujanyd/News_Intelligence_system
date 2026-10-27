@@ -1,40 +1,29 @@
 # Frontend ↔ Backend Contract (Articles and Sources)
 
-## Integration status (checked 27 Oct 2026)
+## Integration status (updated 27 Oct 2026)
 
 | What | Status |
 | ---- | ------ |
-| Frontend reaches the backend (`GET /health`) | ✅ Works (tested in the browser against the real FastAPI app) |
+| Frontend reaches the backend (`GET /health`) | ✅ Works (tested against the real FastAPI app) |
 | CORS for the Vite dev server | ✅ Works (`allow_origins=["*"]` in `app/main.py`) |
-| `GET /api/sources`, `POST /api/sources`, `GET /api/sources/{id}` | ❌ **Not built**: backend returns 404 |
-| `GET /api/articles` (+ `source_id`, `limit`, `offset`), `GET /api/articles/{id}`, `POST /api/articles` | ❌ **Not built**: backend returns 404 |
+| `GET /api/sources`, `POST /api/sources`, `GET /api/sources/{id}` | ✅ **Implemented & tested** (also mounted at `/api/v1/sources`) |
+| `GET /api/articles` (+ `source_id`, `limit`, `offset`), `GET /api/articles/{id}`, `POST /api/articles` | ✅ **Implemented & tested** (also mounted at `/api/v1/articles`) |
 
-**Real integration is not complete.** The frontend client is ready and tested
-against these planned routes, but it has not yet talked to working article or
-source endpoints. Until then, run the frontend with `VITE_USE_MOCK_DATA=true`
-to see the screens with sample data.
+**Real integration is operational.** The backend routes are fully functional and pass 36 unit/integration tests. Both `/api/...` and `/api/v1/...` prefixes are active.
 
-## Questions for Person A (backend)
+## Confirmed Specifications from Person A (Backend)
 
-1. **Path prefix**: the plan says `/api/...`, but `app/core/config.py` uses
-   `API_V1_PREFIX="/api/v1"`. Which one will the routes use?
-   (Frontend setting: `VITE_API_PREFIX`, no code change needed.)
-2. **List format**: will `GET /api/articles` return a plain array, or
-   `{"items": [...], "total": 42}`? The frontend accepts both; with `total`
-   it can show "Page 2 of 9".
-3. **Article list fields**: will each article include `source_name`? If not,
-   the frontend looks the name up from `GET /api/sources`.
-   Will the list include `content`? If not, the table shows "Not in list"
-   and the full text is loaded from `GET /api/articles/{id}`.
-4. **Errors**: will errors use FastAPI's default `{"detail": ...}`?
-   What status for a duplicate source name? (Frontend expects `409`.)
+1. **Path prefix**: Both `/api` and `/api/v1` are mounted. The frontend's default `VITE_API_PREFIX=/api` works seamlessly without changes.
+2. **List format**: Endpoints return a clean JSON array `[...]`. Compatible with `toList(data, 'source')` and `toList(data, 'article')`.
+3. **Article list fields**:
+   - `source_name` is populated automatically on every article via relationship eager-loading (`joinedload`).
+   - `content` is excluded from article lists (`GET /api/articles`) for bandwidth optimization; the full body text is returned on `GET /api/articles/{id}`.
+4. **Errors**: Uses FastAPI standard `{"detail": "..."}`. Duplicate source names and duplicate article URLs return HTTP `409 Conflict`.
 5. **Required fields**:
-   - Create source: `name`, `base_url`?
-   - Create article: `source_id`, `title`, `content`, `url` (all `NOT NULL`
-     in the model), plus optional `published_at` and `event_id`?
-6. **Limits**: is there a maximum `limit`? The frontend asks for 6 at a time.
-7. **CORS**: keep `allow_origins=["*"]` for development; for deployment,
-   list the real frontend address instead.
+   - Create source: `name` (required, 1-255 chars), `base_url` (required, valid http/https URL).
+   - Create article: `source_id` (required, must exist), `title` (required, 1-512 chars), `url` (required, unique http/https URL). Optional: `content`, `published_at`, `event_id`, `content_availability`, `canonical_url`.
+6. **Limits**: `limit` accepts 1 to 100 (default 50). Frontend's request for `limit=6` works perfectly.
+7. **CORS**: `allow_origins=["*"]` enabled for local development.
 
 ## How the frontend calls the API
 

@@ -91,6 +91,11 @@ class Article(Base):
     source = relationship("NewsSource", back_populates="articles")
     event = relationship("Event", back_populates="articles")
 
+    @property
+    def source_name(self) -> str | None:
+        """Returns the name of the publishing source, if loaded/available."""
+        return self.source.name if self.source else None
+
     # Self-referencing duplicate relationships
     duplicate_of = relationship(
         "Article",

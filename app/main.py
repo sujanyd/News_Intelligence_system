@@ -37,8 +37,11 @@ def create_application() -> FastAPI:
     # Health check endpoint directly accessible at /health
     application.include_router(health.router)
 
-    # Versioned API routes accessible at /api/v1 (e.g., /api/v1/health)
+    # Versioned API routes accessible at /api/v1 (e.g., /api/v1/sources, /api/v1/articles)
     application.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
+
+    # API routes accessible at /api (e.g., /api/sources, /api/articles) matching frontend default prefix
+    application.include_router(api_v1_router, prefix="/api")
 
     @application.get("/", tags=["Root"])
     async def root():

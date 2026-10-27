@@ -55,7 +55,9 @@ news_intellegence_AP_project/
 │   │       ├── router.py                # Central v1 router combining all sub-routers
 │   │       └── endpoints/
 │   │           ├── __init__.py
-│   │           └── health.py            # Health-check endpoint (GET /health)
+│   │           ├── health.py            # Health-check endpoint (GET /health)
+│   │           ├── sources.py           # News sources endpoints (GET, POST /api/sources)
+│   │           └── articles.py          # Articles endpoints (GET, POST /api/articles)
 │   │
 │   ├── core/                            # Application configuration
 │   │   ├── __init__.py
@@ -93,8 +95,10 @@ news_intellegence_AP_project/
 │   │   └── report.py                    # REPORT table model
 │   │
 │   ├── schemas/                         # Pydantic schemas (request/response validation)
-│   │   ├── __init__.py
-│   │   └── health.py                    # HealthCheckResponse schema
+│   │   ├── __init__.py                  # Exports all validation models
+│   │   ├── health.py                    # HealthCheckResponse schema
+│   │   ├── news_source.py               # NewsSourceBase, Create, Response schemas
+│   │   └── article.py                   # ArticleCreate, SummaryResponse, DetailResponse schemas
 │   │
 │   └── services/                        # Business logic & analysis algorithms
 │       └── __init__.py                  # News scraping, bias classification, framing logic
@@ -109,7 +113,8 @@ news_intellegence_AP_project/
 │   ├── __init__.py
 │   ├── conftest.py                      # Pytest fixtures (TestClient, DB session, foreign key pragma)
 │   ├── test_health.py                   # Health-check endpoint unit tests
-│   └── test_database.py                 # Comprehensive database models & constraint tests
+│   ├── test_database.py                 # Comprehensive database models & constraint tests
+│   └── test_api_endpoints.py            # News sources and articles API endpoint tests
 │
 ├── .env.example                         # Template for required environment variables
 ├── .gitignore                           # Excludes virtual envs, secrets, and cache files
@@ -215,15 +220,19 @@ erDiagram
 
 | File / Folder | Purpose in Simple Terms |
 | :--- | :--- |
-| `app/main.py` | The starting point of the backend. It creates the FastAPI app, configures CORS middleware, mounts routers, and defines the root endpoint. |
+| `app/main.py` | The starting point of the backend. It creates the FastAPI app, configures CORS middleware, mounts routers at `/api` and `/api/v1`, and defines root/health routes. |
 | `app/core/config.py` | Reads settings from your `.env` file (like database URL and app name) and makes them safely accessible with default values. |
 | `app/models/` | Contains all 21 SQLAlchemy ORM models defining tables, relationships, check constraints, and composite foreign keys. |
+| `app/schemas/` | Pydantic v2 schemas validating request payloads and structuring serialized API responses. |
+| `app/api/v1/endpoints/sources.py` | REST API router for news sources (`GET /api/sources`, `GET /api/sources/{id}`, `POST /api/sources`). |
+| `app/api/v1/endpoints/articles.py` | REST API router for articles (`GET /api/articles` with pagination and source filtering, `GET /api/articles/{id}`, `POST /api/articles`). |
 | `app/db/session.py` | Prepares the connection to PostgreSQL/SQLite. Provides `get_db()` which gives each API request an isolated database session. |
 | `app/db/init_db.py` | Reproducible script to create all 21 database tables in the configured database without needing raw SQL. |
 | `app/db/seed.py` | Populates rich sample data across all 21 tables (Sources, Articles, Embeddings, Analyses, Entities, Comparisons, and Reports). |
 | `alembic/versions/` | Stores version-controlled database migrations (`0001_initial_core_tables` and `0002_remaining_tables_and_constraints`). |
 | `docker-compose.yml` | Spins up a local PostgreSQL 16 container with one command. |
 | `frontend/` | React + Vite web interface with modular navigation (Dashboard, Articles, Comparisons, Reports) and configurable API client. |
+| `tests/test_api_endpoints.py` | Integration tests verifying source and article endpoints, duplicate prevention, pagination, and error handling. |
 | `tests/test_database.py` | Comprehensive test suite verifying all 21 tables, foreign keys, unique constraints, check constraints, and relationships. |
 
 ---
@@ -370,9 +379,185 @@ Once running, you can access:
 
 ---
 
-## 🧪 10. Running Automated Tests
+## 📡 10. API Endpoints & Usage Guide
 
-Run the full test suite using `pytest`:
+The backend exposes RESTful endpoints supporting both `/api` (default frontend prefix) and `/api/v1` (versioned REST standard) prefixes. Interactive API documentation is available at `/docs` (Swagger UI) and `/redoc` (ReDoc).
+
+### News Sources Endpoints
+
+#### 1. List News Sources
+- **Route**: `GET /api/sources` (or `GET /api/v1/sources`)
+- **Query Parameters**:
+  - `limit` *(optional, integer)*: Maximum number of sources to return (1-100).
+  - `offset` *(optional, integer)*: Number of sources to skip (default `0`).
+- **Response** (`200 OK`):
+```json
+[
+  {
+    "id": 1,
+    "name": "Reuters",
+    "base_url": "https://www.reuters.com",
+    "created_at": "2026-10-27T08:00:00Z"
+  },
+  {
+    "id": 2,
+    "name": "The Hindu",
+    "base_url": "https://www.thehindu.com",
+    "created_at": "2026-10-27T08:15:00Z"
+  }
+]
+```
+
+#### 2. Retrieve a News Source
+- **Route**: `GET /api/sources/{source_id}`
+- **Response** (`200 OK`):
+```json
+{
+  "id": 1,
+  "name": "Reuters",
+  "base_url": "https://www.reuters.com",
+  "created_at": "2026-10-27T08:00:00Z"
+}
+```
+- **Error Response** (`404 Not Found`):
+```json
+{
+  "detail": "News source with ID 99 not found"
+}
+```
+
+#### 3. Create a News Source
+- **Route**: `POST /api/sources`
+- **Request Body**:
+```json
+{
+  "name": "Associated Press",
+  "base_url": "https://apnews.com"
+}
+```
+- **Response** (`201 Created`):
+```json
+{
+  "id": 3,
+  "name": "Associated Press",
+  "base_url": "https://apnews.com",
+  "created_at": "2026-10-27T09:30:00Z"
+}
+```
+- **Duplicate Name Error** (`409 Conflict`):
+```json
+{
+  "detail": "News source with this name already exists"
+}
+```
+
+---
+
+### Articles Endpoints
+
+#### 4. List Articles (with Pagination & Source Filtering)
+- **Route**: `GET /api/articles`
+- **Query Parameters**:
+  - `source_id` *(optional, integer)*: Filter articles by publishing source ID.
+  - `limit` *(optional, integer, default 50, max 100)*: Number of articles per page.
+  - `offset` *(optional, integer, default 0)*: Number of articles to skip.
+- **Optimization Note**: Article listings omit the heavy `content` body text to keep network payloads lightweight and fast (Requirement 9).
+- **Response** (`200 OK`):
+```json
+[
+  {
+    "id": 101,
+    "source_id": 1,
+    "source_name": "Reuters",
+    "event_id": null,
+    "title": "Global Leaders Conclude Trade Summit with Landmark Pact",
+    "url": "https://www.reuters.com/world/trade-summit-agreement-2026",
+    "content_availability": "full_text",
+    "published_at": "2026-10-27T06:00:00Z",
+    "retrieved_at": "2026-10-27T06:30:00Z",
+    "created_at": "2026-10-27T06:30:00Z"
+  }
+]
+```
+
+#### 5. Retrieve an Article by ID
+- **Route**: `GET /api/articles/{article_id}`
+- **Response** (`200 OK`, includes full content and deduplication metadata):
+```json
+{
+  "id": 101,
+  "source_id": 1,
+  "source_name": "Reuters",
+  "event_id": null,
+  "title": "Global Leaders Conclude Trade Summit with Landmark Pact",
+  "url": "https://www.reuters.com/world/trade-summit-agreement-2026",
+  "content": "Representatives from forty nations signed a comprehensive tariff reduction treaty on Monday...",
+  "content_availability": "full_text",
+  "canonical_url": null,
+  "content_hash": "a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890",
+  "duplicate_of_article_id": null,
+  "published_at": "2026-10-27T06:00:00Z",
+  "retrieved_at": "2026-10-27T06:30:00Z",
+  "created_at": "2026-10-27T06:30:00Z"
+}
+```
+- **Error Response** (`404 Not Found`):
+```json
+{
+  "detail": "Article with ID 999 not found"
+}
+```
+
+#### 6. Create an Article Manually
+- **Route**: `POST /api/articles`
+- **Request Body**:
+```json
+{
+  "source_id": 1,
+  "title": "Clean Energy Grid Upgrades Receive Approval",
+  "content": "Regulatory commissions today approved a multi-billion dollar framework...",
+  "url": "https://www.reuters.com/sustainability/grid-upgrades-2026",
+  "content_availability": "full_text",
+  "published_at": "2026-10-27T07:15:00Z"
+}
+```
+- **Response** (`201 Created`):
+```json
+{
+  "id": 102,
+  "source_id": 1,
+  "source_name": "Reuters",
+  "event_id": null,
+  "title": "Clean Energy Grid Upgrades Receive Approval",
+  "content": "Regulatory commissions today approved a multi-billion dollar framework...",
+  "url": "https://www.reuters.com/sustainability/grid-upgrades-2026",
+  "content_availability": "full_text",
+  "canonical_url": null,
+  "content_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "duplicate_of_article_id": null,
+  "published_at": "2026-10-27T07:15:00Z",
+  "retrieved_at": "2026-10-27T07:20:00Z",
+  "created_at": "2026-10-27T07:20:00Z"
+}
+```
+- **Duplicate URL Error** (`409 Conflict`):
+```json
+{
+  "detail": "Article with this URL already exists"
+}
+```
+- **Invalid Foreign Key** (`404 Not Found`):
+```json
+{
+  "detail": "News source with ID 999 not found"
+}
+```
+
+---
+
+## 🧪 11. Running Automated Tests
+
+Run the full automated test suite (36 tests) using `pytest`:
 
 ```bash
 pytest -v
@@ -380,31 +565,49 @@ pytest -v
 
 Expected output:
 ```text
-tests/test_database.py::test_create_news_source PASSED                   [  5%]
-tests/test_database.py::test_news_source_unique_name_constraint PASSED   [ 11%]
-tests/test_database.py::test_create_story_and_event_relationship PASSED  [ 16%]
-tests/test_database.py::test_create_article_with_source_and_event PASSED [ 22%]
-tests/test_database.py::test_event_time_independent_from_article_timestamps PASSED [ 27%]
-tests/test_database.py::test_seed_database_function PASSED               [ 33%]
-tests/test_database.py::test_all_21_tables_represented_in_schema PASSED  [ 38%]
-tests/test_database.py::test_article_content_availability_and_duplicate_detection PASSED [ 44%]
-tests/test_database.py::test_article_embedding_metadata_and_constraints PASSED [ 50%]
-tests/test_database.py::test_article_match_pair_ordering_and_constraints PASSED [ 55%]
-tests/test_database.py::test_article_analysis_and_evidence_tables PASSED [ 61%]
-tests/test_database.py::test_entities_aliases_and_analysis_entities PASSED [ 66%]
-tests/test_database.py::test_news_comparison_and_composite_fk_constraints PASSED [ 72%]
-tests/test_database.py::test_ai_detection_result_model PASSED            [ 77%]
-tests/test_database.py::test_report_model_and_comparison_relationship PASSED [ 83%]
-tests/test_health.py::test_health_check_endpoint PASSED                  [ 88%]
-tests/test_health.py::test_versioned_health_check_endpoint PASSED        [ 94%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_list_sources_empty PASSED [  2%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_success PASSED [  5%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_duplicate_conflict PASSED [  8%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_validation_errors PASSED [ 11%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_get_source_by_id_success PASSED [ 13%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_get_source_by_id_not_found PASSED [ 16%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_list_sources_ordered_and_paginated PASSED [ 19%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_empty PASSED [ 22%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_success PASSED [ 25%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_duplicate_url_conflict PASSED [ 27%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_missing_source PASSED [ 30%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_invalid_inputs PASSED [ 33%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_get_article_by_id_success PASSED [ 36%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_get_article_by_id_not_found PASSED [ 38%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_omits_content PASSED [ 41%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_filter_by_source PASSED [ 44%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_pagination PASSED [ 47%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_api_v1_and_api_prefix_parity PASSED [ 50%]
+tests/test_database.py::test_create_news_source PASSED                   [ 52%]
+tests/test_database.py::test_news_source_unique_name_constraint PASSED   [ 55%]
+tests/test_database.py::test_create_story_and_event_relationship PASSED  [ 58%]
+tests/test_database.py::test_create_article_with_source_and_event PASSED [ 61%]
+tests/test_database.py::test_event_time_independent_from_article_timestamps PASSED [ 63%]
+tests/test_database.py::test_seed_database_function PASSED               [ 66%]
+tests/test_database.py::test_all_21_tables_represented_in_schema PASSED  [ 69%]
+tests/test_database.py::test_article_content_availability_and_duplicate_detection PASSED [ 72%]
+tests/test_database.py::test_article_embedding_metadata_and_constraints PASSED [ 75%]
+tests/test_database.py::test_article_match_pair_ordering_and_constraints PASSED [ 77%]
+tests/test_database.py::test_article_analysis_and_evidence_tables PASSED [ 80%]
+tests/test_database.py::test_entities_aliases_and_analysis_entities PASSED [ 83%]
+tests/test_database.py::test_news_comparison_and_composite_fk_constraints PASSED [ 86%]
+tests/test_database.py::test_ai_detection_result_model PASSED            [ 88%]
+tests/test_database.py::test_report_model_and_comparison_relationship PASSED [ 91%]
+tests/test_health.py::test_health_check_endpoint PASSED                  [ 94%]
+tests/test_health.py::test_versioned_health_check_endpoint PASSED        [ 97%]
 tests/test_health.py::test_root_endpoint PASSED                          [100%]
 
-======================== 18 passed in 0.10s =========================
+======================== 36 passed in 0.22s =========================
 ```
 
 ---
 
-## 💻 11. Frontend Setup (React + Vite)
+## 💻 12. Frontend Setup (React + Vite)
 
 The frontend is a lightweight, responsive React single-page application built with Vite.
 
@@ -450,10 +653,11 @@ For detailed component documentation, check [frontend/README.md](frontend/README
 
 ---
 
-## 📋 12. Git Commands for this Commit
+## 📋 13. Git Commands for this Commit
 
 ```bash
 git add .
-git commit -m "feat: implement remaining database schema and constraints"
+git commit -m "feat: add article and news source API endpoints"
 git push origin main
 ```
+
