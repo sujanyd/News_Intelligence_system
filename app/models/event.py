@@ -39,6 +39,8 @@ class Event(Base):
     # Relationships
     story = relationship("Story", back_populates="events")
     articles = relationship("Article", back_populates="event")
+    comparisons = relationship("NewsComparison", back_populates="event")
 
     def __repr__(self) -> str:
         return f"<Event(id={self.id}, story_id={self.story_id}, precision='{self.event_time_precision}')>"
+

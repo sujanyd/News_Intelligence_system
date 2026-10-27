@@ -17,18 +17,29 @@ from app.db.session import get_db
 TEST_DB_URL = "sqlite:///:memory:"
 
 
+from sqlalchemy import event
+
 @pytest.fixture(scope="session")
 def test_engine():
     """
     Creates the database engine and tables for the test session.
+    Enables SQLite foreign key enforcement.
     """
     engine = create_engine(
         TEST_DB_URL,
         connect_args={"check_same_thread": False},
     )
+
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     Base.metadata.create_all(bind=engine)
     yield engine
     Base.metadata.drop_all(bind=engine)
+
 
 
 @pytest.fixture(scope="function")
