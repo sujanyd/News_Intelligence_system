@@ -14,9 +14,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set database URL dynamically from environment / settings if not already explicitly set
-if not config.get_main_option("sqlalchemy.url"):
-    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Set database URL dynamically from environment / settings
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # Set model MetaData object for 'autogenerate' support
 target_metadata = Base.metadata

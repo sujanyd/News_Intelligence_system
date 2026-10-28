@@ -267,101 +267,194 @@ Copy the example environment file to create your local `.env`:
 cp .env.example .env
 ```
 
-Default settings in `.env`:
+> **Security Note**: The `.env` file is excluded from Git tracking via `.gitignore` to prevent leaking database credentials, passwords, or secret tokens. Always configure local secrets in `.env`.
+
+Settings in `.env`:
 ```env
+# Application Settings
 PROJECT_NAME="News Bias and Framing Analysis System"
 API_V1_PREFIX="/api/v1"
 ENVIRONMENT="development"
 DEBUG=True
 HOST="0.0.0.0"
 PORT=8000
+
+# Database Settings (PostgreSQL)
+# Format: postgresql+psycopg://<username>:<password>@<host>:<port>/<database_name>
+# If port 5432 is already bound by an existing local service, use POSTGRES_PORT=5433
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgrespassword
+POSTGRES_DB=news_bias_db
 DATABASE_URL="postgresql+psycopg://postgres:postgrespassword@localhost:5432/news_bias_db"
+
+# Optional SQLite URL for quick local testing without PostgreSQL:
+# DATABASE_URL="sqlite:///./news_bias.db"
 ```
 
 ---
 
-## 🐘 7. PostgreSQL Database Setup
+## 🐘 7. PostgreSQL Database Setup & Initial Core Models
 
-You have two easy ways to run PostgreSQL for this project:
+### How to Create the Database and Configure Connections
 
-### Option A: Using Docker (Recommended)
+You can run PostgreSQL either through Docker (recommended) or via a native system service:
 
-If you have Docker installed, start a local PostgreSQL container in the background:
+#### Option A: Using Docker (Recommended)
 
+1. Start the PostgreSQL container:
+   ```bash
+   docker compose up -d
+   ```
+2. **Port Conflict Note**: If port `5432` is already in use on your host machine (e.g. by a native PostgreSQL installation), set `POSTGRES_PORT=5433` in `.env`. The `docker-compose.yml` automatically maps `${POSTGRES_PORT:-5432}:5432`, allowing you to connect seamlessly via port `5433` without port collisions:
+   ```env
+   POSTGRES_PORT=5433
+   DATABASE_URL="postgresql+psycopg://postgres:postgrespassword@localhost:5433/news_bias_db"
+   ```
+3. Stop the container when finished:
+   ```bash
+   docker compose down
+   ```
+
+#### Option B: Using Native PostgreSQL (Homebrew / macOS / Linux)
+
+If you have PostgreSQL installed natively:
 ```bash
-docker compose up -d
-```
-To stop the database container when finished:
-```bash
-docker compose down
-```
+# 1. Start the service
+brew services start postgresql@16  # On macOS Homebrew
+# sudo systemctl start postgresql  # On Ubuntu/Debian
 
-### Option B: Using Native PostgreSQL (Homebrew / macOS)
-
-If you prefer running PostgreSQL natively on macOS:
-```bash
-brew install postgresql@16
-brew services start postgresql@16
+# 2. Create the user and database
 createuser -s postgres
 createdb -U postgres news_bias_db
+
+# 3. Verify connection
+psql -U postgres -d news_bias_db -c "SELECT version();"
 ```
 
-### Option C: Quick Local Prototyping with SQLite
+#### Option C: Quick Local Prototyping with SQLite
 
-If PostgreSQL is not yet installed on your system, you can develop locally with SQLite by updating `.env`:
+If PostgreSQL is temporarily unavailable in your environment:
 ```env
 DATABASE_URL="sqlite:///./news_bias.db"
 ```
 
 ---
 
-## ⚙️ 8. Running Migrations & Seeding Sample Data
+### Initial Core Models Architecture
 
-### Apply Migrations (Alembic)
+The foundation of the intelligence system models news production across 4 core tables:
 
-To apply all migrations up to the latest revision (all 21 tables and constraints):
-
-```bash
-alembic upgrade head
+```
+[ NEWS_SOURCE ] 1 ──< publishes >── N [ ARTICLE ]
+                                           │
+                                           │ references (0..1)
+                                           ▼
+[ STORY ] 1 ──< encompasses >── N [ EVENT ]
 ```
 
-To inspect the current applied migration version:
-```bash
-alembic current
-```
+#### 1. `NEWS_SOURCE` Table (`news_sources`)
+Represents an editorial organization or media outlet (e.g. Reuters, BBC, AP).
+- `id` (`Integer`, Primary Key, Indexed)
+- `name` (`String(255)`, Unique, Indexed, Non-nullable): Official publisher name.
+- `base_url` (`String(512)`, Non-nullable): Publisher homepage domain.
+- `created_at` (`DateTime(timezone=True)`, Non-nullable, Default: `now()`): Record registration timestamp.
+- **Relationship**: `articles = relationship("Article", back_populates="source", cascade="all, delete-orphan")` (Deleting a source cascades to its published articles).
 
-To view the migration history:
-```bash
-alembic history --verbose
-```
+#### 2. `STORY` Table (`stories`)
+Represents an overarching news narrative, ongoing story, or developing topic (e.g., "2026 UN Climate Summit").
+- `id` (`Integer`, Primary Key, Indexed)
+- `title` (`String(512)`, Indexed, Non-nullable): Narrative title.
+- `created_at` (`DateTime(timezone=True)`, Non-nullable, Default: `now()`): Narrative creation timestamp.
+- **Relationship**: `events = relationship("Event", back_populates="story", cascade="all, delete-orphan")`.
 
-To roll back the last migration step:
-```bash
-alembic downgrade -1
-```
+#### 3. `EVENT` Table (`events`)
+Represents a specific, localized occurrence belonging to a story (e.g., "Signing of Treaty in Geneva on Oct 28").
+- `id` (`Integer`, Primary Key, Indexed)
+- `story_id` (`Integer`, Foreign Key -> `stories.id` ON DELETE CASCADE, Non-nullable, Indexed)
+- `event_time` (`DateTime(timezone=True)`, Nullable): When the real-world occurrence happened.
+- `event_time_precision` (`String(50)`, Nullable, Default: `'unknown'`): Indicates timestamp precision (`'exact'`, `'date'`, `'range'`, `'unknown'`).
+- `event_time_disagreement` (`Boolean`, Non-nullable, Default: `False`): Flag set to `True` if different reporting outlets dispute the event timeline.
+- **Relationships**: `story = relationship("Story", back_populates="events")`, `articles = relationship("Article", back_populates="event")`.
 
-To roll back all migrations to a completely clean state:
-```bash
-alembic downgrade base
-```
+#### 4. `ARTICLE` Table (`articles`)
+Represents an individual news report published by a source and optionally linked to a specific event.
+- `id` (`Integer`, Primary Key, Indexed)
+- `source_id` (`Integer`, Foreign Key -> `news_sources.id` ON DELETE CASCADE, Non-nullable, Indexed)
+- `event_id` (`Integer`, Foreign Key -> `events.id` ON DELETE SET NULL, Nullable, Indexed): Nullable so articles can exist before event clustering or if an event is deleted.
+- `title` (`String(512)`, Non-nullable): Article headline.
+- `content` (`Text`, Non-nullable): Body text of the news report.
+- `url` (`String(1024)`, Unique, Indexed, Non-nullable): Canonical URL prevents duplicate ingestion.
+- `published_at` (`DateTime(timezone=True)`, Nullable): Outlet's reported publication time.
+- `retrieved_at` (`DateTime(timezone=True)`, Non-nullable, Default: `now()`): Ingestion pipeline fetch time.
+- `created_at` (`DateTime(timezone=True)`, Non-nullable, Default: `now()`): Database row creation time.
+- **Relationships**: `source = relationship("NewsSource", back_populates="articles")`, `event = relationship("Event", back_populates="articles")`.
 
-### Direct Table Creation
+#### Key Design Decisions Explained
 
-Alternatively, you can initialize all 21 tables using the Python helper:
-
-```bash
-python -m app.db.init_db
-```
-
-### Seed Sample Data
-
-Populate the database with sample records demonstrating all functional modules:
-
-```bash
-python -m app.db.seed
-```
+1. **Why `DateTime(timezone=True)` across all timestamps?**
+   News reporting is global. Normalizing all datetimes to UTC with explicit timezone offsets eliminates ambiguous daylight-saving shifts and timezone confusion when comparing timelines across international outlets.
+2. **Why decouple `event_time`, `published_at`, and `retrieved_at`?**
+   - `event_time`: The physical real-world occurrence.
+   - `published_at`: When the media outlet published their report (often hours or days after the event).
+   - `retrieved_at`: When our scraping pipeline ingested the article.
+   - Decoupling these three values enables calculating **reporting lag** and identifying **chronological framing discrepancies**.
+3. **Why `event_time_precision` and `event_time_disagreement`?**
+   Breaking news often reports approximate dates ("Tuesday morning") or conflicting timelines across opposing news outlets. Modeling precision and disagreement as explicit attributes allows the system to flag disputed facts.
+4. **Why `url` is Unique and Indexed?**
+   Ensures idempotent data ingestion: re-running feed scrapers cannot accidentally insert duplicate articles.
+5. **Foreign Key Cascade Strategies**:
+   - `NEWS_SOURCE -> ARTICLE`: `ON DELETE CASCADE` (if a source is purged, its articles are purged).
+   - `STORY -> EVENT`: `ON DELETE CASCADE` (if a story narrative is removed, its sub-events are removed).
+   - `EVENT -> ARTICLE`: `ON DELETE SET NULL` (deleting an event does **not** destroy the news article; it simply unlinks it for re-clustering).
 
 ---
+
+## ⚙️ 8. Running Migrations, Verification & Seeding
+
+### Apply Database Migrations (Alembic)
+
+1. **Apply initial core tables migration (`0001_initial_core_tables`)**:
+   ```bash
+   alembic upgrade 0001_initial_core_tables
+   ```
+2. **Apply all migrations up to head**:
+   ```bash
+   alembic upgrade head
+   ```
+3. **Inspect current migration revision**:
+   ```bash
+   alembic current
+   ```
+4. **Rollback migration**:
+   ```bash
+   alembic downgrade -1     # Rollback one step
+   alembic downgrade base   # Rollback all migrations
+   ```
+
+### Run Step-by-Step PostgreSQL Verification Script
+
+A standalone verification script is provided in `scripts/verify_postgres.py` to validate the entire workflow end-to-end:
+```bash
+python scripts/verify_postgres.py
+```
+This script automatically:
+1. Tests the PostgreSQL live connection and prints the database name and server version.
+2. Inserts a sample `NEWS_SOURCE`.
+3. Inserts a sample `STORY`.
+4. Inserts a sample `EVENT` linked to the story.
+5. Inserts a sample `ARTICLE` linked to both the source and the event.
+6. Queries the database and verifies bi-directional foreign-key relationships.
+7. Verifies the FastAPI `/health` endpoint and cleans up test records.
+
+### Direct Table Creation & Seeding
+```bash
+# Alternative direct table creation (using SQLAlchemy metadata)
+python -m app.db.init_db
+
+# Populate rich sample data
+python -m app.db.seed
+```
 
 ## 💻 9. Running the Server
 
@@ -557,7 +650,7 @@ The backend exposes RESTful endpoints supporting both `/api` (default frontend p
 
 ## 🧪 11. Running Automated Tests
 
-Run the full automated test suite (36 tests) using `pytest`:
+Run the full automated test suite (37 tests) using `pytest`:
 
 ```bash
 pytest -v
@@ -568,41 +661,49 @@ Expected output:
 tests/test_api_endpoints.py::TestNewsSourcesAPI::test_list_sources_empty PASSED [  2%]
 tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_success PASSED [  5%]
 tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_duplicate_conflict PASSED [  8%]
-tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_validation_errors PASSED [ 11%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_validation_errors PASSED [ 10%]
 tests/test_api_endpoints.py::TestNewsSourcesAPI::test_get_source_by_id_success PASSED [ 13%]
 tests/test_api_endpoints.py::TestNewsSourcesAPI::test_get_source_by_id_not_found PASSED [ 16%]
-tests/test_api_endpoints.py::TestNewsSourcesAPI::test_list_sources_ordered_and_paginated PASSED [ 19%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_empty PASSED [ 22%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_success PASSED [ 25%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_list_sources_ordered_and_paginated PASSED [ 18%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_empty PASSED [ 21%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_success PASSED [ 24%]
 tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_duplicate_url_conflict PASSED [ 27%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_missing_source PASSED [ 30%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_invalid_inputs PASSED [ 33%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_get_article_by_id_success PASSED [ 36%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_get_article_by_id_not_found PASSED [ 38%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_omits_content PASSED [ 41%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_filter_by_source PASSED [ 44%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_pagination PASSED [ 47%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_api_v1_and_api_prefix_parity PASSED [ 50%]
-tests/test_database.py::test_create_news_source PASSED                   [ 52%]
-tests/test_database.py::test_news_source_unique_name_constraint PASSED   [ 55%]
-tests/test_database.py::test_create_story_and_event_relationship PASSED  [ 58%]
-tests/test_database.py::test_create_article_with_source_and_event PASSED [ 61%]
-tests/test_database.py::test_event_time_independent_from_article_timestamps PASSED [ 63%]
-tests/test_database.py::test_seed_database_function PASSED               [ 66%]
-tests/test_database.py::test_all_21_tables_represented_in_schema PASSED  [ 69%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_missing_source PASSED [ 29%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_invalid_inputs PASSED [ 32%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_get_article_by_id_success PASSED [ 35%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_get_article_by_id_not_found PASSED [ 37%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_omits_content PASSED [ 40%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_filter_by_source PASSED [ 43%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_pagination PASSED [ 45%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_api_v1_and_api_prefix_parity PASSED [ 48%]
+tests/test_database.py::test_create_news_source PASSED                   [ 51%]
+tests/test_database.py::test_news_source_unique_name_constraint PASSED   [ 54%]
+tests/test_database.py::test_create_story_and_event_relationship PASSED  [ 56%]
+tests/test_database.py::test_create_article_with_source_and_event PASSED [ 59%]
+tests/test_database.py::test_event_time_independent_from_article_timestamps PASSED [ 62%]
+tests/test_database.py::test_seed_database_function PASSED               [ 64%]
+tests/test_database.py::test_postgresql_live_connection_and_core_models PASSED [ 67%]
+tests/test_database.py::test_all_21_tables_represented_in_schema PASSED  [ 70%]
 tests/test_database.py::test_article_content_availability_and_duplicate_detection PASSED [ 72%]
 tests/test_database.py::test_article_embedding_metadata_and_constraints PASSED [ 75%]
-tests/test_database.py::test_article_match_pair_ordering_and_constraints PASSED [ 77%]
-tests/test_database.py::test_article_analysis_and_evidence_tables PASSED [ 80%]
+tests/test_database.py::test_article_match_pair_ordering_and_constraints PASSED [ 78%]
+tests/test_database.py::test_article_analysis_and_evidence_tables PASSED [ 81%]
 tests/test_database.py::test_entities_aliases_and_analysis_entities PASSED [ 83%]
 tests/test_database.py::test_news_comparison_and_composite_fk_constraints PASSED [ 86%]
-tests/test_database.py::test_ai_detection_result_model PASSED            [ 88%]
+tests/test_database.py::test_ai_detection_result_model PASSED            [ 89%]
 tests/test_database.py::test_report_model_and_comparison_relationship PASSED [ 91%]
 tests/test_health.py::test_health_check_endpoint PASSED                  [ 94%]
 tests/test_health.py::test_versioned_health_check_endpoint PASSED        [ 97%]
 tests/test_health.py::test_root_endpoint PASSED                          [100%]
 
-======================== 36 passed in 0.22s =========================
+======================== 37 passed in 0.32s =========================
+```
+
+### Direct PostgreSQL End-to-End Verification
+To test directly against the active PostgreSQL database:
+```bash
+python scripts/verify_postgres.py
+```
 ```
 
 ---

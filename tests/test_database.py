@@ -7,9 +7,13 @@ composite foreign keys, self-referencing duplicates, and evidence structures.
 """
 
 from datetime import datetime, timezone
+import uuid
 import pytest
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError, OperationalError
 
+from app.core.config import settings
 from app.models import (
     Base,
     NewsSource,
@@ -196,6 +200,90 @@ def test_seed_database_function(db_session):
     assert data["event"].articles[0].id == data["article"].id
     assert data["article"].source.name == "Reuters"
     assert data["article"].event.story.title == "Global Clean Energy Summit 2026"
+
+
+def test_postgresql_live_connection_and_core_models():
+    """
+    Live PostgreSQL Integration Test:
+    Verifies that the configured PostgreSQL database (from DATABASE_URL)
+    is reachable, accepts connections, and correctly supports CRUD operations
+    and foreign-key relationships across the four core models:
+    NewsSource -> Story -> Event -> Article.
+
+    Gracefully skips if PostgreSQL is not currently running or reachable.
+    """
+    if not settings.DATABASE_URL.startswith("postgresql"):
+        pytest.skip("Configured DATABASE_URL is not PostgreSQL.")
+
+    try:
+        engine = create_engine(settings.DATABASE_URL, connect_args={"connect_timeout": 3})
+        with engine.connect():
+            pass
+    except OperationalError as err:
+        pytest.skip(f"PostgreSQL server not reachable at {settings.DATABASE_URL}: {err}")
+
+    session_factory = sessionmaker(bind=engine)
+    session = session_factory()
+
+    try:
+        uid = str(uuid.uuid4())[:8]
+
+        # 1. Insert NewsSource
+        source = NewsSource(
+            name=f"PG Test Source {uid}",
+            base_url="https://example.org",
+        )
+        session.add(source)
+        session.flush()
+
+        # 2. Insert Story
+        story = Story(
+            title=f"PG Test Story Narrative {uid}",
+        )
+        session.add(story)
+        session.flush()
+
+        # 3. Insert Event associated with Story
+        event_time = datetime(2026, 10, 28, 12, 0, tzinfo=timezone.utc)
+        event = Event(
+            story_id=story.id,
+            event_time=event_time,
+            event_time_precision="exact",
+            event_time_disagreement=False,
+        )
+        session.add(event)
+        session.flush()
+
+        # 4. Insert Article associated with NewsSource and Event
+        pub_time = datetime(2026, 10, 28, 13, 15, tzinfo=timezone.utc)
+        article = Article(
+            source_id=source.id,
+            event_id=event.id,
+            title=f"PG Test Article Headline {uid}",
+            content="Sample article content validating PostgreSQL relational constraints.",
+            url=f"https://example.org/news/{uid}",
+            published_at=pub_time,
+        )
+        session.add(article)
+        session.commit()
+
+        # 5. Query and verify relationships
+        saved = session.query(Article).filter_by(id=article.id).first()
+        assert saved is not None
+        assert saved.source.name == f"PG Test Source {uid}"
+        assert saved.event.id == event.id
+        assert saved.event.story.title == f"PG Test Story Narrative {uid}"
+        assert len(saved.source.articles) == 1
+        assert len(saved.event.story.events) == 1
+
+        # 6. Cleanup test records
+        session.delete(article)
+        session.delete(event)
+        session.delete(story)
+        session.delete(source)
+        session.commit()
+    finally:
+        session.close()
 
 
 # =============================================================================
