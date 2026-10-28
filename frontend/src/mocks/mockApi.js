@@ -59,7 +59,16 @@ export async function postSource(newSource) {
   return savedSource
 }
 
-/** Pretend: GET /articles?source_id=&limit=&offset= */
+// Like the real backend: add the source's name to an article
+function withSourceName(article) {
+  const source = sources.find((item) => item.id === article.source_id)
+  return { ...article, source_name: source ? source.name : null }
+}
+
+/**
+ * Pretend: GET /articles?source_id=&limit=&offset=
+ * Like the real backend, list items have no "content" (only the details do).
+ */
 export async function getArticles({ source_id, limit, offset } = {}) {
   await wait()
   let result = articles
@@ -68,17 +77,21 @@ export async function getArticles({ source_id, limit, offset } = {}) {
   }
   const start = offset || 0
   const end = limit ? start + limit : undefined
-  return result.slice(start, end)
+  return result.slice(start, end).map((article) => {
+    const summary = withSourceName(article)
+    delete summary.content
+    return summary
+  })
 }
 
-/** Pretend: GET /articles/{id} */
+/** Pretend: GET /articles/{id} (includes the full content) */
 export async function getArticle(id) {
   await wait()
   const article = articles.find((item) => String(item.id) === String(id))
   if (!article) {
-    throw new ApiError('Article not found (HTTP 404)', 404)
+    throw new ApiError(`Article with ID ${id} not found (HTTP 404)`, 404)
   }
-  return article
+  return withSourceName(article)
 }
 
 /** Pretend: POST /articles */

@@ -53,31 +53,25 @@ export function toSource(raw) {
  * Checks one article.
  * Required: id and title. Everything else is optional.
  *
- * contentStatus is:
- *   'available' - the article has text
- *   'missing'   - the text is empty or null
- *   'unknown'   - the reply did not include the content field at all
+ * content_availability comes from the backend as
+ * 'full_text', 'summary_only' or 'headline_only' (null if it is missing).
+ * The article list does not include "content"; only GET /articles/{id} does.
  */
 export function toArticle(raw) {
   if (!isObject(raw) || raw.id === undefined || raw.id === null || typeof raw.title !== 'string') {
     throw new ApiError('The backend sent an article in an unexpected format.')
   }
 
-  let contentStatus = 'unknown'
-  if ('content' in raw) {
-    contentStatus = typeof raw.content === 'string' && raw.content.trim() !== '' ? 'available' : 'missing'
-  }
-
   return {
     id: raw.id,
     title: raw.title,
     source_id: raw.source_id ?? null,
-    // The Article model has no source name, only source_id; the page looks the name up
     source_name: typeof raw.source_name === 'string' ? raw.source_name : null,
     url: typeof raw.url === 'string' ? raw.url : '',
     published_at: raw.published_at ?? null,
     retrieved_at: raw.retrieved_at ?? null,
+    content_availability:
+      typeof raw.content_availability === 'string' ? raw.content_availability : null,
     content: typeof raw.content === 'string' ? raw.content : null,
-    contentStatus,
   }
 }

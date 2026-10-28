@@ -20,10 +20,10 @@ export function Sources() {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
 
-  // Goes up by 1 every time "Try again" is clicked, which loads the data again
+  // Goes up by 1 to load the list again ("Try again", or after adding a source)
   const [reloadCount, setReloadCount] = useState(0)
 
-  // Load the sources when the page opens (and again after "Try again")
+  // Load the sources when the page opens, and again whenever reloadCount changes
   useEffect(() => {
     fetchSources()
       .then((sourceList) => setSources(sourceList))
@@ -31,16 +31,17 @@ export function Sources() {
       .finally(() => setIsLoading(false))
   }, [reloadCount])
 
-  // "Try again" button: go back to the loading state and load again
-  function handleRetry() {
+  // Go back to the loading state and ask the backend for the list again
+  function reloadSources() {
     setIsLoading(true)
     setErrorMessage('')
     setReloadCount(reloadCount + 1)
   }
 
-  // When the form saves a new source, add it to the end of the list
-  function handleSourceAdded(newSource) {
-    setSources([...sources, newSource])
+  // After the form saves a new source, load the list again so it shows
+  // exactly what the backend has stored (in the backend's order)
+  function handleSourceAdded() {
+    reloadSources()
   }
 
   const columns = [
@@ -69,7 +70,7 @@ export function Sources() {
           type="error"
           title="Could not load sources."
           message={errorMessage}
-          onRetry={handleRetry}
+          onRetry={reloadSources}
         />
       )
     }

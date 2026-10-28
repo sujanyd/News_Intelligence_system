@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import Card from './Card'
 import StatusBadge from './StatusBadge'
+import ContentAvailabilityBadge from './ContentAvailabilityBadge'
 import LoadingState from './LoadingState'
 import AlertMessage from './AlertMessage'
 import { fetchArticle } from '../api/newsApi'
@@ -91,8 +92,10 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
           </div>
         </dl>
 
-        <h4 className="details-heading">Content</h4>
-        {article.contentStatus === 'available' ? (
+        <h4 className="details-heading">
+          Content <ContentAvailabilityBadge availability={article.content_availability} />
+        </h4>
+        {article.content && article.content.trim() !== '' ? (
           <p className="details-content">{article.content}</p>
         ) : (
           <StatusBadge variant="warning">Content not available for this article</StatusBadge>

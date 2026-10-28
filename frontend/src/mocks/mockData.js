@@ -52,6 +52,7 @@ export const MOCK_ARTICLES = [
     url: 'https://dailyledger.example/news/transport-budget',
     published_at: '2026-10-26T08:30:00Z',
     retrieved_at: '2026-10-26T09:00:00Z',
+    content_availability: 'full_text',
     content:
       'The city council voted on Monday to approve a larger budget for buses and trains. Supporters said the plan will reduce traffic, while some members asked how it will be paid for.',
   },
@@ -62,6 +63,7 @@ export const MOCK_ARTICLES = [
     url: 'https://globalwire.example/stories/council-transport-vote',
     published_at: '2026-10-26T09:10:00Z',
     retrieved_at: '2026-10-26T09:30:00Z',
+    content_availability: 'full_text',
     content:
       'After a debate that lasted more than four hours, the council passed the transport budget. Several members raised concerns about higher local taxes.',
   },
@@ -72,6 +74,7 @@ export const MOCK_ARTICLES = [
     url: 'https://metrotimes.example/local/bus-route-changes',
     published_at: '2026-10-25T17:45:00Z',
     retrieved_at: '2026-10-25T18:05:00Z',
+    content_availability: 'headline_only',
     content: null,
   },
   {
@@ -81,6 +84,7 @@ export const MOCK_ARTICLES = [
     url: 'https://civicpost.example/weather/weekend-rain',
     published_at: '2026-10-25T06:00:00Z',
     retrieved_at: '2026-10-25T06:20:00Z',
+    content_availability: 'full_text',
     content:
       'Weather officials expect heavy rain from Friday night until Sunday. Residents in low-lying areas are advised to stay alert for flood warnings.',
   },
@@ -91,6 +95,7 @@ export const MOCK_ARTICLES = [
     url: 'https://coastalherald.example/coast/storm-preparations',
     published_at: '2026-10-25T07:20:00Z',
     retrieved_at: '2026-10-25T07:40:00Z',
+    content_availability: 'full_text',
     content:
       'Boat owners along the coast are moving their boats to safer harbours ahead of the storm. Local leaders have opened two community shelters.',
   },
@@ -101,6 +106,7 @@ export const MOCK_ARTICLES = [
     url: 'https://dailyledger.example/education/new-scholarship',
     published_at: '2026-10-24T11:00:00Z',
     retrieved_at: '2026-10-24T11:15:00Z',
+    content_availability: 'full_text',
     content:
       'The state university will offer 200 new scholarships next year for students who are the first in their family to attend college.',
   },
@@ -111,6 +117,7 @@ export const MOCK_ARTICLES = [
     url: 'https://globalwire.example/business/electric-car-sales',
     published_at: '2026-10-24T13:40:00Z',
     retrieved_at: '2026-10-24T14:00:00Z',
+    content_availability: 'summary_only',
     content:
       'Sales of electric cars went up again last month. Industry groups say lower battery prices are one reason, but charging stations are still limited.',
   },
@@ -121,6 +128,7 @@ export const MOCK_ARTICLES = [
     url: 'https://metrotimes.example/community/library-hours',
     published_at: null,
     retrieved_at: '2026-10-23T16:10:00Z',
+    content_availability: 'full_text',
     content:
       'The central library will now stay open until 8 PM on Saturdays and Sundays, following requests from students preparing for exams.',
   },
@@ -131,6 +139,7 @@ export const MOCK_ARTICLES = [
     url: 'https://civicpost.example/health/emergency-wing',
     published_at: '2026-10-23T09:30:00Z',
     retrieved_at: '2026-10-23T09:50:00Z',
+    content_availability: 'headline_only',
     content: '',
   },
   {
@@ -140,6 +149,7 @@ export const MOCK_ARTICLES = [
     url: 'https://coastalherald.example/environment/beach-cleanup',
     published_at: '2026-10-22T15:00:00Z',
     retrieved_at: '2026-10-22T15:30:00Z',
+    content_availability: 'full_text',
     content:
       'More than 300 volunteers joined the weekend beach clean-up. Organisers said most of the waste was plastic bottles and food wrappers.',
   },
@@ -150,6 +160,7 @@ export const MOCK_ARTICLES = [
     url: 'https://dailyledger.example/economy/food-prices',
     published_at: '2026-10-21T10:20:00Z',
     retrieved_at: '2026-10-21T10:45:00Z',
+    content_availability: 'full_text',
     content:
       'Prices of everyday food items did not change much this month, even though fuel became more expensive. Shop owners warn that this may not last.',
   },
@@ -160,6 +171,7 @@ export const MOCK_ARTICLES = [
     url: 'https://globalwire.example/business/delivery-charges',
     published_at: '2026-10-21T12:05:00Z',
     retrieved_at: '2026-10-21T12:30:00Z',
+    content_availability: 'headline_only',
     content: null,
   },
 ]

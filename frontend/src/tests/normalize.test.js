@@ -32,11 +32,17 @@ describe('toSource', () => {
 })
 
 describe('toArticle', () => {
-  it('marks content as available, missing or unknown', () => {
-    expect(toArticle({ id: 1, title: 'A', content: 'Some text' }).contentStatus).toBe('available')
-    expect(toArticle({ id: 2, title: 'B', content: '' }).contentStatus).toBe('missing')
-    expect(toArticle({ id: 3, title: 'C', content: null }).contentStatus).toBe('missing')
-    expect(toArticle({ id: 4, title: 'D' }).contentStatus).toBe('unknown')
+  it('keeps content_availability from the backend', () => {
+    expect(toArticle({ id: 1, title: 'A', content_availability: 'full_text' }).content_availability)
+      .toBe('full_text')
+    expect(toArticle({ id: 2, title: 'B', content_availability: 'headline_only' }).content_availability)
+      .toBe('headline_only')
+  })
+
+  it('does not make up content or availability when they are missing', () => {
+    const article = toArticle({ id: 3, title: 'C' })
+    expect(article.content_availability).toBeNull()
+    expect(article.content).toBeNull()
   })
 
   it('fills missing optional fields with safe values', () => {

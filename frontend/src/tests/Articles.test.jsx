@@ -44,10 +44,20 @@ describe('Articles page', () => {
     render(<Articles />)
     const table = await screen.findByRole('table', { name: 'List of articles' })
 
-    // The source name comes from the sources list (articles only have source_id)
+    // source_name and content_availability come from the backend's article list
     expect(within(table).getAllByText('Daily Ledger').length).toBeGreaterThan(0)
-    expect(within(table).getAllByText('Available').length).toBeGreaterThan(0)
-    expect(within(table).getAllByText('Missing').length).toBeGreaterThan(0)
+    expect(within(table).getAllByText('Full text').length).toBeGreaterThan(0)
+    expect(within(table).getAllByText('Headline only').length).toBeGreaterThan(0)
+  })
+
+  it('shows "Not provided" when the backend sends no availability', async () => {
+    fetchArticles.mockResolvedValueOnce({
+      articles: [{ id: 1, title: 'Plain article', source_id: 1, source_name: 'Daily Ledger', content_availability: null }],
+      total: null,
+    })
+    render(<Articles />)
+
+    expect(await screen.findByText('Not provided')).toBeDefined()
   })
 
   it('clearly says it is showing mock data', async () => {
@@ -150,7 +160,18 @@ describe('Articles page', () => {
     expect(await screen.findByText(FIRST_TITLE)).toBeDefined()
     expect(screen.getByText('Source filter unavailable: Sources route missing')).toBeDefined()
     expect(screen.getByLabelText('Source').disabled).toBe(true)
-    // Without names, the source id is shown instead
-    expect(screen.getAllByText('Source #1').length).toBeGreaterThan(0)
+    // The names still show, because the article list includes source_name
+    expect(screen.getAllByText('Daily Ledger').length).toBeGreaterThan(0)
+  })
+
+  it('shows the source id when there is no source name anywhere', async () => {
+    fetchSources.mockRejectedValueOnce(new Error('Sources route missing'))
+    fetchArticles.mockResolvedValueOnce({
+      articles: [{ id: 1, title: 'No name article', source_id: 4, source_name: null, content_availability: 'full_text' }],
+      total: null,
+    })
+    render(<Articles />)
+
+    expect(await screen.findByText('Source #4')).toBeDefined()
   })
 })

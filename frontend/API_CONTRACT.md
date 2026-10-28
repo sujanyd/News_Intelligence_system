@@ -11,6 +11,32 @@
 
 **Real integration is operational.** The backend routes are fully functional and pass 36 unit/integration tests. Both `/api/...` and `/api/v1/...` prefixes are active.
 
+### Frontend end-to-end check (28 Oct 2026)
+
+Run in the browser with the real FastAPI app, a PostgreSQL 18 database
+(filled with `python -m app.db.seed` plus test records added through the API)
+and `VITE_USE_MOCK_DATA=false`:
+
+| Frontend feature | Result |
+| ---------------- | ------ |
+| Sources page loads `GET /api/sources` | ✅ Shows database records |
+| Add-source form → `POST /api/sources` | ✅ Saved in the database, success message, list reloaded |
+| Duplicate name | ✅ Shows "News source with this name already exists (HTTP 409)" |
+| Articles page loads `GET /api/articles?limit=6&offset=0` | ✅ Real titles, `source_name`, dates and `content_availability` |
+| Next page (`offset=5`) | ✅ Works |
+| Source filter (`source_id`) | ✅ Works; a source with no articles shows its empty state |
+| "View" → `GET /api/articles/{id}` | ✅ Shows full content |
+| Dashboard → `GET /health` | ✅ Works |
+| Phone layout | ✅ No sideways scrolling |
+
+### Open backend issue (for Person A)
+
+`alembic upgrade head` fails with `Can't load plugin: sqlalchemy.dialects:driver`.
+`alembic.ini` still has `sqlalchemy.url = driver://user:pass@localhost/dbname`,
+and `alembic/env.py` only uses `settings.DATABASE_URL` when that line is empty.
+Clearing the line (or always using the settings value) should fix it.
+`python -m app.db.seed` creates the tables directly, so it works in the meantime.
+
 ## Confirmed Specifications from Person A (Backend)
 
 1. **Path prefix**: Both `/api` and `/api/v1` are mounted. The frontend's default `VITE_API_PREFIX=/api` works seamlessly without changes.
@@ -59,22 +85,30 @@ Required by the frontend: `id`, `name`. Optional: `base_url`, `created_at`.
 
 POST body: `{ "name": "...", "base_url": "https://..." }`
 
-### Article
+### Article (real reply from `GET /api/articles`)
 
 ```json
 {
-  "id": 101,
+  "id": 1,
   "source_id": 1,
-  "title": "City council approves new budget for public transport",
-  "url": "https://dailyledger.example/news/transport-budget",
-  "published_at": "2026-10-26T08:30:00Z",
-  "retrieved_at": "2026-10-26T09:00:00Z",
-  "content": "The city council voted on Monday..."
+  "source_name": "Reuters",
+  "event_id": 1,
+  "title": "World Leaders Finalize Landmark Clean Energy Transition Pact",
+  "url": "https://www.reuters.com/sustainability/clean-energy-summit-2026-pact-signed",
+  "content_availability": "full_text",
+  "published_at": "2026-10-24T20:30:00+05:30",
+  "retrieved_at": "2026-10-28T11:16:04.157828+05:30",
+  "created_at": "2026-10-28T11:16:04.157831+05:30"
 }
 ```
 
-Required by the frontend: `id`, `title`. Optional: everything else
-(`source_name` too, if the backend wants to add it).
+`GET /api/articles/{id}` returns the same fields plus `content`,
+`canonical_url`, `content_hash` and `duplicate_of_article_id`.
+
+Required by the frontend: `id`, `title`. The Content column shows
+`content_availability` as **Full text**, **Summary only** or **Headline only**
+(or "Not provided" if missing). The frontend does not use `event_id`,
+`content_hash` or `duplicate_of_article_id` yet.
 
 ## Error handling in the frontend
 

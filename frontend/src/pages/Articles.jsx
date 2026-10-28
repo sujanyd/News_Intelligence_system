@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import PageHeader from '../components/PageHeader'
 import Card from '../components/Card'
-import StatusBadge from '../components/StatusBadge'
+import ContentAvailabilityBadge from '../components/ContentAvailabilityBadge'
 import EmptyState from '../components/EmptyState'
 import LoadingState from '../components/LoadingState'
 import AlertMessage from '../components/AlertMessage'
@@ -143,17 +143,9 @@ export function Articles() {
       render: (article) => formatDate(article.published_at),
     },
     {
-      key: 'content',
+      key: 'content_availability',
       label: 'Content',
-      render: (article) => {
-        if (article.contentStatus === 'available') {
-          return <StatusBadge variant="success">Available</StatusBadge>
-        }
-        if (article.contentStatus === 'missing') {
-          return <StatusBadge variant="warning">Missing</StatusBadge>
-        }
-        return <StatusBadge variant="info">Not in list</StatusBadge>
-      },
+      render: (article) => <ContentAvailabilityBadge availability={article.content_availability} />,
     },
     {
       key: 'actions',

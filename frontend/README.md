@@ -112,12 +112,21 @@ cp .env.example .env
 
 ### Connecting to the backend
 
-1. Start the backend from the project root (see the main README), so it runs at `http://localhost:8000`.
-2. In `frontend/.env`, set `VITE_API_BASE_URL=http://localhost:8000` and `VITE_USE_MOCK_DATA=false`.
-3. Start the frontend and click **Check Backend Connection** on the Dashboard. It calls `GET /health`.
-4. If the backend runs on another computer or port, change `VITE_API_BASE_URL` to match. The backend must allow the frontend's address in its CORS settings (`app/main.py`).
+1. Start PostgreSQL and fill it with sample data, from the project root:
+   ```bash
+   docker compose up -d
+   python -m app.db.seed
+   ```
+2. Start the backend from the project root so it runs at `http://localhost:8000`:
+   ```bash
+   uvicorn app.main:app --reload --port 8000
+   ```
+3. In `frontend/.env`, set `VITE_API_BASE_URL=http://localhost:8000`, `VITE_API_PREFIX=/api` and `VITE_USE_MOCK_DATA=false`.
+4. Start the frontend and click **Check Backend Connection** on the Dashboard. It calls `GET /health`.
+5. Open **Sources** and **Articles**: they now show the records stored in the database.
+6. If the backend runs on another computer or port, change `VITE_API_BASE_URL` to match. The backend must allow the frontend's address in its CORS settings (`app/main.py`).
 
-> **Current status**: the backend does not have the article and source routes yet, so in live mode those pages show a clear "no route" error. Use `VITE_USE_MOCK_DATA=true` to work on the screens until the routes are ready. See [`API_CONTRACT.md`](API_CONTRACT.md).
+> **Status**: the Articles and Sources pages were tested end to end with the real backend and PostgreSQL on 28 Oct 2026. See [`API_CONTRACT.md`](API_CONTRACT.md) for the results and one open backend issue (Alembic migrations).
 
 ### 3. Start Development Server
 

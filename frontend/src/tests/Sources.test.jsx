@@ -21,6 +21,7 @@ function fillAndSubmitForm(name, baseUrl) {
 describe('Sources page', () => {
   beforeEach(() => {
     resetMockData()
+    vi.clearAllMocks()
   })
 
   it('shows loading first, then each source name and base URL', async () => {
@@ -52,14 +53,17 @@ describe('Sources page', () => {
     expect(screen.getByText('Base URL must start with http:// or https://')).toBeDefined()
   })
 
-  it('adds a valid source, shows success and clears the form', async () => {
+  it('adds a valid source, shows success, clears the form and reloads the list', async () => {
     render(<Sources />)
     await screen.findByRole('table')
+    expect(fetchSources).toHaveBeenCalledTimes(1)
 
     fillAndSubmitForm('Valley News', 'https://valleynews.example')
 
     expect(await screen.findByText('"Valley News" was added.')).toBeDefined()
-    const table = screen.getByRole('table')
+    // The list is loaded again from the API, and now includes the new source
+    const table = await screen.findByRole('table')
+    expect(fetchSources).toHaveBeenCalledTimes(2)
     expect(within(table).getByText('Valley News')).toBeDefined()
     expect(screen.getByText('6 sources')).toBeDefined()
     expect(screen.getByLabelText(/Source name/).value).toBe('')

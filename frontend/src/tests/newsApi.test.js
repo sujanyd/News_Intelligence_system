@@ -69,7 +69,9 @@ describe('newsApi in live mode', () => {
   })
 
   it('sends limit, offset and source_id when loading articles', async () => {
-    const fakeFetch = stubFetchJson(200, [{ id: 1, title: 'A', source_id: 3, content: 'x' }])
+    const fakeFetch = stubFetchJson(200, [
+      { id: 1, title: 'A', source_id: 3, source_name: 'Metro Times', content_availability: 'full_text' },
+    ])
     const api = await loadLiveApi()
 
     const result = await api.fetchArticles({ limit: 6, offset: 5, sourceId: '3' })
@@ -78,7 +80,8 @@ describe('newsApi in live mode', () => {
       'http://backend.test/api/articles?limit=6&offset=5&source_id=3'
     )
     expect(result.total).toBeNull()
-    expect(result.articles[0].contentStatus).toBe('available')
+    expect(result.articles[0].source_name).toBe('Metro Times')
+    expect(result.articles[0].content_availability).toBe('full_text')
   })
 
   it('reads the total when the backend sends { items, total }', async () => {
