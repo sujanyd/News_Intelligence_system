@@ -14,6 +14,12 @@ from app.schemas.article import (
     ArticleSummaryResponse,
     ArticleDetailResponse,
 )
+from app.schemas.ingestion import (
+    FeedConfigSchema,
+    IngestionRunRequest,
+    FeedResultDetail,
+    IngestionSummaryResponse,
+)
 
 __all__ = [
     "HealthCheckResponse",
@@ -24,4 +30,8 @@ __all__ = [
     "ArticleCreate",
     "ArticleSummaryResponse",
     "ArticleDetailResponse",
+    "FeedConfigSchema",
+    "IngestionRunRequest",
+    "FeedResultDetail",
+    "IngestionSummaryResponse",
 ]

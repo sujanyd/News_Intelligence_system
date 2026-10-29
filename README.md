@@ -226,6 +226,9 @@ erDiagram
 | `app/schemas/` | Pydantic v2 schemas validating request payloads and structuring serialized API responses. |
 | `app/api/v1/endpoints/sources.py` | REST API router for news sources (`GET /api/sources`, `GET /api/sources/{id}`, `POST /api/sources`). |
 | `app/api/v1/endpoints/articles.py` | REST API router for articles (`GET /api/articles` with pagination and source filtering, `GET /api/articles/{id}`, `POST /api/articles`). |
+| `app/api/v1/endpoints/ingestion.py` | REST API router for RSS ingestion (`POST /api/ingestion/run`, `GET /api/ingestion/feeds`). |
+| `app/services/rss_ingestion.py` | RSS ingestion engine: fetches feeds, normalizes URLs, computes SHA-256 hashes, deduplicates, and saves articles to PostgreSQL. |
+| `app/schemas/ingestion.py` | Pydantic validation schemas for RSS feed configs, execution requests, and run summary reports. |
 | `app/db/session.py` | Prepares the connection to PostgreSQL/SQLite. Provides `get_db()` which gives each API request an isolated database session. |
 | `app/db/init_db.py` | Reproducible script to create all 21 database tables in the configured database without needing raw SQL. |
 | `app/db/seed.py` | Populates rich sample data across all 21 tables (Sources, Articles, Embeddings, Analyses, Entities, Comparisons, and Reports). |
@@ -646,11 +649,69 @@ The backend exposes RESTful endpoints supporting both `/api` (default frontend p
 }
 ```
 
+### RSS Ingestion Endpoints
+
+#### 1. Trigger RSS Ingestion Run
+- **Route**: `POST /api/ingestion/run` (or `POST /api/v1/ingestion/run`)
+- **Request Body** *(optional)*:
+```json
+{
+  "max_articles_per_feed": 20
+}
+```
+*(Optionally provide a custom `"feeds": [{"source_name": "...", "base_url": "...", "feed_url": "..."}]` list to ingest specific feeds).*
+- **Response** (`200 OK`):
+```json
+{
+  "feeds_attempted": 5,
+  "feeds_successful": 5,
+  "articles_inserted": 24,
+  "articles_skipped_duplicate": 8,
+  "feed_errors": 0,
+  "details": [
+    {
+      "source_name": "BBC News",
+      "feed_url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+      "status": "success",
+      "articles_inserted": 6,
+      "articles_skipped_duplicate": 2,
+      "error": null
+    },
+    {
+      "source_name": "Reuters",
+      "feed_url": "https://www.reutersagency.com/feed/?taxonomy=best-sectors&post_type=best",
+      "status": "success",
+      "articles_inserted": 5,
+      "articles_skipped_duplicate": 1,
+      "error": null
+    }
+  ]
+}
+```
+
+#### 2. List Configured RSS Feeds
+- **Route**: `GET /api/ingestion/feeds` (or `GET /api/v1/ingestion/feeds`)
+- **Response** (`200 OK`):
+```json
+[
+  {
+    "source_name": "BBC News",
+    "base_url": "https://www.bbc.com",
+    "feed_url": "https://feeds.bbci.co.uk/news/world/rss.xml"
+  },
+  {
+    "source_name": "Reuters",
+    "base_url": "https://www.reuters.com",
+    "feed_url": "https://www.reutersagency.com/feed/?taxonomy=best-sectors&post_type=best"
+  }
+]
+```
+
 ---
 
 ## 🧪 11. Running Automated Tests
 
-Run the full automated test suite (37 tests) using `pytest`:
+Run the full automated test suite (57 tests) using `pytest`:
 
 ```bash
 pytest -v
@@ -658,52 +719,71 @@ pytest -v
 
 Expected output:
 ```text
-tests/test_api_endpoints.py::TestNewsSourcesAPI::test_list_sources_empty PASSED [  2%]
-tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_success PASSED [  5%]
-tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_duplicate_conflict PASSED [  8%]
-tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_validation_errors PASSED [ 10%]
-tests/test_api_endpoints.py::TestNewsSourcesAPI::test_get_source_by_id_success PASSED [ 13%]
-tests/test_api_endpoints.py::TestNewsSourcesAPI::test_get_source_by_id_not_found PASSED [ 16%]
-tests/test_api_endpoints.py::TestNewsSourcesAPI::test_list_sources_ordered_and_paginated PASSED [ 18%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_empty PASSED [ 21%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_success PASSED [ 24%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_duplicate_url_conflict PASSED [ 27%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_missing_source PASSED [ 29%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_invalid_inputs PASSED [ 32%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_get_article_by_id_success PASSED [ 35%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_get_article_by_id_not_found PASSED [ 37%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_omits_content PASSED [ 40%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_filter_by_source PASSED [ 43%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_pagination PASSED [ 45%]
-tests/test_articles_endpoints.py::TestArticlesAPI::test_api_v1_and_api_prefix_parity PASSED [ 48%]
-tests/test_database.py::test_create_news_source PASSED                   [ 51%]
-tests/test_database.py::test_news_source_unique_name_constraint PASSED   [ 54%]
-tests/test_database.py::test_create_story_and_event_relationship PASSED  [ 56%]
-tests/test_database.py::test_create_article_with_source_and_event PASSED [ 59%]
-tests/test_database.py::test_event_time_independent_from_article_timestamps PASSED [ 62%]
-tests/test_database.py::test_seed_database_function PASSED               [ 64%]
-tests/test_database.py::test_postgresql_live_connection_and_core_models PASSED [ 67%]
-tests/test_database.py::test_all_21_tables_represented_in_schema PASSED  [ 70%]
-tests/test_database.py::test_article_content_availability_and_duplicate_detection PASSED [ 72%]
-tests/test_database.py::test_article_embedding_metadata_and_constraints PASSED [ 75%]
-tests/test_database.py::test_article_match_pair_ordering_and_constraints PASSED [ 78%]
-tests/test_database.py::test_article_analysis_and_evidence_tables PASSED [ 81%]
-tests/test_database.py::test_entities_aliases_and_analysis_entities PASSED [ 83%]
-tests/test_database.py::test_news_comparison_and_composite_fk_constraints PASSED [ 86%]
-tests/test_database.py::test_ai_detection_result_model PASSED            [ 89%]
-tests/test_database.py::test_report_model_and_comparison_relationship PASSED [ 91%]
-tests/test_health.py::test_health_check_endpoint PASSED                  [ 94%]
-tests/test_health.py::test_versioned_health_check_endpoint PASSED        [ 97%]
-tests/test_health.py::test_root_endpoint PASSED                          [100%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_list_sources_empty PASSED [  1%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_success PASSED [  3%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_duplicate_conflict PASSED [  5%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_create_source_validation_errors PASSED [  7%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_get_source_by_id_success PASSED [  8%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_get_source_by_id_not_found PASSED [ 10%]
+tests/test_api_endpoints.py::TestNewsSourcesAPI::test_list_sources_ordered_and_paginated PASSED [ 12%]
+tests/test_api_endpoints.py::TestArticlesAPI::test_list_articles_empty PASSED [ 14%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_success PASSED [ 15%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_duplicate_url_conflict PASSED [ 17%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_missing_source PASSED [ 19%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_create_article_invalid_inputs PASSED [ 21%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_get_article_by_id_success PASSED [ 22%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_get_article_by_id_not_found PASSED [ 24%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_omits_content PASSED [ 26%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_filter_by_source PASSED [ 28%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_list_articles_pagination PASSED [ 29%]
+tests/test_articles_endpoints.py::TestArticlesAPI::test_api_v1_and_api_prefix_parity PASSED [ 31%]
+tests/test_database.py::test_create_news_source PASSED                   [ 33%]
+tests/test_database.py::test_news_source_unique_name_constraint PASSED   [ 35%]
+tests/test_database.py::test_create_story_and_event_relationship PASSED  [ 36%]
+tests/test_database.py::test_create_article_with_source_and_event PASSED [ 38%]
+tests/test_database.py::test_event_time_independent_from_article_timestamps PASSED [ 40%]
+tests/test_database.py::test_seed_database_function PASSED               [ 42%]
+tests/test_database.py::test_postgresql_live_connection_and_core_models SKIPPED [ 43%]
+tests/test_database.py::test_all_21_tables_represented_in_schema PASSED  [ 45%]
+tests/test_database.py::test_article_content_availability_and_duplicate_detection PASSED [ 47%]
+tests/test_database.py::test_article_embedding_metadata_and_constraints PASSED [ 49%]
+tests/test_database.py::test_article_match_pair_ordering_and_constraints PASSED [ 50%]
+tests/test_database.py::test_article_analysis_and_evidence_tables PASSED [ 52%]
+tests/test_database.py::test_entities_aliases_and_analysis_entities PASSED [ 54%]
+tests/test_database.py::test_news_comparison_and_composite_fk_constraints PASSED [ 56%]
+tests/test_database.py::test_ai_detection_result_model PASSED            [ 57%]
+tests/test_database.py::test_report_model_and_comparison_relationship PASSED [ 59%]
+tests/test_health.py::test_health_check_endpoint PASSED                  [ 61%]
+tests/test_health.py::test_versioned_health_check_endpoint PASSED        [ 63%]
+tests/test_health.py::test_root_endpoint PASSED                          [ 64%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_normalize_url_strips_tracking_params PASSED [ 66%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_normalize_url_lowercases_host_and_scheme PASSED [ 68%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_normalize_url_handles_empty_and_invalid PASSED [ 70%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_compute_content_hash PASSED [ 71%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_clean_html_text PASSED [ 73%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_clean_html_text_none_and_empty PASSED [ 75%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_parse_entry_published_at_rfc2822 PASSED [ 77%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_parse_entry_published_at_invalid_fallback PASSED [ 78%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_extract_entry_content_full_text PASSED [ 80%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_extract_entry_content_summary_only PASSED [ 82%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_extract_entry_content_headline_only PASSED [ 84%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_ingest_single_feed_success PASSED [ 85%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_duplicate_url_prevention PASSED [ 87%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_missing_and_invalid_fields_handled_safely PASSED [ 89%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_atom_feed_ingestion PASSED [ 91%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_multiple_feeds_orchestration PASSED [ 92%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_failed_feed_does_not_block_successful_feeds PASSED [ 94%]
+tests/test_rss_ingestion.py::TestIngestionAPIEndpoints::test_api_ingestion_run_success PASSED [ 96%]
+tests/test_rss_ingestion.py::TestIngestionAPIEndpoints::test_api_ingestion_network_failure_handling PASSED [ 98%]
+tests/test_rss_ingestion.py::TestIngestionAPIEndpoints::test_api_v1_and_api_prefix_parity PASSED [100%]
 
-======================== 37 passed in 0.32s =========================
+=================== 56 passed, 1 skipped in 0.25s ===================
 ```
 
 ### Direct PostgreSQL End-to-End Verification
 To test directly against the active PostgreSQL database:
 ```bash
 python scripts/verify_postgres.py
-```
 ```
 
 ---
