@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import Card from './Card'
 import StatusBadge from './StatusBadge'
 import AlertMessage from './AlertMessage'
+import DataTable from './DataTable'
 
 /**
  * IngestionPanel Component
@@ -14,11 +15,12 @@ import AlertMessage from './AlertMessage'
  *   save a history of runs (yet).
  *
  * @param {Object} props
- * @param {boolean} props.isAvailable - false when the backend has no collection endpoint
- * @param {() => Promise<{ counts: Array, errors: string[] | null }>} props.onRun - starts one run
- * @param {() => void} [props.onSuccess] - called after a successful run (to reload articles)
+ * @param {boolean} props.isAvailable - false when collection cannot run (e.g. mock mode)
+ * @param {string} [props.unavailableReason] - shown under the disabled button
+ * @param {() => Promise<{ counts: Array, feeds: Array }>} props.onRun - starts one run
+ * @param {() => void} [props.onSuccess] - called after a successful run (to reload the lists)
  */
-export function IngestionPanel({ isAvailable, onRun, onSuccess }) {
+export function IngestionPanel({ isAvailable, unavailableReason, onRun, onSuccess }) {
   const [isRunning, setIsRunning] = useState(false)
   const [result, setResult] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
@@ -39,16 +41,42 @@ export function IngestionPanel({ isAvailable, onRun, onSuccess }) {
     }
   }
 
+  // One row per feed in the result table
+  const feedColumns = [
+    { key: 'source_name', label: 'Feed', render: (feed) => <strong>{feed.source_name}</strong> },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (feed) => {
+        if (feed.status === 'success') return <StatusBadge variant="success">Success</StatusBadge>
+        if (feed.status === 'error') return <StatusBadge variant="warning">Failed</StatusBadge>
+        return feed.status || 'Not provided'
+      },
+    },
+    {
+      key: 'articles_inserted',
+      label: 'New',
+      render: (feed) => (feed.articles_inserted === null ? 'Not provided' : feed.articles_inserted),
+    },
+    {
+      key: 'articles_skipped_duplicate',
+      label: 'Duplicates',
+      render: (feed) =>
+        feed.articles_skipped_duplicate === null ? 'Not provided' : feed.articles_skipped_duplicate,
+    },
+    { key: 'error', label: 'Error', render: (feed) => feed.error || '-' },
+  ]
+
   const statusBadge = isAvailable ? (
-    <StatusBadge variant="success">Endpoint ready</StatusBadge>
+    <StatusBadge variant="success">Live backend</StatusBadge>
   ) : (
-    <StatusBadge variant="warning">Waiting for backend</StatusBadge>
+    <StatusBadge variant="warning">Not available</StatusBadge>
   )
 
   return (
     <Card
       title="News Collection"
-      subtitle="Fetch the latest articles from the RSS feeds of the configured sources"
+      subtitle="Fetch the latest articles from the backend's RSS feeds"
       badge={statusBadge}
     >
       <button
@@ -67,12 +95,13 @@ export function IngestionPanel({ isAvailable, onRun, onSuccess }) {
         )}
       </button>
 
-      {!isAvailable && (
-        <p className="ingestion-note">
-          Not available yet: the backend does not have a news collection endpoint.
-          The button will work once Person A adds it.
+      {isRunning && (
+        <p className="ingestion-note" role="status">
+          Reading every RSS feed. This can take up to a minute.
         </p>
       )}
+
+      {!isAvailable && unavailableReason && <p className="ingestion-note">{unavailableReason}</p>}
 
       {errorMessage && (
         <AlertMessage type="error" title="News collection failed." message={errorMessage} />
@@ -95,18 +124,10 @@ export function IngestionPanel({ isAvailable, onRun, onSuccess }) {
             <p className="ingestion-note">The backend did not send any counts for this run.</p>
           )}
 
-          {result.errors !== null && (
-            <div className="ingestion-errors">
-              <h4 className="details-heading">Feed errors ({result.errors.length})</h4>
-              {result.errors.length === 0 ? (
-                <p className="ingestion-note">No feed errors.</p>
-              ) : (
-                <ul>
-                  {result.errors.map((message, index) => (
-                    <li key={index}>{message}</li>
-                  ))}
-                </ul>
-              )}
+          {result.feeds.length > 0 && (
+            <div className="ingestion-feeds">
+              <h4 className="details-heading">Result for each feed</h4>
+              <DataTable columns={feedColumns} rows={result.feeds} caption="Result for each feed" />
             </div>
           )}
 

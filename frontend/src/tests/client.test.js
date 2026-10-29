@@ -107,6 +107,23 @@ describe('apiGet and apiPost', () => {
     expect(error.message).toBe('The backend took too long to respond. Please try again.')
   })
 
+  it('waits longer when a request asks for a longer timeout', async () => {
+    vi.useFakeTimers()
+    let wasCancelled = false
+    vi.stubGlobal('fetch', vi.fn((url, options) => new Promise(() => {
+      options.signal.addEventListener('abort', () => {
+        wasCancelled = true
+      })
+    })))
+
+    apiPost('/api/ingestion/run', {}, { timeoutMs: 60000 }).catch(() => {})
+    await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS)
+    expect(wasCancelled).toBe(false) // a normal request would have given up here
+
+    await vi.advanceTimersByTimeAsync(60000 - REQUEST_TIMEOUT_MS)
+    expect(wasCancelled).toBe(true)
+  })
+
   it('says clearly when the backend URL is not configured', async () => {
     vi.stubEnv('VITE_API_BASE_URL', '')
     vi.resetModules()

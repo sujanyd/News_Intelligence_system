@@ -76,21 +76,24 @@ export function toArticle(raw) {
   }
 }
 
-// The numbers a news collection run may report, and how the dashboard labels them.
-// PROPOSED names only: the backend has no collection endpoint yet (see API_CONTRACT.md).
+// The numbers POST /ingestion/run reports (app/schemas/ingestion.py), and their labels
 export const INGESTION_COUNT_LABELS = {
   feeds_attempted: 'Feeds attempted',
-  feeds_succeeded: 'Feeds processed successfully',
+  feeds_successful: 'Feeds processed successfully',
   articles_inserted: 'New articles inserted',
-  duplicates_skipped: 'Duplicate articles skipped',
+  articles_skipped_duplicate: 'Duplicate articles skipped',
+  feed_errors: 'Feed errors',
 }
 
 /**
  * Checks the reply of one news collection run.
  * Keeps only the counts the backend really sent, so nothing is made up.
  *
- * @returns {{ counts: Array<{ key: string, label: string, value: number }>, errors: string[] | null }}
- *   errors is null when the backend did not send any error information
+ * "details" has one entry per feed:
+ *   { source_name, feed_url, status: 'success' | 'error',
+ *     articles_inserted, articles_skipped_duplicate, error }
+ *
+ * @returns {{ counts: Array<{ key: string, label: string, value: number }>, feeds: Array }}
  */
 export function toIngestionResult(raw) {
   if (!isObject(raw)) {
@@ -104,15 +107,18 @@ export function toIngestionResult(raw) {
     }
   }
 
-  // Feed errors: a list of messages (text, or objects with a "message")
-  let errors = null
-  if (Array.isArray(raw.errors)) {
-    errors = raw.errors.map((item) => {
-      if (typeof item === 'string') return item
-      if (isObject(item) && typeof item.message === 'string') return item.message
-      return JSON.stringify(item)
-    })
-  }
+  const details = Array.isArray(raw.details) ? raw.details.filter(isObject) : []
+  const feeds = details.map((feed, index) => ({
+    id: index, // DataTable needs an id for each row
+    source_name: typeof feed.source_name === 'string' ? feed.source_name : 'Unknown feed',
+    feed_url: typeof feed.feed_url === 'string' ? feed.feed_url : '',
+    status: typeof feed.status === 'string' ? feed.status : null,
+    articles_inserted: Number.isInteger(feed.articles_inserted) ? feed.articles_inserted : null,
+    articles_skipped_duplicate: Number.isInteger(feed.articles_skipped_duplicate)
+      ? feed.articles_skipped_duplicate
+      : null,
+    error: typeof feed.error === 'string' ? feed.error : null,
+  }))
 
-  return { counts, errors }
+  return { counts, feeds }
 }

@@ -1046,14 +1046,8 @@
   color: var(--color-text-primary);
 }
 
-.ingestion-errors {
-  margin-top: 1rem;
-}
-
-.ingestion-errors ul {
-  padding-left: 1.25rem;
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
+.ingestion-feeds {
+  margin-top: 1.25rem;
 }
 
 /* Leave room for the sticky header when the details panel is scrolled into view */

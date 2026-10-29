@@ -128,12 +128,13 @@ cp .env.example .env
 3. In `frontend/.env`, set `VITE_API_BASE_URL=http://localhost:8000`, `VITE_API_PREFIX=/api` and `VITE_USE_MOCK_DATA=false`.
 4. Start the frontend and click **Check Backend Connection** on the Dashboard. It calls `GET /health`.
 5. On the **Dashboard**, **Recent Articles** shows the 5 newest articles and **News Sources** shows every source from the database. Click **View** on an article to load its full text.
+   Click **Run News Collection** to fetch real articles from the backend's RSS feeds (it can take up to a minute). The result shows the counts and one row per feed, and both lists reload. Run it again: the new articles are counted as duplicates.
 6. Open **Sources** and **Articles**: they show the same records, with paging and the add-source form.
 7. If the backend runs on another computer or port, change `VITE_API_BASE_URL` to match. The backend must allow the frontend's address in its CORS settings (`app/main.py`).
 
-> **Status**: the Dashboard, Articles and Sources pages were tested end to end with the real backend and PostgreSQL (28 and 29 Oct 2026). See [`API_CONTRACT.md`](API_CONTRACT.md) for the results.
+> **Status**: the Dashboard (including a real news collection run), Articles and Sources pages were tested end to end with the real backend and PostgreSQL (28 and 29 Oct 2026). See [`API_CONTRACT.md`](API_CONTRACT.md) for the results.
 >
-> **Blocked**: the backend has no news collection (RSS ingestion) endpoint yet, so **Run News Collection** on the Dashboard is disabled. `API_CONTRACT.md` lists what the frontend needs from Person A to turn it on.
+> **Run News Collection** is turned off while `VITE_USE_MOCK_DATA=true`, because it saves real articles.
 
 ### 3. Start Development Server
 

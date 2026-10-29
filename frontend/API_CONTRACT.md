@@ -1,6 +1,6 @@
 # Frontend ↔ Backend Contract (Articles and Sources)
 
-## Integration status (updated 27 Oct 2026)
+## Integration status (updated 29 Oct 2026)
 
 | What | Status |
 | ---- | ------ |
@@ -8,7 +8,7 @@
 | CORS for the Vite dev server | ✅ Works (`allow_origins=["*"]` in `app/main.py`) |
 | `GET /api/sources`, `POST /api/sources`, `GET /api/sources/{id}` | ✅ **Implemented & tested** (also mounted at `/api/v1/sources`) |
 | `GET /api/articles` (+ `source_id`, `limit`, `offset`), `GET /api/articles/{id}`, `POST /api/articles` | ✅ **Implemented & tested** (also mounted at `/api/v1/articles`) |
-| News collection (RSS ingestion) endpoint | ❌ **Not built yet**: the dashboard button is ready but disabled (see below) |
+| `POST /api/ingestion/run`, `GET /api/ingestion/feeds` | ✅ **Implemented** by Person A; the dashboard's **Run News Collection** button uses `POST /api/ingestion/run` |
 
 **Real integration is operational.** The backend routes are fully functional and pass 36 unit/integration tests. Both `/api/...` and `/api/v1/...` prefixes are active.
 
@@ -41,7 +41,9 @@ Same setup as above:
 | News Sources → `GET /api/sources` | ✅ Name, base URL and date added; the metric card shows the real count |
 | "View all articles" / "Manage sources" | ✅ Open the Articles / Sources pages |
 | Backend unreachable | ✅ Error message and **Try again** on both sections |
-| "Run News Collection" | ⏸ Disabled: no backend endpoint (`POST /api/ingestion/run` returns 404) |
+| "Run News Collection" → `POST /api/ingestion/run` | ✅ Real run: 5 feeds attempted, 2 successful, 50 new articles, 3 feed errors; articles and sources reloaded (3 → 5 sources) |
+| Running the collection again | ✅ 0 new, 50 duplicates skipped |
+| While running | ✅ Button disabled, "Collecting news...", second click ignored |
 | Phone layout | ✅ No sideways scrolling |
 
 ### Open backend issue (for Person A)
@@ -80,7 +82,7 @@ Pages never call `fetch` directly.
 | `fetchArticle(id)`  | GET    | `/api/articles/{article_id}`                     |
 | `createArticle()`   | POST   | `/api/articles`                                  |
 | `checkBackendHealth()` | GET | `/health` (exists today)                         |
-| `runNewsCollection()` | ? | **No route yet** (`INGESTION_ENDPOINT = null`)    |
+| `runNewsCollection()` | POST | `/api/ingestion/run` with body `{}`              |
 
 Pagination: the page shows 5 articles. It asks for `limit=6`, and if 6 come
 back it knows there is a next page. `offset = (page - 1) × 5`.
@@ -126,39 +128,46 @@ Required by the frontend: `id`, `title`. The Content column shows
 (or "Not provided" if missing). The frontend does not use `event_id`,
 `content_hash` or `duplicate_of_article_id` yet.
 
-## News collection (RSS ingestion): blocked
+## News collection (RSS ingestion)
 
-The backend has no ingestion route, and `news_sources` has no RSS feed URL
-column yet. So the dashboard's **Run News Collection** button is shown
-**disabled**, with the note "Not available yet". The frontend never pretends a
-run happened, and there is no mock version of it.
+`POST /api/ingestion/run` (from `app/api/v1/endpoints/ingestion.py`). The
+frontend sends an empty body `{}`, so the backend uses its own feed list
+(`DEFAULT_RSS_FEEDS` in `app/core/config.py`, also at `GET /api/ingestion/feeds`).
 
-When Person A builds it, the frontend needs:
+Real reply (shortened):
 
-1. The path and method (for example `POST /api/ingestion/run`). Put the path in
-   `INGESTION_ENDPOINT` in `src/api/newsApi.js`; the button then turns on.
-2. The reply. The dashboard shows only these fields, and only if they are in
-   the reply (names are a **proposal**, change `INGESTION_COUNT_LABELS` in
-   `src/api/normalize.js` if the backend uses others):
+```json
+{
+  "feeds_attempted": 5,
+  "feeds_successful": 2,
+  "articles_inserted": 50,
+  "articles_skipped_duplicate": 0,
+  "feed_errors": 3,
+  "details": [
+    { "source_name": "The Guardian", "feed_url": "https://www.theguardian.com/world/rss",
+      "status": "success", "articles_inserted": 30, "articles_skipped_duplicate": 0, "error": null }
+  ]
+}
+```
 
-   ```json
-   {
-     "feeds_attempted": 4,
-     "feeds_succeeded": 3,
-     "articles_inserted": 12,
-     "duplicates_skipped": 5,
-     "errors": ["Metro Times: feed timed out"]
-   }
-   ```
+What the dashboard does with it:
 
-   `errors` may hold text or objects with a `message`.
-3. Whether a run finishes inside the request (the frontend waits up to 10
-   seconds, `REQUEST_TIMEOUT_MS`) or is started in the background. A long run
-   needs a status route, or a longer timeout for this one call.
+- Shows the five counts (only the ones in the reply) and a table with one row
+  per feed: name, **Success** / **Failed**, new, duplicates and the error text.
+- Reloads Recent Articles and News Sources afterwards (a run can add sources).
+- Waits up to **2 minutes** (`INGESTION_TIMEOUT_MS`), because the backend reads
+  every feed before it answers. Other requests still wait 10 seconds.
+- Is **turned off in mock mode**, because a run saves real articles while the
+  pages would keep showing sample data.
+- Keeps the result only until the user leaves the page: the backend does not
+  store a history of runs. Source feed status is not shown for the same reason.
 
-The result is only shown until the user leaves the page, because the backend
-does not store a history of runs. Source feed status ("working" / "failing")
-is not shown for the same reason.
+### Seen during the real run (for Person A)
+
+- Reuters: `https://www.reutersagency.com/feed/?taxonomy=best-sectors&post_type=best`
+  redirects and then returns **404**, so that feed URL in `DEFAULT_RSS_FEEDS` needs changing.
+- BBC News and NPR News failed with "Connection reset by peer" on this test
+  network; they may work on another network.
 
 ## Error handling in the frontend
 

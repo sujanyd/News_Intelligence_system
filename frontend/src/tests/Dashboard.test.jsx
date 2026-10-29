@@ -5,9 +5,9 @@ import Dashboard from '../pages/Dashboard'
 import { fetchArticles, fetchSources, runNewsCollection } from '../api/newsApi'
 import { resetMockData } from '../mocks/mockApi'
 
-// The backend has no news collection endpoint yet, so in these tests we
-// pretend it exists (INGESTION_AVAILABLE = true) and replace runNewsCollection
-// with a fake one. Articles and sources come from the pretend backend.
+// Tests run in mock mode, where news collection is turned off. Here we turn it
+// on (INGESTION_AVAILABLE = true) and replace runNewsCollection with a fake one,
+// so no real RSS feed is ever read. Articles and sources come from the pretend backend.
 vi.mock('../api/newsApi', async (importOriginal) => {
   const realModule = await importOriginal()
   return {
@@ -108,12 +108,14 @@ describe('Dashboard', () => {
     expect(screen.getByText('Could not load sources')).toBeDefined()
   })
 
-  it('disables the button while collecting, then shows the result and reloads the articles', async () => {
+  it('disables the button while collecting, then shows the result and reloads the lists', async () => {
     const pendingRun = createPendingPromise()
     runNewsCollection.mockReturnValueOnce(pendingRun.promise)
     render(<Dashboard />)
     await screen.findByRole('table', { name: 'Most recent articles' })
+    await screen.findByRole('table', { name: 'Configured news sources' })
     expect(fetchArticles).toHaveBeenCalledTimes(1)
+    expect(fetchSources).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'Run News Collection' }))
 
@@ -127,21 +129,33 @@ describe('Dashboard', () => {
       counts: [
         { key: 'feeds_attempted', label: 'Feeds attempted', value: 4 },
         { key: 'articles_inserted', label: 'New articles inserted', value: 12 },
+        { key: 'feed_errors', label: 'Feed errors', value: 1 },
       ],
-      errors: ['Metro Times: feed timed out'],
+      feeds: [
+        { id: 0, source_name: 'BBC News', feed_url: 'https://bbc.example/rss', status: 'success',
+          articles_inserted: 12, articles_skipped_duplicate: 3, error: null },
+        { id: 1, source_name: 'Metro Times', feed_url: 'https://metro.example/rss', status: 'error',
+          articles_inserted: 0, articles_skipped_duplicate: 0, error: 'Connection timed out after 10s' },
+      ],
     })
 
     expect(await screen.findByText('News collection finished.')).toBeDefined()
     expect(screen.getByText('Feeds attempted')).toBeDefined()
-    expect(screen.getByText('12')).toBeDefined()
-    expect(screen.getByText('Feed errors (1)')).toBeDefined()
-    expect(screen.getByText('Metro Times: feed timed out')).toBeDefined()
+    expect(screen.getByText('Feed errors')).toBeDefined()
     // Counts the backend did not send are not shown
     expect(screen.queryByText('Duplicate articles skipped')).toBeNull()
 
-    // The article list is loaded again
+    const feedTable = screen.getByRole('table', { name: 'Result for each feed' })
+    expect(within(feedTable).getByText('BBC News')).toBeDefined()
+    expect(within(feedTable).getByText('Success')).toBeDefined()
+    expect(within(feedTable).getByText('Failed')).toBeDefined()
+    expect(within(feedTable).getByText('Connection timed out after 10s')).toBeDefined()
+
+    // Both lists are loaded again (a run can add articles and sources)
     await screen.findByRole('table', { name: 'Most recent articles' })
+    await screen.findByRole('table', { name: 'Configured news sources' })
     expect(fetchArticles).toHaveBeenCalledTimes(2)
+    expect(fetchSources).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('button', { name: 'Run News Collection' }).disabled).toBe(false)
   })
 

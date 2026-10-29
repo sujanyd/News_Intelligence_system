@@ -107,6 +107,12 @@ export function Dashboard({ onNavigate }) {
     setSourcesReloadCount(sourcesReloadCount + 1)
   }
 
+  // A collection run can add articles and new sources, so load both lists again
+  function handleCollectionFinished() {
+    reloadArticles()
+    reloadSources()
+  }
+
   function openPage(tab) {
     if (onNavigate) onNavigate(tab)
   }
@@ -329,8 +335,9 @@ export function Dashboard({ onNavigate }) {
       <section className="dashboard-section" style={{ marginTop: '2rem' }}>
         <IngestionPanel
           isAvailable={INGESTION_AVAILABLE}
+          unavailableReason="Turned off while the app shows mock data. Set VITE_USE_MOCK_DATA=false to collect real news."
           onRun={runNewsCollection}
-          onSuccess={reloadArticles}
+          onSuccess={handleCollectionFinished}
         />
       </section>
 

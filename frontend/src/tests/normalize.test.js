@@ -61,17 +61,26 @@ describe('toArticle', () => {
 
 describe('toIngestionResult', () => {
   it('keeps only the counts the backend sent', () => {
-    const result = toIngestionResult({ feeds_attempted: 3, articles_inserted: 0, something_else: 9 })
+    const result = toIngestionResult({ feeds_attempted: 5, articles_inserted: 0, something_else: 9 })
     expect(result.counts).toEqual([
-      { key: 'feeds_attempted', label: 'Feeds attempted', value: 3 },
+      { key: 'feeds_attempted', label: 'Feeds attempted', value: 5 },
       { key: 'articles_inserted', label: 'New articles inserted', value: 0 },
     ])
-    expect(result.errors).toBeNull()
+    expect(result.feeds).toEqual([])
   })
 
-  it('turns feed errors into messages', () => {
-    const result = toIngestionResult({ errors: ['timeout', { message: 'bad XML' }] })
-    expect(result.errors).toEqual(['timeout', 'bad XML'])
+  it('reads the per-feed details', () => {
+    const result = toIngestionResult({
+      details: [
+        { source_name: 'BBC News', feed_url: 'https://bbc.example/rss', status: 'error',
+          articles_inserted: 0, articles_skipped_duplicate: 0, error: 'HTTP 503' },
+        'not an object',
+      ],
+    })
+    expect(result.feeds).toEqual([
+      { id: 0, source_name: 'BBC News', feed_url: 'https://bbc.example/rss', status: 'error',
+        articles_inserted: 0, articles_skipped_duplicate: 0, error: 'HTTP 503' },
+    ])
   })
 
   it('rejects a reply that is not an object', () => {

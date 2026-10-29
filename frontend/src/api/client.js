@@ -71,10 +71,14 @@ export function readErrorDetail(body) {
  * @param {'GET' | 'POST'} [options.method='GET']
  * @param {Object} [options.body] - Data to send as JSON (for POST)
  * @param {Object} [options.query] - Values to add after "?" in the URL
+ * @param {number} [options.timeoutMs=REQUEST_TIMEOUT_MS] - How long to wait for an answer
  * @returns {Promise<any>} the parsed JSON
  * @throws {ApiError}
  */
-export async function apiRequest(path, { method = 'GET', body, query } = {}) {
+export async function apiRequest(
+  path,
+  { method = 'GET', body, query, timeoutMs = REQUEST_TIMEOUT_MS } = {}
+) {
   if (!API_BASE_URL) {
     throw new ApiError(
       'The backend URL is not set. Add VITE_API_BASE_URL to frontend/.env and restart the dev server.'
@@ -83,7 +87,7 @@ export async function apiRequest(path, { method = 'GET', body, query } = {}) {
 
   // Step 1: send the request (and stop waiting if it takes too long)
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   let response
   try {
     response = await fetch(buildUrl(path, query), {
@@ -150,6 +154,6 @@ export function apiGet(path, query) {
 }
 
 /** Shortcut for a POST request with a JSON body. */
-export function apiPost(path, body) {
-  return apiRequest(path, { method: 'POST', body })
+export function apiPost(path, body, { timeoutMs } = {}) {
+  return apiRequest(path, { method: 'POST', body, timeoutMs })
 }

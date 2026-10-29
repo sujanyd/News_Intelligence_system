@@ -5,12 +5,12 @@ import IngestionPanel from '../components/IngestionPanel'
 import { INGESTION_AVAILABLE } from '../api/newsApi'
 
 describe('IngestionPanel', () => {
-  it('is disabled and says why when the backend has no collection endpoint', () => {
-    render(<IngestionPanel isAvailable={false} onRun={vi.fn()} />)
+  it('is disabled and says why when collection is not available', () => {
+    render(<IngestionPanel isAvailable={false} unavailableReason="Turned off in mock mode." onRun={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: 'Run News Collection' }).disabled).toBe(true)
-    expect(screen.getByText('Waiting for backend')).toBeDefined()
-    expect(screen.getByText(/backend does not have a news collection endpoint/)).toBeDefined()
+    expect(screen.getByText('Not available')).toBeDefined()
+    expect(screen.getByText('Turned off in mock mode.')).toBeDefined()
   })
 
   it('is enabled when the endpoint is available', () => {
@@ -18,7 +18,8 @@ describe('IngestionPanel', () => {
     expect(screen.getByRole('button', { name: 'Run News Collection' }).disabled).toBe(false)
   })
 
-  it('matches the real backend today: no collection endpoint yet', () => {
+  it('is turned off in mock mode, so sample data never hides a real run', () => {
+    // Tests run with VITE_USE_MOCK_DATA=true
     expect(INGESTION_AVAILABLE).toBe(false)
   })
 })

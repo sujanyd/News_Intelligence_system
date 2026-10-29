@@ -142,18 +142,39 @@ describe('newsApi in live mode', () => {
     )
   })
 
+  it('runs news collection with POST /api/ingestion/run and reads the real reply', async () => {
+    const fakeFetch = stubFetchJson(200, {
+      feeds_attempted: 5,
+      feeds_successful: 4,
+      articles_inserted: 37,
+      articles_skipped_duplicate: 3,
+      feed_errors: 1,
+      details: [{ source_name: 'Reuters', feed_url: 'https://r.example/feed', status: 'error',
+        articles_inserted: 0, articles_skipped_duplicate: 0, error: 'HTTP 404' }],
+    })
+    const api = await loadLiveApi()
+    expect(api.INGESTION_AVAILABLE).toBe(true)
+
+    const result = await api.runNewsCollection()
+
+    const [url, options] = fakeFetch.mock.calls[0]
+    expect(url).toBe('http://backend.test/api/ingestion/run')
+    expect(options.method).toBe('POST')
+    expect(JSON.parse(options.body)).toEqual({})
+    expect(result.counts.map((count) => count.value)).toEqual([5, 4, 37, 3, 1])
+    expect(result.feeds[0].error).toBe('HTTP 404')
+  })
+
+  it('refuses to run news collection in mock mode', async () => {
+    const api = await import('../api/newsApi')
+    expect(api.INGESTION_AVAILABLE).toBe(false)
+    await expect(api.runNewsCollection()).rejects.toThrow('only works with the real backend')
+  })
+
   it('passes other backend errors on unchanged', async () => {
     stubFetchJson(404, { detail: 'Article not found' })
     const api = await loadLiveApi()
 
     await expect(api.fetchArticle(999)).rejects.toThrow('Article not found (HTTP 404)')
-  })
-})
-
-describe('runNewsCollection', () => {
-  it('refuses to run while the backend has no collection endpoint', async () => {
-    const api = await import('../api/newsApi')
-    expect(api.INGESTION_ENDPOINT).toBeNull()
-    await expect(api.runNewsCollection()).rejects.toThrow('News collection is not available yet')
   })
 })
