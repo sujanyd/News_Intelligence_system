@@ -8,6 +8,7 @@
 | CORS for the Vite dev server | ✅ Works (`allow_origins=["*"]` in `app/main.py`) |
 | `GET /api/sources`, `POST /api/sources`, `GET /api/sources/{id}` | ✅ **Implemented & tested** (also mounted at `/api/v1/sources`) |
 | `GET /api/articles` (+ `source_id`, `limit`, `offset`), `GET /api/articles/{id}`, `POST /api/articles` | ✅ **Implemented & tested** (also mounted at `/api/v1/articles`) |
+| News collection (RSS ingestion) endpoint | ❌ **Not built yet**: the dashboard button is ready but disabled (see below) |
 
 **Real integration is operational.** The backend routes are fully functional and pass 36 unit/integration tests. Both `/api/...` and `/api/v1/...` prefixes are active.
 
@@ -27,6 +28,20 @@ and `VITE_USE_MOCK_DATA=false`:
 | Source filter (`source_id`) | ✅ Works; a source with no articles shows its empty state |
 | "View" → `GET /api/articles/{id}` | ✅ Shows full content |
 | Dashboard → `GET /health` | ✅ Works |
+| Phone layout | ✅ No sideways scrolling |
+
+### Dashboard check (29 Oct 2026)
+
+Same setup as above:
+
+| Dashboard feature | Result |
+| ----------------- | ------ |
+| Recent Articles → `GET /api/articles?limit=5&offset=0` | ✅ Newest 5 articles with source, date and content badge |
+| "View" on a recent article → `GET /api/articles/{id}` | ✅ Details panel with full content |
+| News Sources → `GET /api/sources` | ✅ Name, base URL and date added; the metric card shows the real count |
+| "View all articles" / "Manage sources" | ✅ Open the Articles / Sources pages |
+| Backend unreachable | ✅ Error message and **Try again** on both sections |
+| "Run News Collection" | ⏸ Disabled: no backend endpoint (`POST /api/ingestion/run` returns 404) |
 | Phone layout | ✅ No sideways scrolling |
 
 ### Open backend issue (for Person A)
@@ -65,6 +80,7 @@ Pages never call `fetch` directly.
 | `fetchArticle(id)`  | GET    | `/api/articles/{article_id}`                     |
 | `createArticle()`   | POST   | `/api/articles`                                  |
 | `checkBackendHealth()` | GET | `/health` (exists today)                         |
+| `runNewsCollection()` | ? | **No route yet** (`INGESTION_ENDPOINT = null`)    |
 
 Pagination: the page shows 5 articles. It asks for `limit=6`, and if 6 come
 back it knows there is a next page. `offset = (page - 1) × 5`.
@@ -110,6 +126,40 @@ Required by the frontend: `id`, `title`. The Content column shows
 (or "Not provided" if missing). The frontend does not use `event_id`,
 `content_hash` or `duplicate_of_article_id` yet.
 
+## News collection (RSS ingestion): blocked
+
+The backend has no ingestion route, and `news_sources` has no RSS feed URL
+column yet. So the dashboard's **Run News Collection** button is shown
+**disabled**, with the note "Not available yet". The frontend never pretends a
+run happened, and there is no mock version of it.
+
+When Person A builds it, the frontend needs:
+
+1. The path and method (for example `POST /api/ingestion/run`). Put the path in
+   `INGESTION_ENDPOINT` in `src/api/newsApi.js`; the button then turns on.
+2. The reply. The dashboard shows only these fields, and only if they are in
+   the reply (names are a **proposal**, change `INGESTION_COUNT_LABELS` in
+   `src/api/normalize.js` if the backend uses others):
+
+   ```json
+   {
+     "feeds_attempted": 4,
+     "feeds_succeeded": 3,
+     "articles_inserted": 12,
+     "duplicates_skipped": 5,
+     "errors": ["Metro Times: feed timed out"]
+   }
+   ```
+
+   `errors` may hold text or objects with a `message`.
+3. Whether a run finishes inside the request (the frontend waits up to 10
+   seconds, `REQUEST_TIMEOUT_MS`) or is started in the background. A long run
+   needs a status route, or a longer timeout for this one call.
+
+The result is only shown until the user leaves the page, because the backend
+does not store a history of runs. Source feed status ("working" / "failing")
+is not shown for the same reason.
+
 ## Error handling in the frontend
 
 | Situation | What the user sees |
@@ -123,4 +173,4 @@ Required by the frontend: `id`, `title`. The Content column shows
 
 ## Not covered
 
-Semantic matching, AI analysis and comparison reports.
+Semantic matching, AI analysis, comparison reports and ingestion history.

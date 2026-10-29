@@ -149,3 +149,11 @@ describe('newsApi in live mode', () => {
     await expect(api.fetchArticle(999)).rejects.toThrow('Article not found (HTTP 404)')
   })
 })
+
+describe('runNewsCollection', () => {
+  it('refuses to run while the backend has no collection endpoint', async () => {
+    const api = await import('../api/newsApi')
+    expect(api.INGESTION_ENDPOINT).toBeNull()
+    await expect(api.runNewsCollection()).rejects.toThrow('News collection is not available yet')
+  })
+})

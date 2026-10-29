@@ -25,7 +25,7 @@ export function App() {
   const renderActivePage = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard />
+        return <Dashboard onNavigate={setActiveTab} />
       case 'articles':
         return <Articles />
       case 'sources':
@@ -35,7 +35,7 @@ export function App() {
       case 'reports':
         return <Reports />
       default:
-        return <Dashboard />
+        return <Dashboard onNavigate={setActiveTab} />
     }
   }
 

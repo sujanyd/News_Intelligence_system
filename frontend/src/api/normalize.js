@@ -75,3 +75,44 @@ export function toArticle(raw) {
     content: typeof raw.content === 'string' ? raw.content : null,
   }
 }
+
+// The numbers a news collection run may report, and how the dashboard labels them.
+// PROPOSED names only: the backend has no collection endpoint yet (see API_CONTRACT.md).
+export const INGESTION_COUNT_LABELS = {
+  feeds_attempted: 'Feeds attempted',
+  feeds_succeeded: 'Feeds processed successfully',
+  articles_inserted: 'New articles inserted',
+  duplicates_skipped: 'Duplicate articles skipped',
+}
+
+/**
+ * Checks the reply of one news collection run.
+ * Keeps only the counts the backend really sent, so nothing is made up.
+ *
+ * @returns {{ counts: Array<{ key: string, label: string, value: number }>, errors: string[] | null }}
+ *   errors is null when the backend did not send any error information
+ */
+export function toIngestionResult(raw) {
+  if (!isObject(raw)) {
+    throw new ApiError('The backend sent the news collection result in an unexpected format.')
+  }
+
+  const counts = []
+  for (const key of Object.keys(INGESTION_COUNT_LABELS)) {
+    if (Number.isInteger(raw[key])) {
+      counts.push({ key, label: INGESTION_COUNT_LABELS[key], value: raw[key] })
+    }
+  }
+
+  // Feed errors: a list of messages (text, or objects with a "message")
+  let errors = null
+  if (Array.isArray(raw.errors)) {
+    errors = raw.errors.map((item) => {
+      if (typeof item === 'string') return item
+      if (isObject(item) && typeof item.message === 'string') return item.message
+      return JSON.stringify(item)
+    })
+  }
+
+  return { counts, errors }
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toList, toSource, toArticle } from '../api/normalize'
+import { toList, toSource, toArticle, toIngestionResult } from '../api/normalize'
 
 describe('toList', () => {
   it('accepts a plain array', () => {
@@ -56,5 +56,25 @@ describe('toArticle', () => {
   it('throws when id or title is missing', () => {
     expect(() => toArticle({ id: 1 })).toThrow('article in an unexpected format')
     expect(() => toArticle([])).toThrow()
+  })
+})
+
+describe('toIngestionResult', () => {
+  it('keeps only the counts the backend sent', () => {
+    const result = toIngestionResult({ feeds_attempted: 3, articles_inserted: 0, something_else: 9 })
+    expect(result.counts).toEqual([
+      { key: 'feeds_attempted', label: 'Feeds attempted', value: 3 },
+      { key: 'articles_inserted', label: 'New articles inserted', value: 0 },
+    ])
+    expect(result.errors).toBeNull()
+  })
+
+  it('turns feed errors into messages', () => {
+    const result = toIngestionResult({ errors: ['timeout', { message: 'bad XML' }] })
+    expect(result.errors).toEqual(['timeout', 'bad XML'])
+  })
+
+  it('rejects a reply that is not an object', () => {
+    expect(() => toIngestionResult([1, 2])).toThrow('unexpected format')
   })
 })

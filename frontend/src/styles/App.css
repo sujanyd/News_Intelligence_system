@@ -1005,3 +1005,58 @@
   font-size: 0.75rem;
   color: var(--color-warning);
 }
+
+/* ==========================================================
+   Dashboard: news collection panel
+   ========================================================== */
+
+/* Small grey explanation text */
+.ingestion-note {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-top: 0.75rem;
+}
+
+.ingestion-result {
+  margin-top: 1rem;
+}
+
+/* The counts of one run, as small boxes side by side */
+.ingestion-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.ingestion-counts div {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.ingestion-counts dt {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.ingestion-counts dd {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.ingestion-errors {
+  margin-top: 1rem;
+}
+
+.ingestion-errors ul {
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+/* Leave room for the sticky header when the details panel is scrolled into view */
+.dashboard-details {
+  scroll-margin-top: 6rem;
+}

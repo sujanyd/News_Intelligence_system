@@ -28,11 +28,17 @@ describe('News Bias and Framing Analysis System - Dashboard & Navigation Tests',
     expect(screen.getByText('Comparisons completed')).toBeDefined()
   })
 
-  it('renders recent articles section with an informative empty state', () => {
+  it('renders the recent articles section with articles from the API', async () => {
     render(<App />)
     expect(screen.getByText('Recent Articles')).toBeDefined()
-    expect(screen.getByText('No articles collected yet')).toBeDefined()
-    expect(screen.getByText(/Articles will appear here after backend integration/i)).toBeDefined()
+    expect(await screen.findByRole('table', { name: 'Most recent articles' })).toBeDefined()
+  })
+
+  it('opens the Articles page from the dashboard "View all articles" button', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'View all articles' }))
+    expect(screen.getByRole('heading', { level: 1, name: 'Articles' })).toBeDefined()
+    await screen.findByRole('table', { name: 'List of articles' })
   })
 
   it('navigates seamlessly across all views when sidebar links are clicked', () => {

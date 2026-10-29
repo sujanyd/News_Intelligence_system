@@ -27,6 +27,7 @@ frontend/
 │   │   ├── Footer.jsx      # Application footer with backend indicator
 │   │   ├── FormField.jsx   # Label + input + error message
 │   │   ├── Header.jsx      # Top app header with breadcrumbs and mobile toggle
+│   │   ├── IngestionPanel.jsx # "Run News Collection" button and run result
 │   │   ├── LoadingState.jsx # Spinner with a loading message
 │   │   ├── MetricCard.jsx  # Metric KPI cards with placeholder tags
 │   │   ├── Navbar.jsx      # Navigation bar
@@ -41,10 +42,11 @@ frontend/
 │   │
 │   ├── utils/
 │   │   ├── formatDate.js   # Readable dates ("Not available" when missing)
+│   │   ├── getSourceName.js # Source name for an article (with fallbacks)
 │   │   └── validateSource.js # Checks for the add-source form
 │   │
 │   ├── pages/              # View pages corresponding to navigation tabs
-│   │   ├── Dashboard.jsx   # Metrics, recent articles empty state & pipeline overview
+│   │   ├── Dashboard.jsx   # Metrics, news collection, recent articles, sources & pipeline
 │   │   ├── Articles.jsx    # Article table with search, source filter & pages
 │   │   ├── Sources.jsx     # Source list and add-source form
 │   │   ├── Comparisons.jsx # Cross-publisher framing comparison placeholder
@@ -57,6 +59,8 @@ frontend/
 │   ├── tests/              # Verification & unit tests
 │   │   ├── setup.js        # Vitest & React Testing Library setup
 │   │   ├── App.test.jsx    # Rendering, navigation & API configuration tests
+│   │   ├── Dashboard.test.jsx # Dashboard: articles, sources, news collection
+│   │   ├── IngestionPanel.test.jsx # News collection button states
 │   │   ├── Articles.test.jsx # Articles page tests
 │   │   ├── Sources.test.jsx  # Sources page & form tests
 │   │   ├── client.test.js    # API client: URLs, errors, timeouts, network failures
@@ -123,10 +127,13 @@ cp .env.example .env
    ```
 3. In `frontend/.env`, set `VITE_API_BASE_URL=http://localhost:8000`, `VITE_API_PREFIX=/api` and `VITE_USE_MOCK_DATA=false`.
 4. Start the frontend and click **Check Backend Connection** on the Dashboard. It calls `GET /health`.
-5. Open **Sources** and **Articles**: they now show the records stored in the database.
-6. If the backend runs on another computer or port, change `VITE_API_BASE_URL` to match. The backend must allow the frontend's address in its CORS settings (`app/main.py`).
+5. On the **Dashboard**, **Recent Articles** shows the 5 newest articles and **News Sources** shows every source from the database. Click **View** on an article to load its full text.
+6. Open **Sources** and **Articles**: they show the same records, with paging and the add-source form.
+7. If the backend runs on another computer or port, change `VITE_API_BASE_URL` to match. The backend must allow the frontend's address in its CORS settings (`app/main.py`).
 
-> **Status**: the Articles and Sources pages were tested end to end with the real backend and PostgreSQL on 28 Oct 2026. See [`API_CONTRACT.md`](API_CONTRACT.md) for the results and one open backend issue (Alembic migrations).
+> **Status**: the Dashboard, Articles and Sources pages were tested end to end with the real backend and PostgreSQL (28 and 29 Oct 2026). See [`API_CONTRACT.md`](API_CONTRACT.md) for the results.
+>
+> **Blocked**: the backend has no news collection (RSS ingestion) endpoint yet, so **Run News Collection** on the Dashboard is disabled. `API_CONTRACT.md` lists what the frontend needs from Person A to turn it on.
 
 ### 3. Start Development Server
 
@@ -158,7 +165,7 @@ The test suite verifies:
 1. Application header and project title rendering (**News Bias and Framing Analysis System**).
 2. All 5 primary navigation links (**Dashboard**, **Articles**, **Sources**, **Comparisons**, **Reports**).
 3. The 4 metric KPI cards (**Total articles**, **News sources**, **Stories and events**, **Comparisons completed**).
-4. Recent articles section empty state behavior.
+4. Dashboard: recent articles and sources from the API, loading, empty and error states, the news collection button (disabled, running, result, failure) and reloading articles after a run.
 5. Tab navigation and dynamic view switching.
 6. Mobile menu drawer toggling.
 7. Environment variable resolution and API endpoint formatting.
@@ -194,5 +201,5 @@ The frontend is prepared for seamless integration with the FastAPI backend:
 - `src/api/config.js` reads `VITE_API_BASE_URL` and `VITE_API_PREFIX`.
 - `src/api/client.js` sends every request, with a 10-second timeout and readable error messages.
 - `src/api/normalize.js` checks every reply before the pages use it.
-- `src/api/newsApi.js` holds every article and source call. Pages never call `fetch` directly.
+- `src/api/newsApi.js` holds every article, source and news collection call. Pages never call `fetch` directly.
 - The planned endpoints (`/api/sources`, `/api/sources/{id}`, `/api/articles`, `/api/articles/{id}`), the open questions for the backend team, and the current status are in [`API_CONTRACT.md`](API_CONTRACT.md).

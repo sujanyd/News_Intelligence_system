@@ -12,21 +12,28 @@
  * In both modes the reply is checked by normalize.js before the pages use it.
  */
 
-import { apiGet, apiPost } from './client'
+import { ApiError, apiGet, apiPost } from './client'
 import { API_PREFIX } from './config'
-import { toArticle, toList, toSource } from './normalize'
+import { toArticle, toIngestionResult, toList, toSource } from './normalize'
 import * as mockApi from '../mocks/mockApi'
 
 // Mock mode only when .env says exactly VITE_USE_MOCK_DATA=true
 export const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true'
 
-// PLANNED routes. Not confirmed by the backend yet (see API_CONTRACT.md).
+// Routes confirmed by Person A (see API_CONTRACT.md).
 export const ENDPOINTS = {
   sources: `${API_PREFIX}/sources`,
   source: (id) => `${API_PREFIX}/sources/${encodeURIComponent(id)}`,
   articles: `${API_PREFIX}/articles`,
   article: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}`,
 }
+
+// News collection (RSS ingestion) is NOT built in the backend yet, so there is
+// no route for it. When Person A adds one, put its path here (for example
+// `${API_PREFIX}/ingestion/run`) and check the method and reply in API_CONTRACT.md.
+// While this is null, the dashboard shows the "Run News Collection" button disabled.
+export const INGESTION_ENDPOINT = null
+export const INGESTION_AVAILABLE = INGESTION_ENDPOINT !== null
 
 /**
  * Gets all news sources.
@@ -105,4 +112,19 @@ export async function createArticle(newArticle) {
  */
 export async function checkBackendHealth() {
   return apiGet('/health')
+}
+
+/**
+ * Starts one news collection run (fetches the RSS feeds).
+ * Only works once INGESTION_ENDPOINT is set. There is no mock version on purpose:
+ * a pretend run would show counts that never happened.
+ *
+ * @returns {Promise<{ counts: Array, errors: string[] | null }>}
+ */
+export async function runNewsCollection() {
+  if (!INGESTION_AVAILABLE) {
+    throw new ApiError('News collection is not available yet: the backend has no collection endpoint.')
+  }
+  const data = await apiPost(INGESTION_ENDPOINT, {})
+  return toIngestionResult(data)
 }

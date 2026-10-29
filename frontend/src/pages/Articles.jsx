@@ -11,6 +11,7 @@ import DataModeBadge from '../components/DataModeBadge'
 import ArticleDetails from '../components/ArticleDetails'
 import { fetchArticles, fetchSources } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
+import { getSourceName } from '../utils/getSourceName'
 
 // How many articles to show on one page of the table
 const ARTICLES_PER_PAGE = 5
@@ -116,15 +117,6 @@ export function Articles() {
     window.scrollTo(0, 0)
   }
 
-  // The Article model only has source_id, so look the name up in the sources list
-  function getSourceName(article) {
-    if (article.source_name) return article.source_name
-    const source = sources.find((item) => String(item.id) === String(article.source_id))
-    if (source) return source.name
-    if (article.source_id !== null) return `Source #${article.source_id}`
-    return 'Unknown source'
-  }
-
   // The search box only filters the articles on this page
   const visibleArticles = articles.filter((article) =>
     article.title.toLowerCase().includes(searchText.trim().toLowerCase())
@@ -136,7 +128,7 @@ export function Articles() {
   // What each column of the table shows
   const columns = [
     { key: 'title', label: 'Title', render: (article) => <strong>{article.title}</strong> },
-    { key: 'source', label: 'Source', render: (article) => getSourceName(article) },
+    { key: 'source', label: 'Source', render: (article) => getSourceName(article, sources) },
     {
       key: 'published_at',
       label: 'Published',
@@ -245,7 +237,7 @@ export function Articles() {
         <ArticleDetails
           key={selectedArticle.id}
           articleId={selectedArticle.id}
-          sourceName={getSourceName(selectedArticle)}
+          sourceName={getSourceName(selectedArticle, sources)}
           onClose={() => setSelectedArticleId(null)}
         />
       )}
