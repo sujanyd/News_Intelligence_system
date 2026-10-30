@@ -47,7 +47,7 @@ frontend/
 │   │
 │   ├── pages/              # View pages corresponding to navigation tabs
 │   │   ├── Dashboard.jsx   # Metrics, news collection, recent articles, sources & pipeline
-│   │   ├── Articles.jsx    # Article table with search, source filter & pages
+│   │   ├── Articles.jsx    # Article table: title search, source filter, pages & refresh
 │   │   ├── Sources.jsx     # Source list and add-source form
 │   │   ├── Comparisons.jsx # Cross-publisher framing comparison placeholder
 │   │   └── Reports.jsx     # Analytical bias distribution reports placeholder
@@ -129,7 +129,7 @@ cp .env.example .env
 4. Start the frontend and click **Check Backend Connection** on the Dashboard. It calls `GET /health`.
 5. On the **Dashboard**, **Recent Articles** shows the 5 newest articles and **News Sources** shows every source from the database. Click **View** on an article to load its full text.
    Click **Run News Collection** to fetch real articles from the backend's RSS feeds (it can take up to a minute). The result shows the counts and one row per feed, and both lists reload. Run it again: the new articles are counted as duplicates.
-6. Open **Sources** and **Articles**: they show the same records, with paging and the add-source form.
+6. Open **Sources** and **Articles**: they show the same records, with paging and the add-source form. On **Articles**, try a word in **Search by title**, pick a **Source**, and click **Refresh articles** (it reloads the list only; it does not collect news).
 7. If the backend runs on another computer or port, change `VITE_API_BASE_URL` to match. The backend must allow the frontend's address in its CORS settings (`app/main.py`).
 
 > **Status**: the Dashboard (including a real news collection run), Articles and Sources pages were tested end to end with the real backend and PostgreSQL (28 and 29 Oct 2026). See [`API_CONTRACT.md`](API_CONTRACT.md) for the results.
@@ -170,7 +170,7 @@ The test suite verifies:
 5. Tab navigation and dynamic view switching.
 6. Mobile menu drawer toggling.
 7. Environment variable resolution and API endpoint formatting.
-8. Articles page: loading, table columns, search, source filter, pagination, details view, empty and error states.
+8. Articles page: loading, table columns, title search (with and without a source), source filter, pagination (backend and search results), refresh (success, failure, keeps filters), no duplicate rows, details view, empty and error states.
 9. Sources page: source list, required-field validation, adding a source, duplicate names, empty and error states.
 10. Live mode: `newsApi.js` calls the right backend paths with `limit`, `offset` and `source_id`.
 11. API client: backend error messages, network failures, timeouts, non-JSON replies and a missing backend URL.

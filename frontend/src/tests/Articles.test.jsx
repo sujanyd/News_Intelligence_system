@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import React from 'react'
 import Articles from '../pages/Articles'
-import { fetchArticles, fetchSources } from '../api/newsApi'
+import { fetchArticles, fetchSources, runNewsCollection } from '../api/newsApi'
 import { resetMockData } from '../mocks/mockApi'
 
 // The page uses the pretend backend (mock mode is on in tests).
@@ -13,8 +13,14 @@ vi.mock('../api/newsApi', async (importOriginal) => {
     ...realModule,
     fetchArticles: vi.fn(realModule.fetchArticles),
     fetchSources: vi.fn(realModule.fetchSources),
+    runNewsCollection: vi.fn(),
   }
 })
+
+// Helper: type into the search box
+function search(text) {
+  fireEvent.change(screen.getByLabelText('Search by title'), { target: { value: text } })
+}
 
 const FIRST_TITLE = 'City council approves new budget for public transport'
 
@@ -104,20 +110,146 @@ describe('Articles page', () => {
     expect(within(table).queryByText('Daily Ledger')).toBeNull()
   })
 
-  it('searches the titles on the current page', async () => {
+  it('searches titles across the newest 100 articles, not only this page', async () => {
     render(<Articles />)
     await screen.findByRole('table')
 
-    fireEvent.change(screen.getByLabelText('Search titles on this page'), {
-      target: { value: 'storm' },
-    })
-    expect(screen.getByText('Fishing communities prepare for weekend storm')).toBeDefined()
-    expect(screen.queryByText(FIRST_TITLE)).toBeNull()
+    // "Fuel" articles are on page 3, so they are not on the screen yet
+    search('fuel')
 
-    fireEvent.change(screen.getByLabelText('Search titles on this page'), {
-      target: { value: 'zzz' },
-    })
-    expect(screen.getByText('No articles on this page match your search')).toBeDefined()
+    expect(screen.getByText('Searching articles...')).toBeDefined()
+    expect(await screen.findByText('Food prices remain steady despite fuel cost increase')).toBeDefined()
+    expect(screen.getByText('Fuel costs push up delivery charges, retailers say')).toBeDefined()
+    expect(screen.queryByText(FIRST_TITLE)).toBeNull()
+    expect(fetchArticles).toHaveBeenLastCalledWith({ limit: 100, offset: 0, sourceId: undefined })
+    expect(screen.getByText('Showing 1–2 of 2 matches for "fuel"')).toBeDefined()
+    expect(screen.getByText(/backend has no title search yet/)).toBeDefined()
+  })
+
+  it('does not send a request for every letter typed', async () => {
+    render(<Articles />)
+    await screen.findByRole('table')
+
+    search('b')
+    await screen.findByText(/matches for "b"/)
+    search('bu')
+    search('bud')
+    search('budget')
+
+    expect(await screen.findByText('Showing 1–2 of 2 matches for "budget"')).toBeDefined()
+    // One request for the first page, one when the search started
+    expect(fetchArticles).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows an empty state when nothing matches, and can clear the search', async () => {
+    render(<Articles />)
+    await screen.findByRole('table')
+
+    search('zzz')
+
+    expect(await screen.findByText('No articles match "zzz"')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    expect(await screen.findByText(FIRST_TITLE)).toBeDefined()
+    expect(screen.getByLabelText('Search by title').value).toBe('')
+  })
+
+  it('combines the search with the source filter', async () => {
+    render(<Articles />)
+    await screen.findByRole('table')
+
+    fireEvent.change(screen.getByLabelText('Source'), { target: { value: '2' } })
+    await screen.findByRole('table')
+    search('budget')
+
+    expect(await screen.findByText('Transport budget passes after long council debate')).toBeDefined()
+    // The Daily Ledger budget article is filtered out by the backend (source_id=2)
+    expect(screen.queryByText(FIRST_TITLE)).toBeNull()
+    expect(fetchArticles).toHaveBeenLastCalledWith({ limit: 100, offset: 0, sourceId: '2' })
+    expect(screen.getByText(/searches the newest 100 articles from Global Wire/)).toBeDefined()
+  })
+
+  it('splits search results into pages without new requests', async () => {
+    render(<Articles />)
+    await screen.findByRole('table')
+
+    search('e') // matches almost every title
+    await screen.findByText(/Showing 1–5 of \d+ matches/)
+    const callsBefore = fetchArticles.mock.calls.length
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+    expect(screen.getByText(/Showing 6–10 of \d+ matches/)).toBeDefined()
+    expect(screen.getByText(/Page 2 of \d+/)).toBeDefined()
+    expect(fetchArticles).toHaveBeenCalledTimes(callsBefore)
+  })
+
+  it('goes back to page 1 when the search changes', async () => {
+    render(<Articles />)
+    await screen.findByRole('table')
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await screen.findByText('Page 2')
+
+    search('budget')
+
+    expect(await screen.findByText('Showing 1–2 of 2 matches for "budget"')).toBeDefined()
+    expect(screen.queryByText(/Page 2/)).toBeNull()
+  })
+
+  it('refreshes from the backend and keeps the source filter', async () => {
+    render(<Articles />)
+    await screen.findByRole('table')
+    fireEvent.change(screen.getByLabelText('Source'), { target: { value: '3' } })
+    await screen.findByRole('table')
+    const callsBefore = fetchArticles.mock.calls.length
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh articles' }))
+
+    // Loading state, and the button cannot be clicked again meanwhile
+    const busyButton = screen.getByRole('button', { name: /Refreshing/ })
+    expect(busyButton.disabled).toBe(true)
+    fireEvent.click(busyButton)
+
+    await screen.findByRole('table')
+    expect(fetchArticles).toHaveBeenCalledTimes(callsBefore + 1)
+    expect(fetchArticles).toHaveBeenLastCalledWith({ limit: 6, offset: 0, sourceId: '3' })
+    expect(screen.getByLabelText('Source').value).toBe('3')
+    expect(screen.getByText(/Last updated/)).toBeDefined()
+    // Refreshing only reads articles; it never starts a news collection run
+    expect(runNewsCollection).not.toHaveBeenCalled()
+  })
+
+  it('keeps the search text when refreshing', async () => {
+    render(<Articles />)
+    await screen.findByRole('table')
+    search('budget')
+    await screen.findByText(/matches for "budget"/)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh articles' }))
+
+    expect(await screen.findByText('Showing 1–2 of 2 matches for "budget"')).toBeDefined()
+    expect(screen.getByLabelText('Search by title').value).toBe('budget')
+  })
+
+  it('shows an error when refreshing fails, and Try again works', async () => {
+    render(<Articles />)
+    await screen.findByRole('table')
+    fetchArticles.mockRejectedValueOnce(new Error('The backend took too long to respond. Please try again.'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh articles' }))
+
+    expect(await screen.findByText('Could not load articles.')).toBeDefined()
+    expect(screen.getByText(/took too long/)).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText(FIRST_TITLE)).toBeDefined()
+  })
+
+  it('never shows the same article twice', async () => {
+    const article = { id: 7, title: 'Repeated article', source_id: 1, source_name: 'Daily Ledger', content_availability: 'full_text' }
+    fetchArticles.mockResolvedValueOnce({ articles: [article, article], total: null })
+    render(<Articles />)
+
+    expect(await screen.findByText('Repeated article')).toBeDefined()
+    expect(screen.getAllByText('Repeated article').length).toBe(1)
   })
 
   it('loads and shows an article when "View" is clicked', async () => {

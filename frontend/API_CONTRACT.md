@@ -46,12 +46,28 @@ Same setup as above:
 | While running | ✅ Button disabled, "Collecting news...", second click ignored |
 | Phone layout | ✅ No sideways scrolling |
 
+### Articles search and refresh check (30 Oct 2026)
+
+With 51 real articles from 3 sources (from one news collection run):
+
+| Feature | Result |
+| ------- | ------ |
+| Search "after" | ✅ 5 matches from the newest 100, one request (`limit=100`) |
+| Search + source The Guardian | ✅ 4 matches, request with `source_id=4`, note names the source |
+| Typing and paging through 51 matches | ✅ No extra requests; "Page 2 of 11" |
+| Normal paging | ✅ "Showing articles 6–10", Page 2 |
+| Refresh articles | ✅ Button disabled while loading, search and page kept, "Last updated" time changes |
+| Refresh with backend unreachable | ✅ Error message, **Try again** recovers |
+| View details from search results | ✅ Full content loads |
+| Phone layout | ✅ No sideways scrolling |
+
 ### Open backend issue (for Person A)
 
-`alembic upgrade head` fails with `Can't load plugin: sqlalchemy.dialects:driver`.
-`alembic.ini` still has `sqlalchemy.url = driver://user:pass@localhost/dbname`,
-and `alembic/env.py` only uses `settings.DATABASE_URL` when that line is empty.
-Clearing the line (or always using the settings value) should fix it.
+The earlier `alembic.ini` URL problem is fixed. On a fresh database (checked
+30 Oct 2026), `alembic upgrade head` now stops at the second migration:
+`value too long for type character varying(32)`. Alembic stores the revision
+id in a `varchar(32)` column, and `0002_remaining_tables_and_constraints` is
+37 characters. A shorter revision id (32 characters or fewer) should fix it.
 `python -m app.db.seed` creates the tables directly, so it works in the meantime.
 
 ## Confirmed Specifications from Person A (Backend)
@@ -86,6 +102,20 @@ Pages never call `fetch` directly.
 
 Pagination: the page shows 5 articles. It asks for `limit=6`, and if 6 come
 back it knows there is a next page. `offset = (page - 1) × 5`.
+
+### Articles page: what the backend does and what the browser does
+
+| Feature | Where it happens |
+| ------- | ---------------- |
+| Source filter | **Backend** (`source_id`) |
+| Paging while not searching | **Backend** (`limit`, `offset`) |
+| Title search | **Browser**: `GET /api/articles` has no search parameter, so the page loads the newest **100** articles once (`limit=100`, the backend maximum, plus `source_id` if a source is picked) and filters their titles. Older articles are not searched. Typing sends no requests. |
+| Paging through search results | **Browser** (the 100 articles are already loaded) |
+| **Refresh articles** | **Backend**: sends the same request again and keeps the search, source and page. It does not run news collection. |
+
+If Person A adds a search parameter (for example `q`), the search can move to
+the backend; it would then need a short delay (debounce) so typing does not
+send a request for every letter.
 
 ## Expected shapes
 

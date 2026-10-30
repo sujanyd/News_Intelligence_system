@@ -16,22 +16,43 @@ import { getSourceName } from '../utils/getSourceName'
 // How many articles to show on one page of the table
 const ARTICLES_PER_PAGE = 5
 
+// The backend has no title search, so a search looks through the newest
+// articles instead. 100 is the most the backend sends in one request.
+const SEARCH_POOL_SIZE = 100
+
+// Keeps only the first article with each id, so no article is shown twice
+function removeDuplicates(articleList) {
+  const seenIds = new Set()
+  return articleList.filter((article) => {
+    if (seenIds.has(article.id)) return false
+    seenIds.add(article.id)
+    return true
+  })
+}
+
 /**
  * Articles Page
  *
- * Asks the backend for one page of articles at a time:
- *   GET /articles?limit=...&offset=...&source_id=...
- * The source filter and Previous / Next buttons change that request.
- * The search box only filters the articles already on the screen,
- * because the backend has no search option (yet).
+ * Two ways of loading, both through GET /articles:
+ *
+ * 1. Normal browsing (search box empty): the backend does the paging and the
+ *    source filter:  GET /articles?limit=6&offset=...&source_id=...
+ * 2. Searching (search box has text): the backend has no search option, so the
+ *    page loads the newest 100 articles ONCE (with the source filter), then
+ *    filters the titles and splits them into pages here in the browser.
+ *    Typing does not send new requests.
+ *
+ * "Refresh articles" loads the list again from the backend and keeps the filters.
+ * It never starts a news collection run (that is on the Dashboard).
  */
 export function Articles() {
   // Data from the API
   const [articles, setArticles] = useState([])
   const [totalArticles, setTotalArticles] = useState(null) // null = backend did not say
-  const [hasNextPage, setHasNextPage] = useState(false)
+  const [serverHasNextPage, setServerHasNextPage] = useState(false)
   const [sources, setSources] = useState([])
   const [sourcesError, setSourcesError] = useState('')
+  const [lastUpdated, setLastUpdated] = useState(null)
 
   // Page status
   const [isLoading, setIsLoading] = useState(true)
@@ -43,37 +64,58 @@ export function Articles() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedArticleId, setSelectedArticleId] = useState(null)
 
-  // Goes up by 1 every time "Try again" is clicked, which loads the data again
+  // Goes up by 1 on every "Refresh" or "Try again", which loads the data again
   const [reloadCount, setReloadCount] = useState(0)
 
-  // Load the sources once, for the filter and to show each article's source name
+  const searchWords = searchText.trim().toLowerCase()
+  const isSearching = searchWords !== ''
+
+  // In search mode the backend request does not depend on the page,
+  // because the paging happens in the browser
+  const requestPage = isSearching ? 1 : currentPage
+
+  // Load the sources, for the filter and to show each article's source name
   useEffect(() => {
     fetchSources()
-      .then((sourceList) => setSources(sourceList))
+      .then((sourceList) => {
+        setSources(sourceList)
+        setSourcesError('')
+      })
       .catch((error) => setSourcesError(error.message))
-  }, [])
+  }, [reloadCount])
 
-  // Load one page of articles whenever the page, the source filter or reloadCount changes
+  // Load the articles whenever the mode, page, source filter or reloadCount changes
   useEffect(() => {
     // Becomes false if the user moves on before this answer arrives,
     // so an old, slow answer can never replace a newer one
     let isCurrentRequest = true
 
-    fetchArticles({
-      // Ask for one extra article: if it comes back, there is a next page
-      limit: ARTICLES_PER_PAGE + 1,
-      offset: (currentPage - 1) * ARTICLES_PER_PAGE,
-      sourceId: selectedSourceId === 'all' ? undefined : selectedSourceId,
-    })
+    const sourceId = selectedSourceId === 'all' ? undefined : selectedSourceId
+    const request = isSearching
+      ? { limit: SEARCH_POOL_SIZE, offset: 0, sourceId }
+      : {
+          // Ask for one extra article: if it comes back, there is a next page
+          limit: ARTICLES_PER_PAGE + 1,
+          offset: (requestPage - 1) * ARTICLES_PER_PAGE,
+          sourceId,
+        }
+
+    fetchArticles(request)
       .then((result) => {
         if (!isCurrentRequest) return
-        setArticles(result.articles.slice(0, ARTICLES_PER_PAGE))
-        setTotalArticles(result.total)
-        if (result.total !== null) {
-          setHasNextPage(currentPage * ARTICLES_PER_PAGE < result.total)
+        const uniqueArticles = removeDuplicates(result.articles)
+        if (isSearching) {
+          setArticles(uniqueArticles)
         } else {
-          setHasNextPage(result.articles.length > ARTICLES_PER_PAGE)
+          setArticles(uniqueArticles.slice(0, ARTICLES_PER_PAGE))
+          setServerHasNextPage(
+            result.total !== null
+              ? requestPage * ARTICLES_PER_PAGE < result.total
+              : uniqueArticles.length > ARTICLES_PER_PAGE
+          )
         }
+        setTotalArticles(result.total)
+        setLastUpdated(new Date())
       })
       .catch((error) => {
         if (isCurrentRequest) setErrorMessage(error.message)
@@ -85,7 +127,7 @@ export function Articles() {
     return () => {
       isCurrentRequest = false
     }
-  }, [currentPage, selectedSourceId, reloadCount])
+  }, [isSearching, requestPage, selectedSourceId, reloadCount])
 
   // Show the spinner and clear old errors before a new request starts
   function startLoading() {
@@ -93,20 +135,35 @@ export function Articles() {
     setErrorMessage('')
   }
 
-  function handleRetry() {
+  function handleRefresh() {
+    if (isLoading) return // a request is already running
     startLoading()
     setReloadCount(reloadCount + 1)
   }
 
-  function handlePageChange(newPage) {
-    startLoading()
+  function handleSearchChange(event) {
+    const newText = event.target.value
+    const willBeSearching = newText.trim() !== ''
+    // Switching between browsing and searching needs a different request
+    if (willBeSearching !== isSearching) startLoading()
+    setSearchText(newText)
+    setCurrentPage(1)
+  }
+
+  function clearSearch() {
+    if (isSearching) startLoading()
     setSearchText('')
+    setCurrentPage(1)
+  }
+
+  function handlePageChange(newPage) {
+    // In search mode the pages are already loaded, so no request is needed
+    if (!isSearching) startLoading()
     setCurrentPage(newPage)
   }
 
   function handleSourceChange(event) {
     startLoading()
-    setSearchText('')
     setSelectedSourceId(event.target.value)
     setCurrentPage(1)
   }
@@ -117,13 +174,24 @@ export function Articles() {
     window.scrollTo(0, 0)
   }
 
-  // The search box only filters the articles on this page
-  const visibleArticles = articles.filter((article) =>
-    article.title.toLowerCase().includes(searchText.trim().toLowerCase())
-  )
+  // Search mode: filter the loaded titles, then cut out the current page
+  const matchingArticles = isSearching
+    ? articles.filter((article) => article.title.toLowerCase().includes(searchWords))
+    : articles
+  const firstIndex = (currentPage - 1) * ARTICLES_PER_PAGE
+  const pageArticles = isSearching
+    ? matchingArticles.slice(firstIndex, firstIndex + ARTICLES_PER_PAGE)
+    : articles
 
-  const totalPages = totalArticles !== null ? Math.ceil(totalArticles / ARTICLES_PER_PAGE) : null
+  let hasNextPage = serverHasNextPage
+  let totalPages = totalArticles !== null ? Math.ceil(totalArticles / ARTICLES_PER_PAGE) : null
+  if (isSearching) {
+    hasNextPage = firstIndex + ARTICLES_PER_PAGE < matchingArticles.length
+    totalPages = Math.max(1, Math.ceil(matchingArticles.length / ARTICLES_PER_PAGE))
+  }
+
   const selectedArticle = articles.find((article) => article.id === selectedArticleId)
+  const selectedSource = sources.find((source) => String(source.id) === selectedSourceId)
 
   // What each column of the table shows
   const columns = [
@@ -164,10 +232,22 @@ export function Articles() {
     />
   )
 
+  // e.g. "Showing articles 6–10" or "Showing 1–5 of 12 matches for "budget""
+  function renderResultCount() {
+    const first = firstIndex + 1
+    const last = firstIndex + pageArticles.length
+    if (isSearching) {
+      const matchWord = matchingArticles.length === 1 ? 'match' : 'matches'
+      return `Showing ${first}–${last} of ${matchingArticles.length} ${matchWord} for "${searchText.trim()}"`
+    }
+    const total = totalArticles !== null ? ` of ${totalArticles}` : ''
+    return `Showing articles ${first}–${last}${total}`
+  }
+
   // Decide what to show inside the card
   function renderArticleList() {
     if (isLoading) {
-      return <LoadingState message="Loading articles..." />
+      return <LoadingState message={isSearching ? 'Searching articles...' : 'Loading articles...'} />
     }
 
     if (errorMessage) {
@@ -176,12 +256,26 @@ export function Articles() {
           type="error"
           title="Could not load articles."
           message={errorMessage}
-          onRetry={handleRetry}
+          onRetry={handleRefresh}
         />
       )
     }
 
-    if (articles.length === 0) {
+    if (isSearching && matchingArticles.length === 0) {
+      return (
+        <EmptyState
+          title={`No articles match "${searchText.trim()}"`}
+          description="Try another word, choose another source, or clear the search."
+          action={
+            <button type="button" className="btn btn-secondary" onClick={clearSearch}>
+              Clear search
+            </button>
+          }
+        />
+      )
+    }
+
+    if (pageArticles.length === 0) {
       let title = 'No articles collected yet'
       let description = 'Articles will appear here once the news collection pipeline has fetched them.'
       if (currentPage > 1) {
@@ -199,37 +293,38 @@ export function Articles() {
       )
     }
 
-    if (visibleArticles.length === 0) {
-      return (
-        <EmptyState
-          title="No articles on this page match your search"
-          description="The search only looks at the articles on this page."
-          action={
-            <button type="button" className="btn btn-secondary" onClick={() => setSearchText('')}>
-              Clear search
-            </button>
-          }
-        />
-      )
-    }
-
     return (
       <>
-        <p className="result-count">
-          Showing {visibleArticles.length} articles on page {currentPage}
-          {totalArticles !== null && ` (${totalArticles} in total)`}
-        </p>
-        <DataTable columns={columns} rows={visibleArticles} caption="List of articles" />
+        <p className="result-count">{renderResultCount()}</p>
+        <DataTable columns={columns} rows={pageArticles} caption="List of articles" />
         {pagination}
       </>
     )
   }
 
+  const refreshButton = (
+    <button
+      type="button"
+      className="btn btn-secondary"
+      onClick={handleRefresh}
+      disabled={isLoading}
+      aria-busy={isLoading}
+    >
+      {isLoading ? (
+        <span className="loading-spinner-wrap">
+          <span className="spinner" aria-hidden="true" /> Refreshing...
+        </span>
+      ) : (
+        'Refresh articles'
+      )}
+    </button>
+  )
+
   return (
     <div className="page-articles">
       <PageHeader
         title="Articles"
-        description="Browse collected news articles and filter them by source."
+        description="Browse collected news articles, search them by title and filter them by source."
         badge={<DataModeBadge />}
       />
 
@@ -242,11 +337,19 @@ export function Articles() {
         />
       )}
 
-      <Card title="All Articles" subtitle="Filter by source, or search the titles on this page">
+      <Card
+        title="All Articles"
+        subtitle={
+          lastUpdated
+            ? `Last updated ${lastUpdated.toLocaleTimeString()}`
+            : 'Search by title or filter by source'
+        }
+        badge={refreshButton}
+      >
         <div className="filter-bar">
           <div className="form-field">
             <label htmlFor="article-search" className="form-label">
-              Search titles on this page
+              Search by title
             </label>
             <input
               id="article-search"
@@ -254,8 +357,7 @@ export function Articles() {
               className="form-input"
               placeholder="e.g. budget"
               value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              disabled={isLoading || Boolean(errorMessage)}
+              onChange={handleSearchChange}
             />
           </div>
 
@@ -282,6 +384,14 @@ export function Articles() {
             )}
           </div>
         </div>
+
+        {isSearching && (
+          <p className="search-note">
+            The backend has no title search yet, so this searches the newest{' '}
+            {SEARCH_POOL_SIZE} articles
+            {selectedSource ? ` from ${selectedSource.name}` : ''}.
+          </p>
+        )}
 
         {renderArticleList()}
       </Card>

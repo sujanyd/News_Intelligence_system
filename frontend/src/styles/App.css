@@ -1054,3 +1054,10 @@
 .dashboard-details {
   scroll-margin-top: 6rem;
 }
+
+/* Articles page: note that explains how search works */
+.search-note {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin: -0.25rem 0 0.75rem;
+}
