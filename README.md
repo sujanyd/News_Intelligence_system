@@ -651,12 +651,16 @@ The backend exposes RESTful endpoints supporting both `/api` (default frontend p
 
 ### RSS Ingestion Endpoints
 
+The system includes a resilient RSS and Atom ingestion pipeline with canonical URL normalization, multi-tiered duplicate prevention, exact-content hash checks, and controlled retries with exponential backoff.
+
 #### 1. Trigger RSS Ingestion Run
 - **Route**: `POST /api/ingestion/run` (or `POST /api/v1/ingestion/run`)
 - **Request Body** *(optional)*:
 ```json
 {
-  "max_articles_per_feed": 20
+  "max_articles_per_feed": 20,
+  "timeout": 10,
+  "max_retries": 2
 }
 ```
 *(Optionally provide a custom `"feeds": [{"source_name": "...", "base_url": "...", "feed_url": "..."}]` list to ingest specific feeds).*
@@ -668,6 +672,7 @@ The backend exposes RESTful endpoints supporting both `/api` (default frontend p
   "articles_inserted": 24,
   "articles_skipped_duplicate": 8,
   "feed_errors": 0,
+  "feed_retries": 1,
   "details": [
     {
       "source_name": "BBC News",
@@ -675,6 +680,7 @@ The backend exposes RESTful endpoints supporting both `/api` (default frontend p
       "status": "success",
       "articles_inserted": 6,
       "articles_skipped_duplicate": 2,
+      "retries_attempted": 0,
       "error": null
     },
     {
@@ -683,6 +689,7 @@ The backend exposes RESTful endpoints supporting both `/api` (default frontend p
       "status": "success",
       "articles_inserted": 5,
       "articles_skipped_duplicate": 1,
+      "retries_attempted": 1,
       "error": null
     }
   ]
@@ -707,11 +714,29 @@ The backend exposes RESTful endpoints supporting both `/api` (default frontend p
 ]
 ```
 
+#### 3. Canonical URL Normalization & Deduplication Features
+- **URL Normalization**:
+  - Strips URL fragments (`#section`, `#comments`).
+  - Lowercases scheme and hostname; strips standard default ports (`:80`, `:443`).
+  - Collapses consecutive slashes and strips unnecessary trailing slashes on non-root paths.
+  - Strips known tracking parameters (`utm_*`, `fbclid`, `gclid`, `twclid`, `mc_cid`, etc.).
+  - Preserves and deterministically sorts meaningful article query parameters (`id`, `v`, `p`, `article_id`, etc.).
+- **Deduplication Strategy**:
+  - Preserves original published link in `Article.url` while storing normalized canonical URL in `Article.canonical_url`.
+  - In-memory duplicate filtering per ingestion run (`seen_urls_in_run`).
+  - Database-level duplicate check against `canonical_url`, original `url`, or direct link.
+  - Exact-content SHA-256 hash deduplication (`content_hash`) across articles from the same publisher.
+  - Transaction savepoints (`db.begin_nested()`) to isolate concurrency collisions without aborting other feed items.
+- **Controlled Retries**:
+  - Temporary server failures (`5xx`, `429`) and timeouts retried up to `RSS_MAX_RETRIES` (default: 2) with exponential backoff (`RSS_RETRY_BACKOFF_SECONDS: 0.5`).
+  - Permanent client errors (`400`, `401`, `403`, `404`, `405`, `410`) fast-fail immediately without wasteful retries.
+  - Failure in one feed is isolated and does not stop subsequent feeds.
+
 ---
 
 ## 🧪 11. Running Automated Tests
 
-Run the full automated test suite (57 tests) using `pytest`:
+Run the full automated test suite (69 tests) using `pytest`:
 
 ```bash
 pytest -v
@@ -756,28 +781,40 @@ tests/test_database.py::test_report_model_and_comparison_relationship PASSED [ 5
 tests/test_health.py::test_health_check_endpoint PASSED                  [ 61%]
 tests/test_health.py::test_versioned_health_check_endpoint PASSED        [ 63%]
 tests/test_health.py::test_root_endpoint PASSED                          [ 64%]
-tests/test_rss_ingestion.py::TestIngestionHelpers::test_normalize_url_strips_tracking_params PASSED [ 66%]
-tests/test_rss_ingestion.py::TestIngestionHelpers::test_normalize_url_lowercases_host_and_scheme PASSED [ 68%]
-tests/test_rss_ingestion.py::TestIngestionHelpers::test_normalize_url_handles_empty_and_invalid PASSED [ 70%]
-tests/test_rss_ingestion.py::TestIngestionHelpers::test_compute_content_hash PASSED [ 71%]
-tests/test_rss_ingestion.py::TestIngestionHelpers::test_clean_html_text PASSED [ 73%]
-tests/test_rss_ingestion.py::TestIngestionHelpers::test_clean_html_text_none_and_empty PASSED [ 75%]
-tests/test_rss_ingestion.py::TestIngestionHelpers::test_parse_entry_published_at_rfc2822 PASSED [ 77%]
-tests/test_rss_ingestion.py::TestIngestionHelpers::test_parse_entry_published_at_invalid_fallback PASSED [ 78%]
-tests/test_rss_ingestion.py::TestIngestionHelpers::test_extract_entry_content_full_text PASSED [ 80%]
-tests/test_rss_ingestion.py::TestIngestionHelpers::test_extract_entry_content_summary_only PASSED [ 82%]
-tests/test_rss_ingestion.py::TestIngestionHelpers::test_extract_entry_content_headline_only PASSED [ 84%]
-tests/test_rss_ingestion.py::TestRSSIngestionService::test_ingest_single_feed_success PASSED [ 85%]
-tests/test_rss_ingestion.py::TestRSSIngestionService::test_duplicate_url_prevention PASSED [ 87%]
-tests/test_rss_ingestion.py::TestRSSIngestionService::test_missing_and_invalid_fields_handled_safely PASSED [ 89%]
-tests/test_rss_ingestion.py::TestRSSIngestionService::test_atom_feed_ingestion PASSED [ 91%]
-tests/test_rss_ingestion.py::TestRSSIngestionService::test_multiple_feeds_orchestration PASSED [ 92%]
-tests/test_rss_ingestion.py::TestRSSIngestionService::test_failed_feed_does_not_block_successful_feeds PASSED [ 94%]
-tests/test_rss_ingestion.py::TestIngestionAPIEndpoints::test_api_ingestion_run_success PASSED [ 96%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_normalize_url_strips_tracking_params PASSED [ 55%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_normalize_url_preserves_meaningful_query_params PASSED [ 56%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_normalize_url_removes_fragments PASSED [ 57%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_normalize_url_lowercases_host_and_scheme PASSED [ 59%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_normalize_url_normalizes_consecutive_slashes PASSED [ 60%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_normalize_url_preserves_root_and_handles_invalid PASSED [ 62%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_compute_content_hash PASSED [ 63%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_clean_html_text PASSED [ 65%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_clean_html_text_none_and_empty PASSED [ 66%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_parse_entry_published_at_rfc2822 PASSED [ 68%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_parse_entry_published_at_invalid_fallback PASSED [ 69%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_extract_entry_content_full_text PASSED [ 71%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_extract_entry_content_summary_only PASSED [ 72%]
+tests/test_rss_ingestion.py::TestIngestionHelpers::test_extract_entry_content_headline_only PASSED [ 73%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_ingest_single_feed_success PASSED [ 75%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_duplicate_url_prevention PASSED [ 76%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_duplicate_detection_different_tracking_params PASSED [ 78%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_exact_content_hash_deduplication PASSED [ 79%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_missing_and_invalid_fields_handled_safely PASSED [ 81%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_atom_feed_ingestion PASSED [ 82%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_concurrent_collision_integrity_error_handled_gracefully PASSED [ 84%]
+tests/test_rss_ingestion.py::TestRSSIngestionService::test_multiple_feeds_orchestration PASSED [ 85%]
+tests/test_rss_ingestion.py::TestIngestionRetriesAndFaultTolerance::test_retry_temporary_503_then_success PASSED [ 86%]
+tests/test_rss_ingestion.py::TestIngestionRetriesAndFaultTolerance::test_retry_temporary_timeout_then_success PASSED [ 88%]
+tests/test_rss_ingestion.py::TestIngestionRetriesAndFaultTolerance::test_permanent_404_not_found_fails_without_retries PASSED [ 89%]
+tests/test_rss_ingestion.py::TestIngestionRetriesAndFaultTolerance::test_permanent_403_forbidden_fails_without_retries PASSED [ 91%]
+tests/test_rss_ingestion.py::TestIngestionRetriesAndFaultTolerance::test_retry_limit_reached_on_persistent_500 PASSED [ 92%]
+tests/test_rss_ingestion.py::TestIngestionRetriesAndFaultTolerance::test_retry_limit_reached_on_persistent_timeout PASSED [ 94%]
+tests/test_rss_ingestion.py::TestIngestionRetriesAndFaultTolerance::test_failed_feed_does_not_block_successful_feeds PASSED [ 95%]
+tests/test_rss_ingestion.py::TestIngestionAPIEndpoints::test_api_ingestion_run_success PASSED [ 97%]
 tests/test_rss_ingestion.py::TestIngestionAPIEndpoints::test_api_ingestion_network_failure_handling PASSED [ 98%]
 tests/test_rss_ingestion.py::TestIngestionAPIEndpoints::test_api_v1_and_api_prefix_parity PASSED [100%]
 
-=================== 56 passed, 1 skipped in 0.25s ===================
+=================== 68 passed, 1 skipped in 0.82s ===================
 ```
 
 ### Direct PostgreSQL End-to-End Verification

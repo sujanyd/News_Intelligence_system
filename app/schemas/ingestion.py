@@ -52,6 +52,20 @@ class IngestionRunRequest(BaseModel):
         description="Optional limit on number of articles to ingest per feed in this run",
         examples=[15],
     )
+    timeout: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=60,
+        description="Optional HTTP request timeout in seconds per feed",
+        examples=[10],
+    )
+    max_retries: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=5,
+        description="Optional maximum number of HTTP retries on temporary failures",
+        examples=[2],
+    )
 
 
 class FeedResultDetail(BaseModel):
@@ -62,6 +76,7 @@ class FeedResultDetail(BaseModel):
     status: str = Field(..., description="Outcome status: 'success' or 'error'")
     articles_inserted: int = Field(default=0, description="Count of new articles inserted")
     articles_skipped_duplicate: int = Field(default=0, description="Count of duplicate articles skipped")
+    retries_attempted: int = Field(default=0, description="Count of HTTP retries attempted for this feed")
     error: Optional[str] = Field(default=None, description="Error message if the feed failed")
 
 
@@ -76,6 +91,7 @@ class IngestionSummaryResponse(BaseModel):
     articles_inserted: int = Field(..., description="Total new articles inserted into the database")
     articles_skipped_duplicate: int = Field(..., description="Total duplicate articles identified and skipped")
     feed_errors: int = Field(..., description="Total number of feeds that encountered errors")
+    feed_retries: int = Field(default=0, description="Total count of HTTP retries attempted across all feeds")
     details: List[FeedResultDetail] = Field(
         default_factory=list,
         description="Per-feed status and counts",

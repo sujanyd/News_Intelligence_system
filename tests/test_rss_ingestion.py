@@ -2,14 +2,25 @@
 Tests for RSS Feed Ingestion Service and API Endpoints.
 
 Validates:
-1. URL normalization (tracking param removal, lowercase domain, path cleanup).
-2. Content hash and HTML cleaning.
-3. Publication date and content availability extraction.
-4. Single and multiple feed ingestion into the database.
-5. Missing and invalid field handling (missing title, URL, date).
-6. Deduplication on repeated feed runs and canonical URLs.
-7. Fault tolerance (one failing feed does not prevent other feeds from succeeding).
-8. API endpoints (POST /api/ingestion/run, POST /api/v1/ingestion/run, GET /api/ingestion/feeds).
+1. Canonical URL normalization:
+   - Removes fragments (#section, #comments).
+   - Normalizes scheme and hostname casing; strips default ports (:80, :443).
+   - Removes known tracking parameters (utm_*, fbclid, gclid, etc.).
+   - Removes unnecessary trailing slashes when safe.
+   - Preserves meaningful query parameters (id, v, p, article_id, story_id, etc.).
+2. Deduplication:
+   - Duplicate prevention on repeated ingestion runs.
+   - Canonical URL deduplication when tracking parameters change.
+   - Exact-content SHA-256 hash deduplication.
+   - Concurrency / uniqueness collision handling via transaction savepoints.
+3. Controlled retries and fault tolerance:
+   - Temporary 5xx and timeout errors retried with exponential backoff.
+   - Permanent 4xx errors (400, 403, 404) fail immediately without wasteful retries.
+   - Retry limits bounded and reported.
+   - Isolated multi-feed failure handling (one failed feed does not block others).
+4. API endpoints:
+   - POST /api/ingestion/run and POST /api/v1/ingestion/run summary reporting.
+   - GET /api/ingestion/feeds and GET /api/v1/ingestion/feeds.
 """
 
 from datetime import datetime, timezone
@@ -23,6 +34,7 @@ from app.services.rss_ingestion import (
     clean_html_text,
     compute_content_hash,
     extract_entry_content,
+    get_or_create_news_source,
     normalize_url,
     parse_entry_published_at,
     ingest_single_feed,
@@ -130,9 +142,31 @@ SAMPLE_API_WIRE_RSS = """<?xml version="1.0" encoding="UTF-8"?>
 </rss>
 """
 
+SAMPLE_EXACT_CONTENT_DUPLICATE_RSS = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Syndicated Wire</title>
+    <link>https://syndicated.example.com</link>
+    <description>Testing exact content duplicates</description>
+    <item>
+      <title>First Morning Report</title>
+      <link>https://syndicated.example.com/reports/morning-edition-1</link>
+      <description>This is a substantial identical body paragraph detailing breaking economic announcements across member states.</description>
+      <pubDate>Thu, 29 Oct 2026 08:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Afternoon Syndicated Copy</title>
+      <link>https://syndicated.example.com/reports/afternoon-rerun-2</link>
+      <description>This is a substantial identical body paragraph detailing breaking economic announcements across member states.</description>
+      <pubDate>Thu, 29 Oct 2026 14:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
+"""
+
 
 # =============================================================================
-# Unit Tests: Helper Functions
+# Unit Tests: URL Normalization and Helpers
 # =============================================================================
 
 class TestIngestionHelpers:
@@ -144,14 +178,37 @@ class TestIngestionHelpers:
         expected = "https://example.com/news/article-1?a=1&b=2"
         assert normalize_url(raw) == expected
 
+    def test_normalize_url_preserves_meaningful_query_params(self):
+        """Preserves article identifying query parameters such as id, v, p, etc."""
+        raw1 = "https://example.com/article.php?id=9999&utm_source=twitter"
+        assert normalize_url(raw1) == "https://example.com/article.php?id=9999"
+
+        raw2 = "https://example.com/watch?v=dQw4w9WgXcQ&utm_campaign=promo&feature=share"
+        assert normalize_url(raw2) == "https://example.com/watch?feature=share&v=dQw4w9WgXcQ"
+
+        raw3 = "https://example.com/post?p=42"
+        assert normalize_url(raw3) == "https://example.com/post?p=42"
+
+    def test_normalize_url_removes_fragments(self):
+        """Removes URL hash fragments."""
+        raw = "https://example.com/news/breaking-story#comments-section"
+        assert normalize_url(raw) == "https://example.com/news/breaking-story"
+
     def test_normalize_url_lowercases_host_and_scheme(self):
         """Host and scheme should be lowercased; path case preserved."""
         raw = "HTTPS://Example.COM:443/Path/To/Story/?fbclid=123"
         expected = "https://example.com/Path/To/Story"
         assert normalize_url(raw) == expected
 
-    def test_normalize_url_handles_empty_and_invalid(self):
-        """Invalid strings should return gracefully without exceptions."""
+    def test_normalize_url_normalizes_consecutive_slashes(self):
+        """Collapses duplicate slashes in path while preserving safe root."""
+        raw = "https://example.com//world///news//"
+        assert normalize_url(raw) == "https://example.com/world/news"
+
+    def test_normalize_url_preserves_root_and_handles_invalid(self):
+        """Preserves root slash and handles invalid strings gracefully."""
+        assert normalize_url("https://example.com/") == "https://example.com/"
+        assert normalize_url("https://example.com") == "https://example.com"
         assert normalize_url("") == ""
         assert normalize_url(None) == ""
         assert normalize_url("not-a-valid-url") == "not-a-valid-url"
@@ -220,14 +277,14 @@ class TestIngestionHelpers:
 
 
 # =============================================================================
-# Integration Tests: Ingestion Service & Database Persistence
+# Integration Tests: Ingestion Service, Canonical URLs & Deduplication
 # =============================================================================
 
 class TestRSSIngestionService:
     """Tests for feed ingestion, database persistence, and deduplication."""
 
     def test_ingest_single_feed_success(self, db_session):
-        """Valid feed is parsed, NewsSource created, and articles inserted."""
+        """Valid feed is parsed, original URL preserved, canonical URL normalized, and articles inserted."""
         feed_cfg = {
             "source_name": "Global Wire",
             "base_url": "https://www.globalwire.com",
@@ -254,11 +311,15 @@ class TestRSSIngestionService:
         articles = db_session.query(Article).filter_by(source_id=source.id).all()
         assert len(articles) == 2
 
-        # Check normalization and content availability
+        # Check normalization and original URL preservation
         a1 = db_session.query(Article).filter(Article.url.contains("trade-summit-2026")).first()
         assert a1 is not None
         assert a1.source.name == "Global Wire"
-        assert "utm_source" not in a1.url
+        # Original URL preserves the link as published
+        assert "utm_source" in a1.url
+        # Canonical URL strips tracking query params
+        assert "utm_source" not in a1.canonical_url
+        assert a1.canonical_url == "https://www.globalwire.com/news/trade-summit-2026"
         assert a1.content_availability == "summary_only"
         assert a1.published_at is not None
         assert a1.retrieved_at is not None
@@ -285,6 +346,77 @@ class TestRSSIngestionService:
         # Verify total count in DB remains 2
         total = db_session.query(Article).count()
         assert total == 2
+
+    def test_duplicate_detection_different_tracking_params(self, db_session):
+        """Detects duplicate articles even when subsequent runs carry different tracking query params."""
+        feed_cfg = {
+            "source_name": "Tracking News Outlet",
+            "base_url": "https://tracking.com",
+            "feed_url": "https://tracking.com/rss.xml",
+        }
+
+        # Run 1: RSS entry with utm_source=twitter
+        rss_run_1 = """<?xml version="1.0" encoding="UTF-8"?>
+        <rss version="2.0">
+          <channel>
+            <title>Tracking News Outlet</title>
+            <link>https://tracking.com</link>
+            <item>
+              <title>Major Breakthrough in Fusion Energy</title>
+              <link>https://tracking.com/story/fusion?utm_source=twitter&amp;utm_medium=social</link>
+              <description>Scientists announced sustained reaction output.</description>
+            </item>
+          </channel>
+        </rss>
+        """
+        res1 = ingest_single_feed(feed_cfg=feed_cfg, db=db_session, raw_xml=rss_run_1)
+        assert res1.articles_inserted == 1
+        assert res1.articles_skipped_duplicate == 0
+
+        # Run 2: Same article with utm_source=newsletter (canonical URL matches)
+        rss_run_2 = """<?xml version="1.0" encoding="UTF-8"?>
+        <rss version="2.0">
+          <channel>
+            <title>Tracking News Outlet</title>
+            <link>https://tracking.com</link>
+            <item>
+              <title>Major Breakthrough in Fusion Energy</title>
+              <link>https://tracking.com/story/fusion?utm_source=newsletter&amp;utm_campaign=weekly</link>
+              <description>Scientists announced sustained reaction output.</description>
+            </item>
+          </channel>
+        </rss>
+        """
+        res2 = ingest_single_feed(feed_cfg=feed_cfg, db=db_session, raw_xml=rss_run_2)
+        assert res2.articles_inserted == 0
+        assert res2.articles_skipped_duplicate == 1
+
+        # Total in DB is still 1
+        assert db_session.query(Article).count() == 1
+
+    def test_exact_content_hash_deduplication(self, db_session):
+        """Skips duplicate entries from the same source sharing identical content bodies under different URLs."""
+        feed_cfg = {
+            "source_name": "Syndicated Wire",
+            "base_url": "https://syndicated.example.com",
+            "feed_url": "https://syndicated.example.com/rss.xml",
+        }
+
+        result = ingest_single_feed(
+            feed_cfg=feed_cfg,
+            db=db_session,
+            raw_xml=SAMPLE_EXACT_CONTENT_DUPLICATE_RSS,
+        )
+
+        assert result.status == "success"
+        # First entry is inserted; second entry has identical content hash and is skipped as a duplicate
+        assert result.articles_inserted == 1
+        assert result.articles_skipped_duplicate == 1
+
+        # Database contains exactly 1 article
+        articles = db_session.query(Article).all()
+        assert len(articles) == 1
+        assert articles[0].title == "First Morning Report"
 
     def test_missing_and_invalid_fields_handled_safely(self, db_session):
         """Safely handles missing title, invalid URL, missing date, and headline-only entries."""
@@ -325,7 +457,7 @@ class TestRSSIngestionService:
         assert headline_art.content_availability == "headline_only"
 
     def test_atom_feed_ingestion(self, db_session):
-        """Atom feeds are parsed and full content is correctly stored."""
+        """Atom feeds are parsed, original and canonical URLs recorded, and full content stored."""
         feed_cfg = {
             "source_name": "Tech Dispatch",
             "base_url": "https://techdispatch.io",
@@ -344,8 +476,50 @@ class TestRSSIngestionService:
         article = db_session.query(Article).filter(Article.url.contains("quantum-breakthrough")).first()
         assert article is not None
         assert article.content_availability == "full_text"
-        assert "fbclid" not in article.url
+        assert "fbclid" in article.url
+        assert "fbclid" not in article.canonical_url
         assert "fault-tolerant logical qubits" in article.content
+
+    def test_concurrent_collision_integrity_error_handled_gracefully(self, db_session):
+        """Simulates an IntegrityError collision during flush and verifies savepoint rollback."""
+        feed_cfg = {
+            "source_name": "Savepoint Source",
+            "base_url": "https://savepoint.org",
+            "feed_url": "https://savepoint.org/rss.xml",
+        }
+        source = get_or_create_news_source(db_session, "Savepoint Source", "https://savepoint.org")
+        pre_existing = Article(
+            source_id=source.id,
+            title="Pre-existing Article",
+            url="https://savepoint.org/news/first-article",
+            canonical_url="https://savepoint.org/news/first-article",
+            content_availability="summary_only",
+        )
+        db_session.add(pre_existing)
+        db_session.commit()
+
+        two_items_rss = """<?xml version="1.0" encoding="UTF-8"?>
+        <rss version="2.0">
+          <channel>
+            <title>Savepoint Source</title>
+            <link>https://savepoint.org</link>
+            <item>
+              <title>First Article</title>
+              <link>https://savepoint.org/news/first-article</link>
+              <description>Description of first article.</description>
+            </item>
+            <item>
+              <title>Second Article Brand New</title>
+              <link>https://savepoint.org/news/second-article-new</link>
+              <description>Description of brand new second article.</description>
+            </item>
+          </channel>
+        </rss>
+        """
+        result = ingest_single_feed(feed_cfg=feed_cfg, db=db_session, raw_xml=two_items_rss)
+        assert result.status == "success"
+        assert result.articles_inserted == 1
+        assert result.articles_skipped_duplicate == 1
 
     def test_multiple_feeds_orchestration(self, db_session):
         """Multiple feeds are processed and associated with distinct news sources."""
@@ -376,15 +550,183 @@ class TestRSSIngestionService:
         assert summary.feeds_successful == 2
         assert summary.feed_errors == 0
         assert summary.articles_inserted == 3  # 2 from Global Wire + 1 from Tech Dispatch
+        assert summary.feed_retries == 0
 
         sources_count = db_session.query(NewsSource).count()
         assert sources_count == 2
 
+
+# =============================================================================
+# Unit & Integration Tests: Retries and Fault Tolerance
+# =============================================================================
+
+class TestIngestionRetriesAndFaultTolerance:
+    """Tests for temporary error retries, backoff, permanent error fast-fail, and retry bounds."""
+
+    @patch("app.services.rss_ingestion.httpx.get")
+    def test_retry_temporary_503_then_success(self, mock_get, db_session):
+        """Temporary HTTP 503 is retried and succeeds on attempt 2."""
+        mock_503 = MagicMock()
+        mock_503.status_code = 503
+        err_503 = httpx.HTTPStatusError("503 Service Unavailable", request=MagicMock(), response=mock_503)
+
+        mock_200 = MagicMock()
+        mock_200.status_code = 200
+        mock_200.content = SAMPLE_RSS_2.encode("utf-8")
+        mock_200.raise_for_status = MagicMock()
+
+        mock_get.side_effect = [err_503, mock_200]
+
+        feed_cfg = {
+            "source_name": "Temp 503 Outlet",
+            "base_url": "https://temp503.com",
+            "feed_url": "https://temp503.com/rss.xml",
+        }
+
+        result = ingest_single_feed(
+            feed_cfg=feed_cfg,
+            db=db_session,
+            max_retries=2,
+            retry_delay=0.001,
+        )
+
+        assert result.status == "success"
+        assert result.retries_attempted == 1
+        assert result.articles_inserted == 2
+        assert mock_get.call_count == 2
+
+    @patch("app.services.rss_ingestion.httpx.get")
+    def test_retry_temporary_timeout_then_success(self, mock_get, db_session):
+        """Temporary timeout is retried and succeeds on attempt 2."""
+        mock_200 = MagicMock()
+        mock_200.status_code = 200
+        mock_200.content = SAMPLE_RSS_2.encode("utf-8")
+        mock_200.raise_for_status = MagicMock()
+
+        mock_get.side_effect = [httpx.TimeoutException("Read timed out"), mock_200]
+
+        feed_cfg = {
+            "source_name": "Timeout Outlet",
+            "base_url": "https://timeoutoutlet.com",
+            "feed_url": "https://timeoutoutlet.com/rss.xml",
+        }
+
+        result = ingest_single_feed(
+            feed_cfg=feed_cfg,
+            db=db_session,
+            max_retries=2,
+            retry_delay=0.001,
+        )
+
+        assert result.status == "success"
+        assert result.retries_attempted == 1
+        assert result.articles_inserted == 2
+        assert mock_get.call_count == 2
+
+    @patch("app.services.rss_ingestion.httpx.get")
+    def test_permanent_404_not_found_fails_without_retries(self, mock_get, db_session):
+        """Permanent 404 client error fails immediately without retrying."""
+        mock_404 = MagicMock()
+        mock_404.status_code = 404
+        err_404 = httpx.HTTPStatusError("404 Not Found", request=MagicMock(), response=mock_404)
+        mock_get.side_effect = err_404
+
+        feed_cfg = {
+            "source_name": "Missing Feed",
+            "base_url": "https://notfound.example.com",
+            "feed_url": "https://notfound.example.com/rss.xml",
+        }
+
+        result = ingest_single_feed(
+            feed_cfg=feed_cfg,
+            db=db_session,
+            max_retries=3,
+            retry_delay=0.001,
+        )
+
+        assert result.status == "error"
+        assert result.retries_attempted == 0
+        assert "Permanent error, not retrying" in result.error
+        # Fast fail: exactly 1 attempt made
+        assert mock_get.call_count == 1
+
+    @patch("app.services.rss_ingestion.httpx.get")
+    def test_permanent_403_forbidden_fails_without_retries(self, mock_get, db_session):
+        """Permanent 403 forbidden error fails immediately without retrying."""
+        mock_403 = MagicMock()
+        mock_403.status_code = 403
+        err_403 = httpx.HTTPStatusError("403 Forbidden", request=MagicMock(), response=mock_403)
+        mock_get.side_effect = err_403
+
+        feed_cfg = {
+            "source_name": "Forbidden Feed",
+            "base_url": "https://forbidden.example.com",
+            "feed_url": "https://forbidden.example.com/rss.xml",
+        }
+
+        result = ingest_single_feed(
+            feed_cfg=feed_cfg,
+            db=db_session,
+            max_retries=3,
+            retry_delay=0.001,
+        )
+
+        assert result.status == "error"
+        assert result.retries_attempted == 0
+        assert mock_get.call_count == 1
+
+    @patch("app.services.rss_ingestion.httpx.get")
+    def test_retry_limit_reached_on_persistent_500(self, mock_get, db_session):
+        """Persistent 500 server error exhausts max retries and halts."""
+        mock_500 = MagicMock()
+        mock_500.status_code = 500
+        err_500 = httpx.HTTPStatusError("500 Internal Server Error", request=MagicMock(), response=mock_500)
+        mock_get.side_effect = err_500
+
+        feed_cfg = {
+            "source_name": "Persistent Error Feed",
+            "base_url": "https://servererr.example.com",
+            "feed_url": "https://servererr.example.com/rss.xml",
+        }
+
+        result = ingest_single_feed(
+            feed_cfg=feed_cfg,
+            db=db_session,
+            max_retries=2,
+            retry_delay=0.001,
+        )
+
+        assert result.status == "error"
+        assert result.retries_attempted == 2
+        # 1 initial attempt + 2 retries = 3 attempts total
+        assert mock_get.call_count == 3
+        assert "after 3 attempts" in result.error
+
+    @patch("app.services.rss_ingestion.httpx.get")
+    def test_retry_limit_reached_on_persistent_timeout(self, mock_get, db_session):
+        """Persistent timeout exhausts max retries and records failure."""
+        mock_get.side_effect = httpx.TimeoutException("Connection timed out")
+
+        feed_cfg = {
+            "source_name": "Timeout Server Feed",
+            "base_url": "https://timeout500.example.com",
+            "feed_url": "https://timeout500.example.com/rss.xml",
+        }
+
+        result = ingest_single_feed(
+            feed_cfg=feed_cfg,
+            db=db_session,
+            max_retries=2,
+            retry_delay=0.001,
+        )
+
+        assert result.status == "error"
+        assert result.retries_attempted == 2
+        assert mock_get.call_count == 3
+        assert "after 3 attempts" in result.error
+
     def test_failed_feed_does_not_block_successful_feeds(self, db_session):
-        """
-        Fault tolerance: an unreachable or broken feed fails gracefully
-        without preventing other feeds from processing.
-        """
+        """Fault tolerance: an unreachable feed fails gracefully without stopping other feeds."""
         feeds = [
             {
                 "source_name": "Broken Feed Outlet",
@@ -413,7 +755,6 @@ class TestRSSIngestionService:
         assert summary.feed_errors == 1
         assert summary.articles_inserted == 2
 
-        # Check detail records
         err_detail = next(d for d in summary.details if d.source_name == "Broken Feed Outlet")
         assert err_detail.status == "error"
         assert err_detail.error is not None
@@ -459,8 +800,10 @@ class TestIngestionAPIEndpoints:
         assert data["articles_inserted"] == 2
         assert data["articles_skipped_duplicate"] == 0
         assert data["feed_errors"] == 0
+        assert data["feed_retries"] == 0
         assert len(data["details"]) == 1
         assert data["details"][0]["source_name"] == "API Wire Source"
+        assert data["details"][0]["retries_attempted"] == 0
 
     @patch("app.services.rss_ingestion.httpx.get")
     def test_api_ingestion_network_failure_handling(self, mock_get, client):
@@ -474,7 +817,8 @@ class TestIngestionAPIEndpoints:
                     "base_url": "https://offline.example.com",
                     "feed_url": "https://offline.example.com/rss.xml",
                 }
-            ]
+            ],
+            "max_retries": 1,
         }
 
         response = client.post("/api/ingestion/run", json=payload)
@@ -484,8 +828,10 @@ class TestIngestionAPIEndpoints:
         assert data["feeds_attempted"] == 1
         assert data["feeds_successful"] == 0
         assert data["feed_errors"] == 1
+        assert data["feed_retries"] == 1
         assert data["articles_inserted"] == 0
         assert "Network request failed" in data["details"][0]["error"]
+        assert data["details"][0]["retries_attempted"] == 1
 
     def test_api_v1_and_api_prefix_parity(self, client):
         """Both /api/ingestion and /api/v1/ingestion paths are available."""

@@ -3,6 +3,8 @@ RSS Feed Ingestion Service.
 
 Collects, parses, normalizes, and stores news articles from configured
 RSS/Atom feeds into the PostgreSQL database.
+Includes canonical URL normalization, duplicate prevention, exact-content hash checks,
+and controlled retries for temporary feed failures.
 """
 
 from datetime import datetime, timezone
@@ -11,6 +13,7 @@ import hashlib
 import html
 import logging
 import re
+import time
 from typing import Any, Dict, List, Optional, Set, Tuple
 import urllib.parse
 
@@ -26,8 +29,9 @@ from app.schemas.ingestion import FeedResultDetail, IngestionSummaryResponse
 
 logger = logging.getLogger(__name__)
 
-# Tracking query parameters commonly appended to article links
+# Known tracking query parameters commonly appended to article links
 TRACKING_PARAMS: Set[str] = {
+    # UTM parameters
     "utm_source",
     "utm_medium",
     "utm_campaign",
@@ -37,64 +41,115 @@ TRACKING_PARAMS: Set[str] = {
     "utm_source_platform",
     "utm_creative_format",
     "utm_marketing_tactic",
+    "utm_reader",
+    "utm_place",
+    "utm_userid",
+    # Ad click identifiers
     "fbclid",
     "gclid",
     "gclsrc",
     "dclid",
-    "zanpid",
+    "wbraid",
+    "gbraid",
     "msclkid",
+    "twclid",
+    "yclid",
+    "zanpid",
+    # Social & email marketing trackers
+    "igshid",
     "mc_cid",
     "mc_eid",
+    "_hsenc",
+    "_hsmi",
+    "mkt_tok",
+    "cmpid",
+    "sc_src",
+    "sc_cid",
+    "sc_lid",
+    # Referral & feed tags
     "ref",
     "ref_src",
     "rss",
     "feed",
 }
 
+# HTTP status codes that represent permanent client errors (do not retry)
+PERMANENT_HTTP_STATUS_CODES: Set[int] = {
+    400,  # Bad Request
+    401,  # Unauthorized
+    403,  # Forbidden
+    404,  # Not Found
+    405,  # Method Not Allowed
+    410,  # Gone
+    422,  # Unprocessable Entity
+}
 
-def normalize_url(raw_url: str) -> str:
+
+def normalize_url(raw_url: Optional[str]) -> str:
     """
-    Normalizes an article URL:
-    - Strips leading/trailing whitespace
-    - Lowercases scheme and netloc
-    - Removes standard ports (:80, :443)
-    - Strips tracking query parameters (utm_*, fbclid, etc.)
-    - Deterministically sorts remaining query parameters
-    - Normalizes path slashes
-    - Strips fragment identifiers (#...)
+    Normalizes an article URL into a canonical format:
+    - Strips leading and trailing whitespace
+    - Lowercases scheme and netloc (domain)
+    - Strips default HTTP (:80) and HTTPS (:443) ports while preserving non-standard ports
+    - Normalizes consecutive slashes in the path (e.g. //news/// -> /news/)
+    - Safely strips trailing slashes on non-root paths (/story/ -> /story)
+    - Strips known tracking parameters (utm_*, fbclid, gclid, etc.)
+    - Preserves meaningful query parameters (id, v, p, article_id, story_id, etc.)
+    - Sorts query parameters deterministically for consistency
+    - Strips URL fragment identifiers (#section, #comments, etc.)
     """
     if not raw_url or not isinstance(raw_url, str):
         return ""
 
     url = raw_url.strip()
+    if not url:
+        return ""
+
     parsed = urllib.parse.urlsplit(url)
     if not parsed.scheme or not parsed.netloc:
         return url
 
     scheme = parsed.scheme.lower()
-    netloc = parsed.netloc.lower()
 
-    # Remove standard port specifications
-    if (scheme == "http" and netloc.endswith(":80")) or (
-        scheme == "https" and netloc.endswith(":443")
-    ):
-        netloc = netloc.rsplit(":", 1)[0]
+    # Normalize netloc: lowercase hostname, remove default ports, keep non-default ports
+    hostname = (parsed.hostname or "").lower()
+    if hostname:
+        port = parsed.port
+        if (scheme == "http" and port == 80) or (scheme == "https" and port == 443):
+            port = None
+        userinfo = ""
+        if parsed.username:
+            userinfo = parsed.username
+            if parsed.password:
+                userinfo += f":{parsed.password}"
+            userinfo += "@"
+        netloc = f"{userinfo}{hostname}:{port}" if port else f"{userinfo}{hostname}"
+    else:
+        netloc = parsed.netloc.lower()
+        if (scheme == "http" and netloc.endswith(":80")) or (
+            scheme == "https" and netloc.endswith(":443")
+        ):
+            netloc = netloc.rsplit(":", 1)[0]
 
-    # Filter out tracking query parameters
+    # Normalize path: collapse consecutive slashes and safely strip trailing slash on non-root paths
+    path = parsed.path
+    if path:
+        path = re.sub(r"/{2,}", "/", path)
+        if len(path) > 1 and path.endswith("/"):
+            path = path.rstrip("/")
+
+    # Filter out known tracking parameters while strictly preserving meaningful query parameters
     query_tuples = urllib.parse.parse_qsl(parsed.query, keep_blank_values=False)
     cleaned_tuples = [
         (k, v)
         for k, v in query_tuples
         if k.lower() not in TRACKING_PARAMS and not k.lower().startswith("utm_")
     ]
-    cleaned_tuples.sort(key=lambda x: x[0])
+    # Deterministic sorting of query parameters
+    cleaned_tuples.sort(key=lambda x: (x[0], x[1]))
     new_query = urllib.parse.urlencode(cleaned_tuples)
 
-    # Normalize trailing slash in path if not root
-    path = parsed.path
-    if path.endswith("/") and len(path) > 1:
-        path = path.rstrip("/")
-
+    # Reconstruct URL without fragment
     return urllib.parse.urlunsplit((scheme, netloc, path, new_query, ""))
 
 
@@ -185,7 +240,6 @@ def extract_entry_content(entry: Any) -> Tuple[Optional[str], str]:
     raw_summary = entry.get("summary") or entry.get("description")
     cleaned_summary = clean_html_text(raw_summary)
     if cleaned_summary:
-        # Feeds provide summaries, not full articles
         return cleaned_summary, "summary_only"
 
     # 3. If no body or summary is provided, only the headline is available
@@ -195,37 +249,140 @@ def extract_entry_content(entry: Any) -> Tuple[Optional[str], str]:
 def fetch_and_parse_feed(
     feed_url: str,
     raw_xml: Optional[str | bytes] = None,
-    timeout: int = 10,
+    timeout: Optional[int] = None,
+    max_retries: Optional[int] = None,
+    retry_delay: Optional[float] = None,
 ) -> feedparser.FeedParserDict:
     """
-    Retrieves and parses an RSS or Atom feed.
-    Supports injecting raw_xml directly for testing and offline environments.
+    Retrieves and parses an RSS or Atom feed with controlled retries.
+
+    Features:
+    - Configurable timeout and retry bounds
+    - Exponential backoff on temporary failures (network timeouts, 5xx server errors, 429)
+    - Immediate failure on permanent client errors (400, 401, 403, 404, 410, etc.) without wasted retries
+    - Diagnostic tracking of retries count attached to returned FeedParserDict (or exception)
+    - Supports injecting raw_xml directly for offline testing
     """
     if raw_xml is not None:
         feed = feedparser.parse(raw_xml)
-    else:
+        feed.retries_count = 0
+        if feed.bozo == 1 and not feed.entries and not feed.feed.get("title"):
+            bozo_exc = getattr(feed, "bozo_exception", "Invalid or malformed feed XML")
+            raise ValueError(f"Failed to parse feed data: {bozo_exc}")
+        return feed
+
+    effective_timeout = timeout or settings.RSS_FEED_TIMEOUT_SECONDS
+    effective_max_retries = (
+        max_retries if max_retries is not None else settings.RSS_MAX_RETRIES
+    )
+    effective_retry_delay = (
+        retry_delay if retry_delay is not None else settings.RSS_RETRY_BACKOFF_SECONDS
+    )
+
+    max_attempts = 1 + max(0, effective_max_retries)
+    retries_attempted = 0
+
+    for attempt in range(1, max_attempts + 1):
+        if attempt > 1:
+            retries_attempted += 1
+            backoff = effective_retry_delay * (2 ** (attempt - 2))
+            logger.warning(
+                "Retrying feed fetch for %s (attempt %d/%d) after %.2fs backoff",
+                feed_url,
+                attempt,
+                max_attempts,
+                backoff,
+            )
+            time.sleep(backoff)
+
         try:
             response = httpx.get(
                 feed_url,
-                timeout=float(timeout),
+                timeout=float(effective_timeout),
                 headers={"User-Agent": settings.RSS_USER_AGENT},
                 follow_redirects=True,
             )
+
+            # Check status code for permanent client errors
+            status_code = response.status_code
+            if status_code in PERMANENT_HTTP_STATUS_CODES:
+                err = RuntimeError(
+                    f"HTTP error {status_code}: Permanent error, not retrying ({feed_url})"
+                )
+                setattr(err, "retries_attempted", retries_attempted)
+                raise err
+
             response.raise_for_status()
+
+            # Successfully received HTTP response, parse XML
             feed = feedparser.parse(response.content)
-        except httpx.TimeoutException as exc:
-            raise TimeoutError(f"Connection timed out after {timeout}s: {exc}") from exc
+
+            # Check if XML is malformed
+            if feed.bozo == 1 and not feed.entries and not feed.feed.get("title"):
+                bozo_exc = getattr(feed, "bozo_exception", "Invalid or malformed feed XML")
+                err = ValueError(f"Failed to parse feed data: {bozo_exc}")
+                setattr(err, "retries_attempted", retries_attempted)
+                raise err
+
+            feed.retries_count = retries_attempted
+            return feed
+
         except httpx.HTTPStatusError as exc:
-            raise RuntimeError(f"HTTP error {exc.response.status_code}: {exc}") from exc
+            status_code = exc.response.status_code
+            if status_code in PERMANENT_HTTP_STATUS_CODES:
+                err = RuntimeError(
+                    f"HTTP error {status_code}: Permanent error, not retrying ({feed_url})"
+                )
+                setattr(err, "retries_attempted", retries_attempted)
+                raise err from exc
+
+            # Retryable server error (5xx, 429)
+            if attempt >= max_attempts:
+                err = RuntimeError(
+                    f"HTTP error {status_code} after {max_attempts} attempts: {exc}"
+                )
+                setattr(err, "retries_attempted", retries_attempted)
+                raise err from exc
+            logger.warning(
+                "Temporary HTTP error %d on attempt %d/%d for %s",
+                status_code,
+                attempt,
+                max_attempts,
+                feed_url,
+            )
+
+        except httpx.TimeoutException as exc:
+            if attempt >= max_attempts:
+                err = TimeoutError(
+                    f"Connection timed out after {max_attempts} attempts ({effective_timeout}s timeout): {exc}"
+                )
+                setattr(err, "retries_attempted", retries_attempted)
+                raise err from exc
+            logger.warning(
+                "Timeout on attempt %d/%d for %s",
+                attempt,
+                max_attempts,
+                feed_url,
+            )
+
         except httpx.RequestError as exc:
-            raise ConnectionError(f"Network request failed: {exc}") from exc
+            if attempt >= max_attempts:
+                err = ConnectionError(
+                    f"Network request failed after {max_attempts} attempts: {exc}"
+                )
+                setattr(err, "retries_attempted", retries_attempted)
+                raise err from exc
+            logger.warning(
+                "Network request error on attempt %d/%d for %s: %s",
+                attempt,
+                max_attempts,
+                feed_url,
+                exc,
+            )
 
-    # Validate feed structure
-    if feed.bozo == 1 and not feed.entries and not feed.feed.get("title"):
-        bozo_exc = getattr(feed, "bozo_exception", "Invalid or malformed feed XML")
-        raise ValueError(f"Failed to parse feed data: {bozo_exc}")
-
-    return feed
+    err = RuntimeError(f"Failed to fetch feed {feed_url} after {max_attempts} attempts")
+    setattr(err, "retries_attempted", retries_attempted)
+    raise err
 
 
 def get_or_create_news_source(
@@ -265,11 +422,16 @@ def ingest_single_feed(
     db: Session,
     raw_xml: Optional[str | bytes] = None,
     max_articles: Optional[int] = None,
-    timeout: int = 10,
+    timeout: Optional[int] = None,
+    max_retries: Optional[int] = None,
+    retry_delay: Optional[float] = None,
 ) -> FeedResultDetail:
     """
     Ingests articles from a single configured RSS feed into PostgreSQL.
-    Deduplicates URLs, validates entries, and safely records metadata.
+    - Normalizes canonical URLs and preserves original URLs
+    - Deduplicates by canonical URL, original URL, in-memory cache, and exact-content hash
+    - Catches concurrent insert collisions using transaction savepoints (begin_nested)
+    - Records retries and diagnostic errors safely
     """
     source_name = feed_cfg.get("source_name", "Unknown Source")
     feed_url = feed_cfg.get("feed_url", "")
@@ -282,19 +444,29 @@ def ingest_single_feed(
             status="error",
             articles_inserted=0,
             articles_skipped_duplicate=0,
+            retries_attempted=0,
             error="Missing feed_url in configuration",
         )
 
     articles_inserted = 0
     articles_skipped_duplicate = 0
     seen_urls_in_run: Set[str] = set()
+    seen_hashes_in_run: Set[str] = set()
+    retries_count = 0
 
     try:
         # 1. Resolve or create parent NewsSource
         source = get_or_create_news_source(db, source_name=source_name, base_url=base_url)
 
-        # 2. Fetch and parse feed entries
-        feed = fetch_and_parse_feed(feed_url=feed_url, raw_xml=raw_xml, timeout=timeout)
+        # 2. Fetch and parse feed entries with retries
+        feed = fetch_and_parse_feed(
+            feed_url=feed_url,
+            raw_xml=raw_xml,
+            timeout=timeout,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+        )
+        retries_count = getattr(feed, "retries_count", 0)
 
         entries = feed.entries
         if max_articles is not None and max_articles > 0:
@@ -308,7 +480,8 @@ def ingest_single_feed(
                 logger.warning("Skipping entry without valid HTTP link: %s", entry.get("title", "No Title"))
                 continue
 
-            canonical_url = normalize_url(raw_link)
+            raw_url = raw_link.strip()
+            canonical_url = normalize_url(raw_url)
             if not canonical_url:
                 continue
 
@@ -317,13 +490,13 @@ def ingest_single_feed(
                 articles_skipped_duplicate += 1
                 continue
 
-            # Check database for existing article with this URL or canonical_url
+            # Database deduplication: check canonical_url or raw url
             existing_article = (
                 db.query(Article)
                 .filter(
-                    (Article.url == canonical_url)
-                    | (Article.url == raw_link)
-                    | (Article.canonical_url == canonical_url)
+                    (Article.canonical_url == canonical_url)
+                    | (Article.url == canonical_url)
+                    | (Article.url == raw_url)
                 )
                 .first()
             )
@@ -332,31 +505,53 @@ def ingest_single_feed(
                 articles_skipped_duplicate += 1
                 continue
 
+            # Parse content and content availability
+            content, content_availability = extract_entry_content(entry)
+            content_hash = compute_content_hash(content)
+
+            # Exact-content hash deduplication for articles from the same source
+            if content_hash:
+                if content_hash in seen_hashes_in_run:
+                    seen_urls_in_run.add(canonical_url)
+                    articles_skipped_duplicate += 1
+                    continue
+
+                if content and len(content.strip()) >= 50:
+                    existing_by_hash = (
+                        db.query(Article)
+                        .filter(
+                            Article.content_hash == content_hash,
+                            Article.source_id == source.id,
+                        )
+                        .first()
+                    )
+                    if existing_by_hash:
+                        seen_urls_in_run.add(canonical_url)
+                        seen_hashes_in_run.add(content_hash)
+                        articles_skipped_duplicate += 1
+                        continue
+
             # Parse Title with fallback
             raw_title = entry.get("title")
             cleaned_title = clean_html_text(raw_title)
             if not cleaned_title:
-                # Fallback to summary snippet or generic title
                 summary_snippet = clean_html_text(entry.get("summary") or entry.get("description"))
                 cleaned_title = summary_snippet[:80] + "..." if summary_snippet else "Untitled Article"
 
-            # Enforce max title length of 512
             title = cleaned_title[:512]
-
-            # Parse content and content availability
-            content, content_availability = extract_entry_content(entry)
-            content_hash = compute_content_hash(content)
 
             # Parse publication timestamp
             published_at = parse_entry_published_at(entry)
             retrieved_at = datetime.now(timezone.utc)
 
-            # Create Article record
+            # Create Article record:
+            # url: original article link from RSS feed
+            # canonical_url: normalized canonical URL
             article = Article(
                 source_id=source.id,
                 title=title,
                 content=content,
-                url=canonical_url[:1024],
+                url=raw_url[:1024],
                 canonical_url=canonical_url[:1024],
                 content_availability=content_availability,
                 content_hash=content_hash,
@@ -364,17 +559,23 @@ def ingest_single_feed(
                 retrieved_at=retrieved_at,
             )
 
+            # Safe database insertion using nested savepoint for concurrency safety
             try:
-                db.add(article)
-                db.flush()
+                with db.begin_nested():
+                    db.add(article)
+                    db.flush()
                 seen_urls_in_run.add(canonical_url)
+                if content_hash:
+                    seen_hashes_in_run.add(content_hash)
                 articles_inserted += 1
             except IntegrityError:
-                db.rollback()
+                # Concurrent insert or uniqueness conflict safely caught by savepoint
                 articles_skipped_duplicate += 1
                 seen_urls_in_run.add(canonical_url)
+                if content_hash:
+                    seen_hashes_in_run.add(content_hash)
 
-        # Commit all successful inserts for this feed
+        # Commit all successfully inserted articles for this feed
         db.commit()
 
         return FeedResultDetail(
@@ -383,18 +584,21 @@ def ingest_single_feed(
             status="success",
             articles_inserted=articles_inserted,
             articles_skipped_duplicate=articles_skipped_duplicate,
+            retries_attempted=retries_count,
             error=None,
         )
 
     except Exception as exc:
         db.rollback()
-        logger.error("Error ingesting feed %s: %s", feed_url, exc)
+        retries_attempted = getattr(exc, "retries_attempted", retries_count)
+        logger.error("Error ingesting feed %s (after %d retries): %s", feed_url, retries_attempted, exc)
         return FeedResultDetail(
             source_name=source_name,
             feed_url=feed_url,
             status="error",
             articles_inserted=0,
             articles_skipped_duplicate=0,
+            retries_attempted=retries_attempted,
             error=str(exc),
         )
 
@@ -404,6 +608,8 @@ def run_rss_ingestion(
     feeds: Optional[List[Dict[str, str]]] = None,
     max_articles_per_feed: Optional[int] = None,
     timeout: Optional[int] = None,
+    max_retries: Optional[int] = None,
+    retry_delay: Optional[float] = None,
     raw_feeds: Optional[Dict[str, str | bytes]] = None,
 ) -> IngestionSummaryResponse:
     """
@@ -413,12 +619,15 @@ def run_rss_ingestion(
     feed_list = feeds if feeds is not None else DEFAULT_RSS_FEEDS
     effective_timeout = timeout or settings.RSS_FEED_TIMEOUT_SECONDS
     effective_limit = max_articles_per_feed or settings.RSS_MAX_ARTICLES_PER_FEED
+    effective_max_retries = max_retries if max_retries is not None else settings.RSS_MAX_RETRIES
+    effective_retry_delay = retry_delay if retry_delay is not None else settings.RSS_RETRY_BACKOFF_SECONDS
 
     total_attempted = 0
     total_successful = 0
     total_inserted = 0
     total_skipped = 0
     total_errors = 0
+    total_retries = 0
     details: List[FeedResultDetail] = []
 
     for feed_cfg in feed_list:
@@ -432,9 +641,12 @@ def run_rss_ingestion(
             raw_xml=raw_xml,
             max_articles=effective_limit,
             timeout=effective_timeout,
+            max_retries=effective_max_retries,
+            retry_delay=effective_retry_delay,
         )
 
         details.append(detail)
+        total_retries += detail.retries_attempted
         if detail.status == "success":
             total_successful += 1
             total_inserted += detail.articles_inserted
@@ -448,6 +660,6 @@ def run_rss_ingestion(
         articles_inserted=total_inserted,
         articles_skipped_duplicate=total_skipped,
         feed_errors=total_errors,
+        feed_retries=total_retries,
         details=details,
     )
-

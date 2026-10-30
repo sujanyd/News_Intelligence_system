@@ -47,6 +47,8 @@ def run_ingestion(
         db=db,
         feeds=custom_feeds,
         max_articles_per_feed=request.max_articles_per_feed,
+        timeout=request.timeout,
+        max_retries=request.max_retries,
     )
     return summary
 

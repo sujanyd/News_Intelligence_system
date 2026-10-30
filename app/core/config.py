@@ -31,6 +31,8 @@ class Settings(BaseSettings):
 
     # RSS Ingestion Pipeline Configuration
     RSS_FEED_TIMEOUT_SECONDS: int = 10
+    RSS_MAX_RETRIES: int = 2
+    RSS_RETRY_BACKOFF_SECONDS: float = 0.5
     RSS_USER_AGENT: str = "NewsBiasIntelligenceBot/1.0 (+https://github.com/sujanyd/News_Intelligence_system)"
     RSS_MAX_ARTICLES_PER_FEED: int = 30
 
