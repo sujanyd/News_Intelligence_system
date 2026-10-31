@@ -262,7 +262,7 @@ describe('Articles page', () => {
     expect(within(details).getByText('Loading article...')).toBeDefined()
     expect(await within(details).findByText(/The city council voted on Monday/)).toBeDefined()
 
-    fireEvent.click(within(details).getByRole('button', { name: 'Close' }))
+    fireEvent.click(within(details).getByRole('button', { name: /Back to articles/i }))
     expect(screen.queryByRole('region', { name: 'Article details' })).toBeNull()
   })
 

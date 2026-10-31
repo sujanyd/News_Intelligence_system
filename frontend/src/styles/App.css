@@ -1061,3 +1061,173 @@
   color: var(--color-text-muted);
   margin: -0.25rem 0 0.75rem;
 }
+
+/* ==========================================================
+   ArticleDetails – section layout
+   ========================================================== */
+
+/* Each named section inside the details panel */
+.ad-section {
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.ad-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.ad-section-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+/* URL row inside Article Information */
+.ad-url-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+}
+
+.ad-url-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.ad-url-link {
+  font-size: 0.875rem;
+  color: var(--color-primary);
+  word-break: break-all;
+}
+
+.ad-url-missing {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Content section variants */
+.ad-content-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: rgba(31, 41, 55, 0.4);
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.ad-notice-text {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.ad-summary-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 0.75rem;
+}
+
+.ad-summary-note {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Source Information section */
+.ad-source-list {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.ad-section-note {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin-top: 0.625rem;
+  line-height: 1.5;
+}
+
+/* Analysis placeholder section */
+.ad-analysis-section {
+  background-color: rgba(17, 24, 39, 0.35);
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  margin-top: 0.25rem;
+}
+
+.ad-coming-soon {
+  font-size: 0.65rem !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-weight: 500 !important;
+}
+
+.ad-analysis-placeholder-msg {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-bottom: 1.25rem;
+  padding: 0.625rem 0.875rem;
+  background-color: rgba(31, 41, 55, 0.5);
+  border-left: 3px solid var(--color-border-subtle);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.ad-analysis-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.ad-analysis-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 0.875rem;
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  opacity: 0.72;
+  transition: opacity var(--transition-fast);
+}
+
+.ad-analysis-card:hover {
+  opacity: 0.9;
+}
+
+.ad-analysis-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.ad-analysis-card-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 0.2rem;
+}
+
+.ad-analysis-card-desc {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+/* Responsive: stack source list on small screens */
+@media (max-width: 640px) {
+  .ad-source-list {
+    grid-template-columns: 1fr;
+  }
+}
