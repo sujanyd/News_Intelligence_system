@@ -732,11 +732,18 @@ The system includes a resilient RSS and Atom ingestion pipeline with canonical U
   - Permanent client errors (`400`, `401`, `403`, `404`, `405`, `410`) fast-fail immediately without wasteful retries.
   - Failure in one feed is isolated and does not stop subsequent feeds.
 
+### Article Text Preprocessing Pipeline
+Located in `app/services/text_preprocessing.py`, the preprocessing pipeline prepares news text for downstream embedding generation, vector indexing in Qdrant, semantic clustering, and bias/framing analysis:
+- **Separation of Concerns**: Prepares dedicated representations for **Headline text** (`processed.headline`) and **Body text** (`processed.body`), avoiding naive concatenation.
+- **Meaning Preservation**: Retains all named entities, organizations, geopolitical terms, dates, numbers, financial metrics, and essential punctuation.
+- **Non-Destructive Execution**: Leaves original `Article` database records untouched.
+- **Structured Return Object**: Returns `ProcessedArticleText` dataclass with `headline`, `body`, `content_availability`, `is_body_available`, `word_count`, `character_count`, and `get_embedding_input(target)` helper.
+
 ---
 
 ## 🧪 11. Running Automated Tests
 
-Run the full automated test suite (69 tests) using `pytest`:
+Run the full automated test suite (88 tests) using `pytest`:
 
 ```bash
 pytest -v
@@ -811,10 +818,29 @@ tests/test_rss_ingestion.py::TestIngestionRetriesAndFaultTolerance::test_retry_l
 tests/test_rss_ingestion.py::TestIngestionRetriesAndFaultTolerance::test_retry_limit_reached_on_persistent_timeout PASSED [ 94%]
 tests/test_rss_ingestion.py::TestIngestionRetriesAndFaultTolerance::test_failed_feed_does_not_block_successful_feeds PASSED [ 95%]
 tests/test_rss_ingestion.py::TestIngestionAPIEndpoints::test_api_ingestion_run_success PASSED [ 97%]
-tests/test_rss_ingestion.py::TestIngestionAPIEndpoints::test_api_ingestion_network_failure_handling PASSED [ 98%]
-tests/test_rss_ingestion.py::TestIngestionAPIEndpoints::test_api_v1_and_api_prefix_parity PASSED [100%]
+tests/test_rss_ingestion.py::TestIngestionAPIEndpoints::test_api_ingestion_network_failure_handling PASSED [ 77%]
+tests/test_rss_ingestion.py::TestIngestionAPIEndpoints::test_api_v1_and_api_prefix_parity PASSED [ 78%]
+tests/test_text_preprocessing.py::TestTextPreprocessingCleaningHelpers::test_strip_markup_and_entities_removes_tags_and_decodes PASSED [ 79%]
+tests/test_text_preprocessing.py::TestTextPreprocessingCleaningHelpers::test_strip_markup_none_and_empty PASSED [ 80%]
+tests/test_text_preprocessing.py::TestTextPreprocessingCleaningHelpers::test_clean_unicode_and_quotes PASSED [ 81%]
+tests/test_text_preprocessing.py::TestTextPreprocessingCleaningHelpers::test_normalize_whitespace_inline PASSED [ 82%]
+tests/test_text_preprocessing.py::TestTextPreprocessingCleaningHelpers::test_normalize_whitespace_preserve_paragraphs PASSED [ 84%]
+tests/test_headlinePreprocessing::test_normal_headline PASSED            [ 85%]
+tests/test_text_preprocessing.py::TestHeadlinePreprocessing::test_headline_with_extra_whitespace_and_html PASSED [ 86%]
+tests/test_text_preprocessing.py::TestHeadlinePreprocessing::test_missing_headline_fallback PASSED [ 87%]
+tests/test_text_preprocessing.py::TestHeadlinePreprocessing::test_headline_preserves_numbers_names_dates PASSED [ 88%]
+tests/test_text_preprocessing.py::TestBodyPreprocessing::test_normal_body_content PASSED [ 89%]
+tests/test_text_preprocessing.py::TestBodyPreprocessing::test_missing_content PASSED [ 90%]
+tests/test_text_preprocessing.py::TestBodyPreprocessing::test_summary_only_preservation PASSED [ 92%]
+tests/test_text_preprocessing.py::TestFullArticlePreprocessingPipeline::test_preprocess_article_from_orm_instance PASSED [ 93%]
+tests/test_text_preprocessing.py::TestFullArticlePreprocessingPipeline::test_preprocess_article_from_dict PASSED [ 94%]
+tests/test_text_preprocessing.py::TestFullArticlePreprocessingPipeline::test_preprocess_article_headline_only PASSED [ 95%]
+tests/test_text_preprocessing.py::TestFullArticlePreprocessingPipeline::test_preprocess_article_preserves_sensitive_news_entities PASSED [ 96%]
+tests/test_text_preprocessing.py::TestFullArticlePreprocessingPipeline::test_get_embedding_input_targets PASSED [ 97%]
+tests/test_text_preprocessing.py::TestFullArticlePreprocessingPipeline::test_get_embedding_input_body_fallback_when_empty PASSED [ 98%]
+tests/test_text_preprocessing.py::TestFullArticlePreprocessingPipeline::test_get_embedding_input_invalid_target_raises_error PASSED [100%]
 
-=================== 68 passed, 1 skipped in 0.82s ===================
+=================== 87 passed, 1 skipped in 0.96s ===================
 ```
 
 ### Direct PostgreSQL End-to-End Verification
