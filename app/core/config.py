@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     RSS_USER_AGENT: str = "NewsBiasIntelligenceBot/1.0 (+https://github.com/sujanyd/News_Intelligence_system)"
     RSS_MAX_ARTICLES_PER_FEED: int = 30
 
+    # Article Embedding Configuration
+    # Supported providers: 'mock', 'openai', 'gemini'
+    EMBEDDING_PROVIDER: str = "mock"
+    EMBEDDING_MODEL_NAME: str = "text-embedding-3-small"
+    EMBEDDING_DIMENSIONS: int = 1536
+    EMBEDDING_API_KEY: str = ""
+    EMBEDDING_BATCH_SIZE: int = 20
+
     # Configuration for pydantic-settings
     model_config = SettingsConfigDict(
         env_file=".env",

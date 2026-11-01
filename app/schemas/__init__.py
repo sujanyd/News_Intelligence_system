@@ -20,6 +20,11 @@ from app.schemas.ingestion import (
     FeedResultDetail,
     IngestionSummaryResponse,
 )
+from app.schemas.embedding import (
+    EmbeddingGenerateRequest,
+    ArticleEmbeddingResultDetail,
+    EmbeddingGenerateSummaryResponse,
+)
 
 __all__ = [
     "HealthCheckResponse",
@@ -34,4 +39,7 @@ __all__ = [
     "IngestionRunRequest",
     "FeedResultDetail",
     "IngestionSummaryResponse",
+    "EmbeddingGenerateRequest",
+    "ArticleEmbeddingResultDetail",
+    "EmbeddingGenerateSummaryResponse",
 ]

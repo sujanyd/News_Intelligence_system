@@ -739,11 +739,78 @@ Located in `app/services/text_preprocessing.py`, the preprocessing pipeline prep
 - **Non-Destructive Execution**: Leaves original `Article` database records untouched.
 - **Structured Return Object**: Returns `ProcessedArticleText` dataclass with `headline`, `body`, `content_availability`, `is_body_available`, `word_count`, `character_count`, and `get_embedding_input(target)` helper.
 
+### Semantic Embedding Generation Service & Endpoints
+
+The embedding service prepares high-dimensional semantic representations for articles to enable downstream semantic similarity, cross-publisher narrative matching, and framing comparison.
+
+#### Key Features:
+- **Provider Agnostic**: Pluggable provider architecture with built-in support for `mock` (deterministic unit-normalized vectors for local testing), `openai` (OpenAI Text Embeddings API), and `gemini` (Google Gemini Embeddings API via REST).
+- **Target Separation**: Supports distinct `headline` (title embedding for fast clustering and candidate retrieval) and `body` (in-depth narrative representation).
+- **Relational Metadata Decoupling**: High-dimensional vectors are referenced by point reference ID (`vector_reference`), keeping PostgreSQL transactions fast and clean while preserving vector search scalability for Qdrant.
+- **Safety & Deduplication**: Checks `ArticleEmbedding` unique constraint `(article_id, embedding_type, model_name)` before generating to prevent redundant API spend. Includes `force_regenerate` toggle. Skips missing or untitled text gracefully.
+- **Original Content Immutability**: Guarantees raw article text, titles, URLs, and timestamps remain untouched.
+
+#### 1. Batch Generate Article Embeddings
+- **Route**: `POST /api/embeddings/generate` (or `POST /api/v1/embeddings/generate`)
+- **Request Body**:
+```json
+{
+  "article_ids": [1, 2, 3],
+  "embedding_type": "headline",
+  "force_regenerate": false
+}
+```
+*(Omit `article_ids` to process all eligible articles in batches)*
+- **Response** (`200 OK`):
+```json
+{
+  "message": "Processed 3 articles (headline): 3 succeeded, 0 skipped, 0 failed",
+  "total_requested": 3,
+  "successful": 3,
+  "skipped": 0,
+  "failed": 0,
+  "embedding_type": "headline",
+  "provider": "mock",
+  "model_name": "mock-text-embedding-001",
+  "dimensions": 1536,
+  "details": [
+    {
+      "article_id": 1,
+      "embedding_id": 1,
+      "embedding_type": "headline",
+      "model_name": "mock-text-embedding-001",
+      "dimensions": 1536,
+      "vector_reference": "art-1-headline-9b2f671b-a9b3-469b-8aef-13b65ef399c0",
+      "status": "created",
+      "message": "Embedding generated and metadata stored successfully"
+    }
+  ]
+}
+```
+
+#### 2. Get Article Embedding Metadata
+- **Route**: `GET /api/embeddings/article/{article_id}` (or `GET /api/v1/embeddings/article/{article_id}`)
+- **Response** (`200 OK`):
+```json
+[
+  {
+    "article_id": 1,
+    "embedding_id": 1,
+    "embedding_type": "headline",
+    "model_name": "mock-text-embedding-001",
+    "dimensions": 1536,
+    "vector_reference": "art-1-headline-9b2f671b-a9b3-469b-8aef-13b65ef399c0",
+    "status": "existing",
+    "message": "Existing embedding record retrieved"
+  }
+]
+```
+
 ---
 
 ## 🧪 11. Running Automated Tests
 
-Run the full automated test suite (88 tests) using `pytest`:
+Run the full automated test suite (103 tests) using `pytest`:
 
 ```bash
 pytest -v

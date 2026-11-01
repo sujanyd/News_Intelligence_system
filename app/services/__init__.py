@@ -15,6 +15,17 @@ from app.services.text_preprocessing import (
     clean_unicode_and_quotes,
     strip_markup_and_entities,
 )
+from app.services.embedding import (
+    BaseEmbeddingProvider,
+    GeneratedVector,
+    MockEmbeddingProvider,
+    OpenAIEmbeddingProvider,
+    GeminiEmbeddingProvider,
+    get_embedding_provider,
+    generate_article_embedding,
+    run_article_embedding_generation,
+    normalize_embedding_type,
+)
 
 __all__ = [
     "ProcessedArticleText",
@@ -24,5 +35,14 @@ __all__ = [
     "normalize_whitespace",
     "clean_unicode_and_quotes",
     "strip_markup_and_entities",
+    "BaseEmbeddingProvider",
+    "GeneratedVector",
+    "MockEmbeddingProvider",
+    "OpenAIEmbeddingProvider",
+    "GeminiEmbeddingProvider",
+    "get_embedding_provider",
+    "generate_article_embedding",
+    "run_article_embedding_generation",
+    "normalize_embedding_type",
 ]
 
