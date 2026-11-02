@@ -208,4 +208,40 @@ describe('newsApi in live mode', () => {
     expect(embeddings.length).toBeGreaterThan(0)
     expect(embeddings[0].model_name).toBe('all-MiniLM-L6-v2')
   })
+
+  it('fetches similar articles in live mode', async () => {
+    const fakeResponse = {
+      query_article_id: 101,
+      query_title: 'City council approves new budget',
+      embedding_type: 'headline',
+      model_name: 'all-MiniLM-L6-v2',
+      total_matches: 1,
+      matches: [
+        {
+          article_id: 103,
+          title: 'Commuters react',
+          similarity_score: 0.884,
+        },
+      ],
+    }
+    const fakeFetch = stubFetchJson(200, fakeResponse)
+    const api = await loadLiveApi()
+
+    const result = await api.fetchSimilarArticles(101, { limit: 5 })
+    expect(fakeFetch).toHaveBeenCalledWith(
+      'http://backend.test/api/similarity/article/101?embedding_type=headline&limit=5',
+      expect.objectContaining({ method: 'GET' })
+    )
+    expect(result.matches.length).toBe(1)
+    expect(result.matches[0].similarity_score).toBe(0.884)
+  })
+
+  it('fetches similar articles in mock mode', async () => {
+    const api = await import('../api/newsApi')
+    const data = await api.fetchSimilarArticles(101)
+    expect(data.matches.length).toBeGreaterThan(0)
+    expect(data.matches[0].title).toContain('Commuters react')
+    expect(data.matches[0].similarity_score).toBe(0.884)
+  })
 })
+

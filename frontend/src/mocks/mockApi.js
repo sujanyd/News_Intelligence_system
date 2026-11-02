@@ -9,7 +9,7 @@
  */
 
 import { ApiError } from '../api/client'
-import { MOCK_ARTICLES, MOCK_EMBEDDINGS, MOCK_SOURCES } from './mockData'
+import { MOCK_ARTICLES, MOCK_EMBEDDINGS, MOCK_SIMILARITY_DATA, MOCK_SOURCES } from './mockData'
 
 // Small pause so the loading state can be seen (no pause in tests)
 const MOCK_DELAY_MS = import.meta.env.MODE === 'test' ? 0 : 500
@@ -18,6 +18,7 @@ const MOCK_DELAY_MS = import.meta.env.MODE === 'test' ? 0 : 500
 let sources = [...MOCK_SOURCES]
 let articles = [...MOCK_ARTICLES]
 let embeddings = [...MOCK_EMBEDDINGS]
+let similarityData = { ...MOCK_SIMILARITY_DATA }
 
 function wait() {
   return new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS))
@@ -28,6 +29,7 @@ export function resetMockData() {
   sources = [...MOCK_SOURCES]
   articles = [...MOCK_ARTICLES]
   embeddings = [...MOCK_EMBEDDINGS]
+  similarityData = { ...MOCK_SIMILARITY_DATA }
 }
 
 /** Pretend: GET /sources */
@@ -113,4 +115,34 @@ export async function postArticle(newArticle) {
 export async function getArticleEmbeddings(articleId) {
   await wait()
   return embeddings.filter((item) => String(item.article_id) === String(articleId))
+}
+
+/** Pretend: GET /similarity/article/{id} */
+export async function getSimilarArticles(
+  articleId,
+  { embedding_type = 'headline', limit = 10, score_threshold } = {}
+) {
+  await wait()
+  const entry = similarityData[articleId]
+  if (!entry) {
+    throw new ApiError(
+      `No '${embedding_type}' embedding found for article ID ${articleId}. Please generate embeddings first.`,
+      404
+    )
+  }
+
+  let matches = [...entry.matches]
+  if (score_threshold !== undefined && score_threshold !== null) {
+    matches = matches.filter((m) => m.similarity_score >= score_threshold)
+  }
+  if (limit) {
+    matches = matches.slice(0, limit)
+  }
+
+  return {
+    ...entry,
+    embedding_type,
+    total_matches: matches.length,
+    matches,
+  }
 }

@@ -14,7 +14,14 @@
 
 import { ApiError, apiGet, apiPost } from './client'
 import { API_PREFIX } from './config'
-import { toArticle, toEmbeddingResultList, toIngestionResult, toList, toSource } from './normalize'
+import {
+  toArticle,
+  toEmbeddingResultList,
+  toIngestionResult,
+  toList,
+  toSimilarArticlesResponse,
+  toSource,
+} from './normalize'
 import * as mockApi from '../mocks/mockApi'
 
 // Mock mode only when .env says exactly VITE_USE_MOCK_DATA=true
@@ -27,6 +34,7 @@ export const ENDPOINTS = {
   articles: `${API_PREFIX}/articles`,
   article: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}`,
   articleEmbeddings: (id) => `${API_PREFIX}/embeddings/article/${encodeURIComponent(id)}`,
+  similarArticles: (id) => `${API_PREFIX}/similarity/article/${encodeURIComponent(id)}`,
 }
 
 // News collection (RSS ingestion): POST /ingestion/run (built by Person A).
@@ -111,6 +119,28 @@ export async function fetchArticleEmbeddings(articleId) {
     ? await mockApi.getArticleEmbeddings(articleId)
     : await apiGet(ENDPOINTS.articleEmbeddings(articleId))
   return toEmbeddingResultList(data)
+}
+
+/**
+ * Finds semantically similar articles using vector search.
+ * Endpoint: GET /similarity/article/{article_id}
+ *
+ * @param {number | string} articleId - Query article ID
+ * @param {Object} [options]
+ * @param {'headline' | 'body'} [options.embedding_type='headline'] - Vector target
+ * @param {number} [options.limit=5] - Maximum similar articles to retrieve
+ * @param {number} [options.score_threshold] - Minimum cosine similarity score
+ * @returns {Promise<{ query_article_id: number, query_title: string, embedding_type: string, model_name: string, total_matches: number, matches: Array }>}
+ */
+export async function fetchSimilarArticles(
+  articleId,
+  { embedding_type = 'headline', limit = 5, score_threshold } = {}
+) {
+  const query = { embedding_type, limit, score_threshold }
+  const data = USE_MOCK_DATA
+    ? await mockApi.getSimilarArticles(articleId, query)
+    : await apiGet(ENDPOINTS.similarArticles(articleId), query)
+  return toSimilarArticlesResponse(data)
 }
 
 /**

@@ -342,12 +342,11 @@ export function Dashboard({ onNavigate }) {
       </section>
 
       {/* Article details open here when "View" is clicked */}
-      {selectedArticle && (
+      {selectedArticleId !== null && (
         <section className="dashboard-section dashboard-details" style={{ marginTop: '2rem' }} ref={detailsRef}>
           <ArticleDetails
-            key={selectedArticle.id}
-            articleId={selectedArticle.id}
-            sourceName={getSourceName(selectedArticle, sources)}
+            articleId={selectedArticleId}
+            sourceName={selectedArticle ? getSourceName(selectedArticle, sources) : undefined}
             onClose={() => setSelectedArticleId(null)}
           />
         </section>

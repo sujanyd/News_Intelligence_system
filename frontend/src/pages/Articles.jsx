@@ -328,11 +328,10 @@ export function Articles() {
         badge={<DataModeBadge />}
       />
 
-      {selectedArticle && (
+      {selectedArticleId !== null && (
         <ArticleDetails
-          key={selectedArticle.id}
-          articleId={selectedArticle.id}
-          sourceName={getSourceName(selectedArticle, sources)}
+          articleId={selectedArticleId}
+          sourceName={selectedArticle ? getSourceName(selectedArticle, sources) : undefined}
           onClose={() => setSelectedArticleId(null)}
         />
       )}

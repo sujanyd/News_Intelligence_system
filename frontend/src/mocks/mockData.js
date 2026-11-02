@@ -214,3 +214,68 @@ export const MOCK_EMBEDDINGS = [
     error: 'Text content too brief for body embedding generation',
   },
 ]
+
+export const MOCK_SIMILARITY_DATA = {
+  101: {
+    query_article_id: 101,
+    query_title: 'City council approves new budget for public transport',
+    embedding_type: 'headline',
+    model_name: 'all-MiniLM-L6-v2',
+    total_matches: 2,
+    matches: [
+      {
+        article_id: 103,
+        title: 'Commuters react to planned bus route changes',
+        source_name: 'Metro Times',
+        source_id: 3,
+        url: 'https://metrotimes.example/local/bus-route-changes',
+        published_at: '2026-10-25T17:45:00Z',
+        similarity_score: 0.884,
+        embedding_type: 'headline',
+        model_name: 'all-MiniLM-L6-v2',
+        vector_id: 'art_103_headline_vec',
+      },
+      {
+        article_id: 102,
+        title: 'New subway extension reduces downtown congestion',
+        source_name: 'Global Wire',
+        source_id: 2,
+        url: 'https://globalwire.example/transport/subway-extension',
+        published_at: '2026-10-26T07:15:00Z',
+        similarity_score: 0.742,
+        embedding_type: 'headline',
+        model_name: 'all-MiniLM-L6-v2',
+        vector_id: 'art_102_headline_vec',
+      },
+    ],
+  },
+  103: {
+    query_article_id: 103,
+    query_title: 'Commuters react to planned bus route changes',
+    embedding_type: 'headline',
+    model_name: 'all-MiniLM-L6-v2',
+    total_matches: 1,
+    matches: [
+      {
+        article_id: 101,
+        title: 'City council approves new budget for public transport',
+        source_name: 'Daily Ledger',
+        source_id: 1,
+        url: 'https://dailyledger.example/news/transport-budget',
+        published_at: '2026-10-26T08:30:00Z',
+        similarity_score: 0.884,
+        embedding_type: 'headline',
+        model_name: 'all-MiniLM-L6-v2',
+        vector_id: 'art_101_headline_vec',
+      },
+    ],
+  },
+  108: {
+    query_article_id: 108,
+    query_title: 'Local library extends weekend opening hours',
+    embedding_type: 'headline',
+    model_name: 'all-MiniLM-L6-v2',
+    total_matches: 0,
+    matches: [],
+  },
+}

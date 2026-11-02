@@ -159,3 +159,51 @@ export function toEmbeddingResultList(raw) {
   }
   return raw.map(toEmbeddingResult)
 }
+
+/**
+ * Checks an individual similar article match.
+ * Matches backend ArticleSimilarityMatch schema (app/services/similarity.py).
+ */
+export function toSimilarArticleMatch(raw) {
+  if (
+    !isObject(raw) ||
+    raw.article_id === undefined ||
+    raw.article_id === null ||
+    typeof raw.similarity_score !== 'number'
+  ) {
+    throw new ApiError('The backend sent a similar article match in an unexpected format.')
+  }
+
+  return {
+    article_id: raw.article_id,
+    title: typeof raw.title === 'string' ? raw.title : 'Untitled article',
+    source_name: typeof raw.source_name === 'string' ? raw.source_name : null,
+    source_id: raw.source_id ?? null,
+    url: typeof raw.url === 'string' ? raw.url : '',
+    published_at: raw.published_at ?? null,
+    similarity_score: raw.similarity_score,
+    embedding_type: typeof raw.embedding_type === 'string' ? raw.embedding_type : 'headline',
+    model_name: typeof raw.model_name === 'string' ? raw.model_name : 'unknown',
+    vector_id: typeof raw.vector_id === 'string' ? raw.vector_id : '',
+  }
+}
+
+/**
+ * Checks a similar articles response.
+ * Matches backend ArticleSimilarityResponse schema (app/services/similarity.py).
+ * Endpoint: GET /api/v1/similarity/article/{article_id}
+ */
+export function toSimilarArticlesResponse(raw) {
+  if (!isObject(raw) || !Array.isArray(raw.matches)) {
+    throw new ApiError('The backend sent the similarity results in an unexpected format.')
+  }
+
+  return {
+    query_article_id: raw.query_article_id ?? null,
+    query_title: typeof raw.query_title === 'string' ? raw.query_title : null,
+    embedding_type: typeof raw.embedding_type === 'string' ? raw.embedding_type : 'headline',
+    model_name: typeof raw.model_name === 'string' ? raw.model_name : 'unknown',
+    total_matches: Number.isInteger(raw.total_matches) ? raw.total_matches : raw.matches.length,
+    matches: raw.matches.map(toSimilarArticleMatch),
+  }
+}

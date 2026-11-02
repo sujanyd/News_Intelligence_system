@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { toList, toSource, toArticle, toIngestionResult, toEmbeddingResult, toEmbeddingResultList } from '../api/normalize'
+import {
+  toList,
+  toSource,
+  toArticle,
+  toIngestionResult,
+  toEmbeddingResult,
+  toEmbeddingResultList,
+  toSimilarArticleMatch,
+  toSimilarArticlesResponse,
+} from '../api/normalize'
 
 describe('toList', () => {
   it('accepts a plain array', () => {
@@ -146,4 +155,73 @@ describe('toEmbeddingResultList', () => {
     expect(() => toEmbeddingResultList({ not: 'an array' })).toThrow('unexpected format')
   })
 })
+
+describe('toSimilarArticleMatch', () => {
+  it('normalizes a valid match from backend', () => {
+    const raw = {
+      article_id: 103,
+      title: 'Commuters react to planned bus route changes',
+      source_name: 'Metro Times',
+      source_id: 3,
+      url: 'https://metrotimes.example/local/bus-route-changes',
+      published_at: '2026-10-25T17:45:00Z',
+      similarity_score: 0.884,
+      embedding_type: 'headline',
+      model_name: 'all-MiniLM-L6-v2',
+      vector_id: 'art_103_headline_vec',
+    }
+    const result = toSimilarArticleMatch(raw)
+    expect(result).toEqual(raw)
+  })
+
+  it('provides safe fallbacks for optional fields', () => {
+    const raw = {
+      article_id: 104,
+      similarity_score: 0.72,
+    }
+    const result = toSimilarArticleMatch(raw)
+    expect(result.article_id).toBe(104)
+    expect(result.similarity_score).toBe(0.72)
+    expect(result.title).toBe('Untitled article')
+    expect(result.source_name).toBeNull()
+    expect(result.source_id).toBeNull()
+    expect(result.url).toBe('')
+    expect(result.embedding_type).toBe('headline')
+  })
+
+  it('throws for invalid match payload', () => {
+    expect(() => toSimilarArticleMatch(null)).toThrow('unexpected format')
+    expect(() => toSimilarArticleMatch({ title: 'No ID or score' })).toThrow('unexpected format')
+  })
+})
+
+describe('toSimilarArticlesResponse', () => {
+  it('normalizes full similarity response', () => {
+    const raw = {
+      query_article_id: 101,
+      query_title: 'City council approves new budget',
+      embedding_type: 'headline',
+      model_name: 'all-MiniLM-L6-v2',
+      total_matches: 1,
+      matches: [
+        {
+          article_id: 103,
+          title: 'Commuters react',
+          similarity_score: 0.88,
+        },
+      ],
+    }
+    const result = toSimilarArticlesResponse(raw)
+    expect(result.query_article_id).toBe(101)
+    expect(result.total_matches).toBe(1)
+    expect(result.matches.length).toBe(1)
+    expect(result.matches[0].similarity_score).toBe(0.88)
+  })
+
+  it('throws for invalid response format', () => {
+    expect(() => toSimilarArticlesResponse(null)).toThrow('unexpected format')
+    expect(() => toSimilarArticlesResponse({ matches: 'not an array' })).toThrow('unexpected format')
+  })
+})
+
 

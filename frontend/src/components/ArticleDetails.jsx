@@ -5,6 +5,7 @@ import ContentAvailabilityBadge from './ContentAvailabilityBadge'
 import LoadingState from './LoadingState'
 import AlertMessage from './AlertMessage'
 import ProcessingStatusPanel from './ProcessingStatusPanel'
+import SimilarArticlesSection from './SimilarArticlesSection'
 import { fetchArticle, fetchArticleEmbeddings } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
 
@@ -14,20 +15,30 @@ import { formatDate } from '../utils/formatDate'
  * Loads one article from GET /api/articles/{id} and displays its full
  * information in clearly separated sections:
  *
- *   1. Article Information  – title, source, dates, URL
- *   2. Article Content      – full text, summary, or headline-only notice
- *   3. Source Information   – source name from the backend
- *   4. Analysis             – placeholder for future AI features
+ *   1. Article Information   – title, source, dates, URL
+ *   2. Article Content       – full text, summary, or headline-only notice
+ *   3. Processing Status     – lifecycle status from collection to embeddings
+ *   4. Similar Articles      – semantically similar articles via vector search
+ *   5. Source Information    – source name from the backend
+ *   6. Analysis              – placeholder for future AI features
  *
  * States handled: loading, API error, article-not-found (HTTP 404),
  * missing content (null / empty string), summary-only, headline-only.
  *
+ * Navigation: Supports traversing into similar articles with a history stack
+ * allowing users to return to previously inspected articles.
+ *
  * @param {Object}             props
- * @param {number | string}    props.articleId  - Which article to load
- * @param {string}             props.sourceName - Source name shown while loading
- * @param {() => void}         props.onClose    - Called when the user closes the panel
+ * @param {number | string}    props.articleId        - Which article to load
+ * @param {string}             [props.sourceName]     - Source name shown while loading
+ * @param {() => void}         props.onClose          - Called when the user closes the panel
+ * @param {(id: number) => void} [props.onSelectArticle] - Called when user navigates to an article
  */
-export function ArticleDetails({ articleId, sourceName, onClose }) {
+export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle }) {
+  // Navigation stack state
+  const [activeArticleId, setActiveArticleId] = useState(articleId)
+  const [history, setHistory] = useState([])
+
   const [article, setArticle] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -39,9 +50,18 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
   const [embeddingsError, setEmbeddingsError] = useState('')
   const [embeddingsReloadCount, setEmbeddingsReloadCount] = useState(0)
 
-  const [prevArticleId, setPrevArticleId] = useState(articleId)
-  if (articleId !== prevArticleId) {
-    setPrevArticleId(articleId)
+  // Reset if external articleId prop changes
+  const [prevPropArticleId, setPrevPropArticleId] = useState(articleId)
+  if (articleId !== prevPropArticleId) {
+    setPrevPropArticleId(articleId)
+    setActiveArticleId(articleId)
+    setHistory([])
+  }
+
+  // Reset loading & states whenever activeArticleId changes
+  const [prevActiveId, setPrevActiveId] = useState(activeArticleId)
+  if (activeArticleId !== prevActiveId) {
+    setPrevActiveId(activeArticleId)
     setIsLoading(true)
     setErrorMessage('')
     setIsNotFound(false)
@@ -54,13 +74,12 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
   useEffect(() => {
     let isCurrentRequest = true
 
-    fetchArticle(articleId)
+    fetchArticle(activeArticleId)
       .then((result) => {
         if (isCurrentRequest) setArticle(result)
       })
       .catch((error) => {
         if (!isCurrentRequest) return
-        // HTTP 404 gets its own state so the UI can explain it clearly
         if (error.status === 404 || /404|not found/i.test(error.message)) {
           setIsNotFound(true)
         } else {
@@ -74,12 +93,12 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
     return () => {
       isCurrentRequest = false
     }
-  }, [articleId, reloadCount])
+  }, [activeArticleId, reloadCount])
 
   useEffect(() => {
     let isCurrentRequest = true
 
-    fetchArticleEmbeddings(articleId)
+    fetchArticleEmbeddings(activeArticleId)
       .then((result) => {
         if (isCurrentRequest) setEmbeddings(result)
       })
@@ -94,7 +113,7 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
     return () => {
       isCurrentRequest = false
     }
-  }, [articleId, embeddingsReloadCount])
+  }, [activeArticleId, embeddingsReloadCount])
 
   function handleRetry() {
     setIsLoading(true)
@@ -112,11 +131,54 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
     setEmbeddingsReloadCount((c) => c + 1)
   }
 
-  // ── Close button (always in the card header) ─────────────────────────────
+  // ── Navigation between similar articles ───────────────────────────────────
+  function handleSelectSimilar(similarId) {
+    if (similarId === activeArticleId) return
+    setHistory((prev) => [
+      ...prev,
+      {
+        id: activeArticleId,
+        title: article ? article.title : `Article #${activeArticleId}`,
+      },
+    ])
+    setActiveArticleId(similarId)
+    if (onSelectArticle) {
+      onSelectArticle(similarId)
+    }
+  }
+
+  function handleReturnToPrevious() {
+    if (history.length === 0) return
+    const prev = history[history.length - 1]
+    setHistory((h) => h.slice(0, -1))
+    setActiveArticleId(prev.id)
+    if (onSelectArticle) {
+      onSelectArticle(prev.id)
+    }
+  }
+
+  // ── Close / Navigation buttons in card header ─────────────────────────────
   const closeButton = (
-    <button type="button" className="btn btn-secondary" onClick={onClose}>
-      ← Back to articles
-    </button>
+    <div className="ad-header-actions">
+      {history.length > 0 && (
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={handleReturnToPrevious}
+          aria-label="Return to previous article"
+        >
+          ← Return to previous article
+        </button>
+      )}
+      <button
+        type="button"
+        className="btn btn-secondary"
+        onClick={onClose}
+        aria-label="Back to articles"
+      >
+        ← Back to articles
+      </button>
+    </div>
   )
 
   // ── Content availability helpers ─────────────────────────────────────────
@@ -187,7 +249,7 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
         <AlertMessage
           type="warning"
           title="Article not found."
-          message={`Article #${articleId} no longer exists in the system. It may have been removed.`}
+          message={`Article #${activeArticleId} no longer exists in the system. It may have been removed.`}
         />
       )
     }
@@ -199,6 +261,21 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
 
     return (
       <>
+        {/* Navigation Breadcrumb Trail if navigating history */}
+        {history.length > 0 && (
+          <div className="ad-history-banner" data-testid="history-banner">
+            <span className="ad-history-label">Viewing similar article:</span>
+            <button
+              type="button"
+              className="ad-history-link"
+              onClick={handleReturnToPrevious}
+              title={`Return to: ${history[history.length - 1].title}`}
+            >
+              ← Back to {history[history.length - 1].title}
+            </button>
+          </div>
+        )}
+
         {/* ── Section 1: Article Information ───────────────────────────── */}
         <section className="ad-section" aria-labelledby="ad-section-info">
           <h4 className="ad-section-title" id="ad-section-info">
@@ -261,7 +338,13 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
           />
         </section>
 
-        {/* ── Section 4: Source Information ─────────────────────────────── */}
+        {/* ── Section 4: Similar Articles ────────────────────────────────── */}
+        <SimilarArticlesSection
+          articleId={activeArticleId}
+          onSelectArticle={handleSelectSimilar}
+        />
+
+        {/* ── Section 5: Source Information ─────────────────────────────── */}
         <section className="ad-section" aria-labelledby="ad-section-source">
           <h4 className="ad-section-title" id="ad-section-source">
             Source Information
@@ -284,7 +367,7 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
           </p>
         </section>
 
-        {/* ── Section 4: Analysis (future features) ────────────────────── */}
+        {/* ── Section 6: Analysis (future features) ────────────────────── */}
         <section
           className="ad-section ad-analysis-section"
           aria-labelledby="ad-section-analysis"
