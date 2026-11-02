@@ -9,7 +9,7 @@
  */
 
 import { ApiError } from '../api/client'
-import { MOCK_ARTICLES, MOCK_SOURCES } from './mockData'
+import { MOCK_ARTICLES, MOCK_EMBEDDINGS, MOCK_SOURCES } from './mockData'
 
 // Small pause so the loading state can be seen (no pause in tests)
 const MOCK_DELAY_MS = import.meta.env.MODE === 'test' ? 0 : 500
@@ -17,6 +17,7 @@ const MOCK_DELAY_MS = import.meta.env.MODE === 'test' ? 0 : 500
 // Copies of the sample data, so adding a source does not change the original list
 let sources = [...MOCK_SOURCES]
 let articles = [...MOCK_ARTICLES]
+let embeddings = [...MOCK_EMBEDDINGS]
 
 function wait() {
   return new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS))
@@ -26,6 +27,7 @@ function wait() {
 export function resetMockData() {
   sources = [...MOCK_SOURCES]
   articles = [...MOCK_ARTICLES]
+  embeddings = [...MOCK_EMBEDDINGS]
 }
 
 /** Pretend: GET /sources */
@@ -105,4 +107,10 @@ export async function postArticle(newArticle) {
   }
   articles = [savedArticle, ...articles]
   return savedArticle
+}
+
+/** Pretend: GET /embeddings/article/{id} */
+export async function getArticleEmbeddings(articleId) {
+  await wait()
+  return embeddings.filter((item) => String(item.article_id) === String(articleId))
 }

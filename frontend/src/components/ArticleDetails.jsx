@@ -4,7 +4,8 @@ import StatusBadge from './StatusBadge'
 import ContentAvailabilityBadge from './ContentAvailabilityBadge'
 import LoadingState from './LoadingState'
 import AlertMessage from './AlertMessage'
-import { fetchArticle } from '../api/newsApi'
+import ProcessingStatusPanel from './ProcessingStatusPanel'
+import { fetchArticle, fetchArticleEmbeddings } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
 
 /**
@@ -33,6 +34,11 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
   const [isNotFound, setIsNotFound] = useState(false)
   const [reloadCount, setReloadCount] = useState(0)
 
+  const [embeddings, setEmbeddings] = useState([])
+  const [isLoadingEmbeddings, setIsLoadingEmbeddings] = useState(true)
+  const [embeddingsError, setEmbeddingsError] = useState('')
+  const [embeddingsReloadCount, setEmbeddingsReloadCount] = useState(0)
+
   const [prevArticleId, setPrevArticleId] = useState(articleId)
   if (articleId !== prevArticleId) {
     setPrevArticleId(articleId)
@@ -40,6 +46,9 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
     setErrorMessage('')
     setIsNotFound(false)
     setArticle(null)
+    setEmbeddings([])
+    setIsLoadingEmbeddings(true)
+    setEmbeddingsError('')
   }
 
   useEffect(() => {
@@ -67,11 +76,40 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
     }
   }, [articleId, reloadCount])
 
+  useEffect(() => {
+    let isCurrentRequest = true
+
+    fetchArticleEmbeddings(articleId)
+      .then((result) => {
+        if (isCurrentRequest) setEmbeddings(result)
+      })
+      .catch((error) => {
+        if (!isCurrentRequest) return
+        setEmbeddingsError(error.message || 'Could not load embedding status')
+      })
+      .finally(() => {
+        if (isCurrentRequest) setIsLoadingEmbeddings(false)
+      })
+
+    return () => {
+      isCurrentRequest = false
+    }
+  }, [articleId, embeddingsReloadCount])
+
   function handleRetry() {
     setIsLoading(true)
     setErrorMessage('')
     setIsNotFound(false)
     setReloadCount((c) => c + 1)
+    setIsLoadingEmbeddings(true)
+    setEmbeddingsError('')
+    setEmbeddingsReloadCount((c) => c + 1)
+  }
+
+  function handleRetryEmbeddings() {
+    setIsLoadingEmbeddings(true)
+    setEmbeddingsError('')
+    setEmbeddingsReloadCount((c) => c + 1)
   }
 
   // ── Close button (always in the card header) ─────────────────────────────
@@ -208,7 +246,22 @@ export function ArticleDetails({ articleId, sourceName, onClose }) {
           {renderContentBody()}
         </section>
 
-        {/* ── Section 3: Source Information ─────────────────────────────── */}
+        {/* ── Section 3: Processing Status ──────────────────────────────── */}
+        <section
+          className="ad-section"
+          aria-labelledby="ad-section-processing"
+          data-testid="processing-status-section"
+        >
+          <ProcessingStatusPanel
+            article={article}
+            embeddings={embeddings}
+            isLoadingEmbeddings={isLoadingEmbeddings}
+            embeddingsError={embeddingsError}
+            onRetryEmbeddings={handleRetryEmbeddings}
+          />
+        </section>
+
+        {/* ── Section 4: Source Information ─────────────────────────────── */}
         <section className="ad-section" aria-labelledby="ad-section-source">
           <h4 className="ad-section-title" id="ad-section-source">
             Source Information

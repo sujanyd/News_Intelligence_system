@@ -175,3 +175,42 @@ export const MOCK_ARTICLES = [
     content: null,
   },
 ]
+
+export const MOCK_EMBEDDINGS = [
+  {
+    article_id: 101,
+    embedding_type: 'headline',
+    status: 'generated',
+    model_name: 'all-MiniLM-L6-v2',
+    vector_reference: 'art_101_headline_vec',
+    dimensions: 384,
+    error: null,
+  },
+  {
+    article_id: 101,
+    embedding_type: 'body',
+    status: 'generated',
+    model_name: 'all-MiniLM-L6-v2',
+    vector_reference: 'art_101_body_vec',
+    dimensions: 384,
+    error: null,
+  },
+  {
+    article_id: 102,
+    embedding_type: 'headline',
+    status: 'generated',
+    model_name: 'all-MiniLM-L6-v2',
+    vector_reference: 'art_102_headline_vec',
+    dimensions: 384,
+    error: null,
+  },
+  {
+    article_id: 105,
+    embedding_type: 'body',
+    status: 'error',
+    model_name: 'all-MiniLM-L6-v2',
+    vector_reference: null,
+    dimensions: null,
+    error: 'Text content too brief for body embedding generation',
+  },
+]

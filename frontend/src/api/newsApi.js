@@ -14,7 +14,7 @@
 
 import { ApiError, apiGet, apiPost } from './client'
 import { API_PREFIX } from './config'
-import { toArticle, toIngestionResult, toList, toSource } from './normalize'
+import { toArticle, toEmbeddingResultList, toIngestionResult, toList, toSource } from './normalize'
 import * as mockApi from '../mocks/mockApi'
 
 // Mock mode only when .env says exactly VITE_USE_MOCK_DATA=true
@@ -26,6 +26,7 @@ export const ENDPOINTS = {
   source: (id) => `${API_PREFIX}/sources/${encodeURIComponent(id)}`,
   articles: `${API_PREFIX}/articles`,
   article: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}`,
+  articleEmbeddings: (id) => `${API_PREFIX}/embeddings/article/${encodeURIComponent(id)}`,
 }
 
 // News collection (RSS ingestion): POST /ingestion/run (built by Person A).
@@ -96,6 +97,20 @@ export async function fetchArticle(articleId) {
     ? await mockApi.getArticle(articleId)
     : await apiGet(ENDPOINTS.article(articleId))
   return toArticle(data)
+}
+
+/**
+ * Gets embeddings generated for an article.
+ * Endpoint: GET /embeddings/article/{article_id}
+ *
+ * @param {number | string} articleId
+ * @returns {Promise<Array>} List of embedding results
+ */
+export async function fetchArticleEmbeddings(articleId) {
+  const data = USE_MOCK_DATA
+    ? await mockApi.getArticleEmbeddings(articleId)
+    : await apiGet(ENDPOINTS.articleEmbeddings(articleId))
+  return toEmbeddingResultList(data)
 }
 
 /**

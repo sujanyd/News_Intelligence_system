@@ -122,3 +122,40 @@ export function toIngestionResult(raw) {
 
   return { counts, feeds }
 }
+
+/**
+ * Checks an individual article embedding result.
+ * Matches backend ArticleEmbeddingResultDetail schema (app/schemas/embedding.py).
+ */
+export function toEmbeddingResult(raw) {
+  if (
+    !isObject(raw) ||
+    raw.article_id === undefined ||
+    raw.article_id === null ||
+    typeof raw.embedding_type !== 'string' ||
+    typeof raw.status !== 'string'
+  ) {
+    throw new ApiError('The backend sent an article embedding result in an unexpected format.')
+  }
+
+  return {
+    article_id: raw.article_id,
+    embedding_type: raw.embedding_type,
+    status: raw.status,
+    model_name: typeof raw.model_name === 'string' ? raw.model_name : 'unknown',
+    vector_reference: typeof raw.vector_reference === 'string' ? raw.vector_reference : null,
+    dimensions: Number.isInteger(raw.dimensions) ? raw.dimensions : null,
+    error: typeof raw.error === 'string' ? raw.error : null,
+  }
+}
+
+/**
+ * Checks a list of article embedding results.
+ * Endpoint: GET /api/v1/embeddings/article/{article_id}
+ */
+export function toEmbeddingResultList(raw) {
+  if (!Array.isArray(raw)) {
+    throw new ApiError('The backend sent the embedding list in an unexpected format.')
+  }
+  return raw.map(toEmbeddingResult)
+}

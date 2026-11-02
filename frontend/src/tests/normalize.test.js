@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toList, toSource, toArticle, toIngestionResult } from '../api/normalize'
+import { toList, toSource, toArticle, toIngestionResult, toEmbeddingResult, toEmbeddingResultList } from '../api/normalize'
 
 describe('toList', () => {
   it('accepts a plain array', () => {
@@ -87,3 +87,63 @@ describe('toIngestionResult', () => {
     expect(() => toIngestionResult([1, 2])).toThrow('unexpected format')
   })
 })
+
+describe('toEmbeddingResult', () => {
+  it('normalizes valid embedding response from backend', () => {
+    const raw = {
+      article_id: 101,
+      embedding_type: 'headline',
+      status: 'generated',
+      model_name: 'all-MiniLM-L6-v2',
+      vector_reference: 'art_101_headline_vec',
+      dimensions: 384,
+      error: null,
+    }
+    const result = toEmbeddingResult(raw)
+    expect(result).toEqual(raw)
+  })
+
+  it('handles optional fields gracefully', () => {
+    const raw = {
+      article_id: 102,
+      embedding_type: 'body',
+      status: 'error',
+      error: 'Text too short',
+    }
+    const result = toEmbeddingResult(raw)
+    expect(result.article_id).toBe(102)
+    expect(result.embedding_type).toBe('body')
+    expect(result.status).toBe('error')
+    expect(result.model_name).toBe('unknown')
+    expect(result.vector_reference).toBeNull()
+    expect(result.dimensions).toBeNull()
+    expect(result.error).toBe('Text too short')
+  })
+
+  it('throws for invalid format', () => {
+    expect(() => toEmbeddingResult(null)).toThrow('unexpected format')
+    expect(() => toEmbeddingResult({ article_id: 101 })).toThrow('unexpected format')
+  })
+})
+
+describe('toEmbeddingResultList', () => {
+  it('maps an array of embedding items', () => {
+    const raw = [
+      {
+        article_id: 101,
+        embedding_type: 'headline',
+        status: 'generated',
+        model_name: 'all-MiniLM-L6-v2',
+        dimensions: 384,
+      },
+    ]
+    const list = toEmbeddingResultList(raw)
+    expect(list.length).toBe(1)
+    expect(list[0].dimensions).toBe(384)
+  })
+
+  it('throws if input is not an array', () => {
+    expect(() => toEmbeddingResultList({ not: 'an array' })).toThrow('unexpected format')
+  })
+})
+

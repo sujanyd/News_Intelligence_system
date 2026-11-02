@@ -320,7 +320,7 @@ describe('ArticleDetails component', () => {
     render(<ArticleDetails {...DEFAULT_PROPS} />)
     await screen.findByText('City council approves new budget for public transport')
     // ARTICLE_FULL is full_text
-    expect(screen.getByText('Full text')).toBeDefined()
+    expect(screen.getAllByText('Full text').length).toBeGreaterThan(0)
   })
 
   // ── Sections absent on errors ─────────────────────────────────────────────

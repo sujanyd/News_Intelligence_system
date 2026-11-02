@@ -177,4 +177,35 @@ describe('newsApi in live mode', () => {
 
     await expect(api.fetchArticle(999)).rejects.toThrow('Article not found (HTTP 404)')
   })
+
+  it('fetches article embeddings in live mode', async () => {
+    const fakeEmbeddings = [
+      {
+        article_id: 101,
+        embedding_type: 'headline',
+        status: 'generated',
+        model_name: 'all-MiniLM-L6-v2',
+        vector_reference: 'art_101_vec',
+        dimensions: 384,
+        error: null,
+      },
+    ]
+    const fakeFetch = stubFetchJson(200, fakeEmbeddings)
+    const api = await loadLiveApi()
+
+    const result = await api.fetchArticleEmbeddings(101)
+    expect(fakeFetch).toHaveBeenCalledWith(
+      'http://backend.test/api/embeddings/article/101',
+      expect.objectContaining({ method: 'GET' })
+    )
+    expect(result).toEqual(fakeEmbeddings)
+  })
+
+  it('fetches article embeddings in mock mode', async () => {
+    const api = await import('../api/newsApi')
+    const embeddings = await api.fetchArticleEmbeddings(101)
+    expect(Array.isArray(embeddings)).toBe(true)
+    expect(embeddings.length).toBeGreaterThan(0)
+    expect(embeddings[0].model_name).toBe('all-MiniLM-L6-v2')
+  })
 })
