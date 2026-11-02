@@ -37,6 +37,10 @@ from app.services.text_preprocessing import (
     ProcessedArticleText,
     preprocess_article,
 )
+from app.services.vector_db import (
+    VectorDatabaseService,
+    get_vector_db_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -374,6 +378,7 @@ def generate_article_embedding(
     article: Article,
     embedding_type: str = "headline",
     provider: Optional[BaseEmbeddingProvider] = None,
+    vector_db: Optional[VectorDatabaseService] = None,
     force_regenerate: bool = False,
 ) -> Tuple[ArticleEmbeddingResultDetail, Optional[GeneratedVector]]:
     """
@@ -387,15 +392,17 @@ def generate_article_embedding(
     3. Checks whether a valid embedding already exists in PostgreSQL for this article,
        embedding type, and model. If so and force_regenerate is False, skips duplicate generation.
     4. Generates the vector via the active provider.
-    5. Saves or updates the ArticleEmbedding record in PostgreSQL with vector reference ID,
+    5. Stores the vector in the Vector Database (Qdrant) with metadata payload.
+    6. Saves or updates the ArticleEmbedding record in PostgreSQL with vector reference ID,
        model name, dimensions, and creation timestamp.
-    6. Leaves the original Article content and attributes completely intact.
+    7. Leaves the original Article content and attributes completely intact.
 
     Returns:
         Tuple of (ArticleEmbeddingResultDetail, Optional[GeneratedVector])
     """
     norm_type = normalize_embedding_type(embedding_type)
     active_provider = provider or get_embedding_provider()
+    active_vector_db = vector_db or get_vector_db_service()
     model_name = active_provider.model_name
 
     # 1. Preprocess article text (non-destructive)
@@ -495,7 +502,33 @@ def generate_article_embedding(
     # 5. Prepare vector reference identifier for vector database
     point_uuid = f"art-{article.id}-{norm_type}-{uuid.uuid4().hex[:12]}"
 
-    # 6. Persist metadata in PostgreSQL
+    # 6. Store vector in Vector Database (Qdrant)
+    try:
+        stored_point_id = active_vector_db.store_vector(
+            vector_id=point_uuid,
+            vector=gen_vector.vector,
+            article_id=article.id,
+            embedding_type=norm_type,
+            model_name=model_name,
+            extra_payload={
+                "title": processed.headline,
+                "source_id": article.source_id,
+            },
+        )
+    except Exception as exc:
+        logger.error("Failed to store vector in vector database for article ID %d: %s", article.id, exc)
+        return (
+            ArticleEmbeddingResultDetail(
+                article_id=article.id,
+                embedding_type=norm_type,
+                status="error",
+                model_name=model_name,
+                error=f"Vector database storage error: {exc}",
+            ),
+            None,
+        )
+
+    # 7. Persist metadata in PostgreSQL
     if existing_emb:
         existing_emb.vector_reference = point_uuid
         existing_emb.dimensions = gen_vector.dimensions
@@ -534,6 +567,7 @@ def run_article_embedding_generation(
     force_regenerate: bool = False,
     limit: Optional[int] = None,
     provider: Optional[BaseEmbeddingProvider] = None,
+    vector_db: Optional[VectorDatabaseService] = None,
 ) -> EmbeddingGenerateSummaryResponse:
     """
     Batch runner for article embedding generation across the database.
@@ -545,8 +579,10 @@ def run_article_embedding_generation(
         force_regenerate: Whether to overwrite existing embeddings for the model.
         limit: Max articles to evaluate.
         provider: Custom or mocked embedding provider. Defaults to configured provider.
+        vector_db: Optional VectorDatabaseService instance (defaults to singleton).
     """
     active_provider = provider or get_embedding_provider()
+    active_vector_db = vector_db or get_vector_db_service()
     model_name = active_provider.model_name
 
     # Resolve query
@@ -580,6 +616,7 @@ def run_article_embedding_generation(
                 article=article,
                 embedding_type=emb_type,
                 provider=active_provider,
+                vector_db=active_vector_db,
                 force_regenerate=force_regenerate,
             )
             details.append(detail)
@@ -600,3 +637,4 @@ def run_article_embedding_generation(
         errors_encountered=error_count,
         details=details,
     )
+

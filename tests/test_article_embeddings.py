@@ -353,3 +353,4 @@ class TestEmbeddingAPIEndpoints:
         assert res1.status_code == 200
         assert res2.status_code == 200
         assert res1.json() == res2.json()
+

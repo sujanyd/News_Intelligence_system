@@ -12,12 +12,31 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.models import Base
 from app.db.session import get_db
+from app.services.vector_db import (
+    VectorDatabaseService,
+    get_vector_db_service,
+    set_vector_db_service,
+)
+from qdrant_client import QdrantClient
 
 # Use an in-memory SQLite database for fast, isolated, and self-contained tests
 TEST_DB_URL = "sqlite:///:memory:"
 
 
 from sqlalchemy import event
+
+@pytest.fixture(autouse=True)
+def in_memory_vector_db():
+    """
+    Ensures every test runs against a clean, isolated in-memory Qdrant instance.
+    Prevents tests from attempting network calls to a remote Qdrant server.
+    """
+    mem_client = QdrantClient(":memory:")
+    test_vdb = VectorDatabaseService(client=mem_client)
+    set_vector_db_service(test_vdb)
+    yield test_vdb
+    set_vector_db_service(None)
+
 
 @pytest.fixture(scope="session")
 def test_engine():

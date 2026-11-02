@@ -806,11 +806,71 @@ The embedding service prepares high-dimensional semantic representations for art
 ]
 ```
 
+### Vector Database & Article Similarity Endpoints
+
+The system stores high-dimensional dense vectors in **Qdrant** while preserving lean metadata and point IDs (`vector_reference`) in PostgreSQL. This enables fast nearest-neighbor similarity search using Cosine distance while ensuring raw vectors are never unnecessarily exposed in public API responses.
+
+#### Local Qdrant Setup:
+You can run Qdrant locally using Docker:
+```bash
+docker run -d --name qdrant -p 6333:6333 -p 6334:6334 -v $(pwd)/qdrant_storage:/qdrant/storage:z qdrant/qdrant
+```
+Or for local unit tests without running Docker, set `QDRANT_URL=":memory:"` in `.env`.
+
+#### 1. Find Similar Articles by Article ID
+- **Route**: `GET /api/similarity/article/{article_id}` (or `GET /api/v1/similarity/article/{article_id}`)
+- **Query Parameters**:
+  - `embedding_type` *(optional, string, default: "headline")*: Target embedding to compare (`headline` or `body`).
+  - `limit` *(optional, integer, default: 10, max: 50)*: Maximum number of similar articles to return.
+  - `score_threshold` *(optional, float)*: Minimum cosine similarity score threshold (-1.0 to 1.0).
+- **Self Exclusion**: The query article itself is strictly excluded from results.
+- **Response** (`200 OK`):
+```json
+{
+  "query_article_id": 1,
+  "query_title": "Federal Reserve Cuts Interest Rates by 25 Basis Points",
+  "embedding_type": "headline",
+  "model_name": "mock-similarity-model",
+  "total_matches": 2,
+  "matches": [
+    {
+      "article_id": 2,
+      "title": "Central Bank Reduces Policy Rate Amid Cooling Inflation",
+      "source_name": "Global News Network",
+      "source_id": 1,
+      "url": "https://globalnews.org/articles/fed-rate-cut-2",
+      "published_at": "2026-11-02T10:00:00Z",
+      "similarity_score": 0.9412,
+      "embedding_type": "headline",
+      "model_name": "mock-similarity-model",
+      "vector_id": "8377f2e7-4569-5725-a386-2759e7d1a349"
+    }
+  ]
+}
+```
+
 ---
 
 ## 🧪 11. Running Automated Tests
 
-Run the full automated test suite (103 tests) using `pytest`:
+Run the full automated test suite (118 tests) using `pytest`:
+
+```bash
+pytest -v
+```
+
+Expected output:
+```text
+tests/test_api_endpoints.py ... PASSED
+tests/test_article_embeddings.py ... PASSED
+tests/test_vector_db_and_similarity.py ... PASSED
+tests/test_database.py ... PASSED
+tests/test_health.py ... PASSED
+tests/test_rss_ingestion.py ... PASSED
+tests/test_text_preprocessing.py ... PASSED
+
+================== 117 passed, 1 skipped, 1 warning in 1.25s ==================
+```
 
 ```bash
 pytest -v

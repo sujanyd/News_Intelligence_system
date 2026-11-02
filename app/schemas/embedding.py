@@ -67,3 +67,4 @@ class EmbeddingGenerateSummaryResponse(BaseModel):
         default_factory=list,
         description="Detailed outcome per article",
     )
+

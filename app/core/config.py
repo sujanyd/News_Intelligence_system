@@ -44,6 +44,18 @@ class Settings(BaseSettings):
     EMBEDDING_API_KEY: str = ""
     EMBEDDING_BATCH_SIZE: int = 20
 
+    # Vector Database Configuration (Qdrant)
+    # Mode: 'memory' for in-memory testing, or 'remote' for Docker/Cloud Qdrant server
+    QDRANT_HOST: str = "localhost"
+    QDRANT_PORT: int = 6333
+    QDRANT_GRPC_PORT: int = 6334
+    QDRANT_URL: str = ""  # If set, used directly (e.g., http://localhost:6333 or cloud URL)
+    QDRANT_API_KEY: str = ""
+    QDRANT_COLLECTION_NAME: str = "article_embeddings"
+    QDRANT_DISTANCE: str = "Cosine"  # Cosine, Dot, or Euclid
+    QDRANT_TIMEOUT_SECONDS: float = 10.0
+    QDRANT_PREFER_GRPC: bool = False
+
     # Configuration for pydantic-settings
     model_config = SettingsConfigDict(
         env_file=".env",

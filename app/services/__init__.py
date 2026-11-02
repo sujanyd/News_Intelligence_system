@@ -27,6 +27,19 @@ from app.services.embedding import (
     normalize_embedding_type,
 )
 
+from app.services.vector_db import (
+    VectorDatabaseService,
+    VectorSearchResult,
+    get_vector_db_service,
+    set_vector_db_service,
+)
+from app.services.similarity import (
+    SimilaritySearchService,
+    ArticleSimilarityMatch,
+    ArticleSimilarityResponse,
+    get_similarity_service,
+)
+
 __all__ = [
     "ProcessedArticleText",
     "preprocess_article",
@@ -44,5 +57,13 @@ __all__ = [
     "generate_article_embedding",
     "run_article_embedding_generation",
     "normalize_embedding_type",
+    "VectorDatabaseService",
+    "VectorSearchResult",
+    "get_vector_db_service",
+    "set_vector_db_service",
+    "SimilaritySearchService",
+    "ArticleSimilarityMatch",
+    "ArticleSimilarityResponse",
+    "get_similarity_service",
 ]
 

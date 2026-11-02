@@ -92,3 +92,4 @@ def get_article_embeddings(
         )
         for emb in embeddings
     ]
+

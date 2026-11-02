@@ -19,3 +19,6 @@ feedparser>=6.0.10
 # Testing
 pytest>=8.1.0
 httpx>=0.27.0
+
+# Vector Database (Qdrant)
+qdrant-client>=1.8.0,<2.0.0
