@@ -16,6 +16,8 @@ import { ApiError, apiGet, apiPost } from './client'
 import { API_PREFIX } from './config'
 import {
   toArticle,
+  toArticleMatch,
+  toArticleMatchList,
   toEmbeddingResultList,
   toIngestionResult,
   toList,
@@ -35,6 +37,9 @@ export const ENDPOINTS = {
   article: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}`,
   articleEmbeddings: (id) => `${API_PREFIX}/embeddings/article/${encodeURIComponent(id)}`,
   similarArticles: (id) => `${API_PREFIX}/similarity/article/${encodeURIComponent(id)}`,
+  matches: `${API_PREFIX}/matches`,
+  match: (id) => `${API_PREFIX}/matches/${encodeURIComponent(id)}`,
+  matchReview: (id) => `${API_PREFIX}/matches/${encodeURIComponent(id)}/review`,
 }
 
 // News collection (RSS ingestion): POST /ingestion/run (built by Person A).
@@ -177,3 +182,64 @@ export async function runNewsCollection() {
   const data = await apiPost(INGESTION_ENDPOINT, {}, { timeoutMs: INGESTION_TIMEOUT_MS })
   return toIngestionResult(data)
 }
+
+/**
+ * Manual classification review persistence is NOT yet implemented in the backend API contract.
+ * The frontend operates in read-only review mode by default until endpoints are deployed.
+ */
+export const MATCH_REVIEW_AVAILABLE = false
+
+/**
+ * Gets article pairwise matches with classification labels (SAME, RELATED, DIFFERENT).
+ * Endpoint: GET /matches?article_id=&label=
+ *
+ * @param {Object} [options]
+ * @param {number | string} [options.articleId] - Filter pairs containing this article
+ * @param {'SAME' | 'RELATED' | 'DIFFERENT'} [options.label] - Filter by classification label
+ * @returns {Promise<Array<Object>>} List of normalized ArticleMatch objects
+ */
+export async function fetchMatches({ articleId, label } = {}) {
+  const query = { article_id: articleId, label }
+  const data = USE_MOCK_DATA
+    ? await mockApi.getMatches({ articleId, label })
+    : await apiGet(ENDPOINTS.matches, query)
+  return toArticleMatchList(data)
+}
+
+/**
+ * Gets one article match pair by its ID.
+ * Endpoint: GET /matches/{id}
+ *
+ * @param {number | string} matchId
+ * @returns {Promise<Object>} Normalized ArticleMatch object
+ */
+export async function fetchMatch(matchId) {
+  const data = USE_MOCK_DATA
+    ? await mockApi.getMatch(matchId)
+    : await apiGet(ENDPOINTS.match(matchId))
+  return toArticleMatch(data)
+}
+
+/**
+ * Submits a manual review or classification correction for an article match.
+ * Endpoint: PATCH /matches/{id}/review (if supported by backend).
+ *
+ * @param {number | string} matchId
+ * @param {Object} reviewData
+ * @param {boolean} [reviewData.reviewed=true]
+ * @param {'SAME' | 'RELATED' | 'DIFFERENT'} [reviewData.match_label]
+ * @param {string} [reviewData.reviewer_notes]
+ * @returns {Promise<Object>} Updated ArticleMatch object
+ */
+export async function submitMatchReview(matchId, reviewData = {}) {
+  if (!MATCH_REVIEW_AVAILABLE && !USE_MOCK_DATA) {
+    throw new ApiError(
+      'Manual review persistence is not currently supported by the backend. The interface is operating in read-only mode.'
+    )
+  }
+  const data = USE_MOCK_DATA
+    ? await mockApi.updateMatchReview(matchId, reviewData)
+    : await apiPost(ENDPOINTS.matchReview(matchId), reviewData)
+  return toArticleMatch(data)
+}
+

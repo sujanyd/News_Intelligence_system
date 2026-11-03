@@ -9,7 +9,13 @@
  */
 
 import { ApiError } from '../api/client'
-import { MOCK_ARTICLES, MOCK_EMBEDDINGS, MOCK_SIMILARITY_DATA, MOCK_SOURCES } from './mockData'
+import {
+  MOCK_ARTICLES,
+  MOCK_EMBEDDINGS,
+  MOCK_MATCHES,
+  MOCK_SIMILARITY_DATA,
+  MOCK_SOURCES,
+} from './mockData'
 
 // Small pause so the loading state can be seen (no pause in tests)
 const MOCK_DELAY_MS = import.meta.env.MODE === 'test' ? 0 : 500
@@ -19,6 +25,7 @@ let sources = [...MOCK_SOURCES]
 let articles = [...MOCK_ARTICLES]
 let embeddings = [...MOCK_EMBEDDINGS]
 let similarityData = { ...MOCK_SIMILARITY_DATA }
+let matchesData = [...MOCK_MATCHES]
 
 function wait() {
   return new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS))
@@ -30,6 +37,7 @@ export function resetMockData() {
   articles = [...MOCK_ARTICLES]
   embeddings = [...MOCK_EMBEDDINGS]
   similarityData = { ...MOCK_SIMILARITY_DATA }
+  matchesData = [...MOCK_MATCHES]
 }
 
 /** Pretend: GET /sources */
@@ -146,3 +154,58 @@ export async function getSimilarArticles(
     matches,
   }
 }
+
+/**
+ * Pretend: GET /matches?article_id=&label=
+ * Returns article pairwise matches with classification labels.
+ */
+export async function getMatches({ articleId, label } = {}) {
+  await wait()
+  let list = [...matchesData]
+  if (articleId !== undefined && articleId !== null && articleId !== '') {
+    list = list.filter(
+      (m) =>
+        String(m.article_id_1) === String(articleId) ||
+        String(m.article_id_2) === String(articleId)
+    )
+  }
+  if (label && typeof label === 'string') {
+    list = list.filter((m) => m.match_label?.toUpperCase() === label.toUpperCase())
+  }
+  return list
+}
+
+/**
+ * Pretend: GET /matches/{id}
+ */
+export async function getMatch(id) {
+  await wait()
+  const match = matchesData.find((item) => String(item.id) === String(id))
+  if (!match) {
+    throw new ApiError(`Article match with ID ${id} not found (HTTP 404)`, 404)
+  }
+  return match
+}
+
+/**
+ * Pretend: PATCH /matches/{id}/review
+ */
+export async function updateMatchReview(matchId, { reviewed, match_label, reviewer_notes } = {}) {
+  await wait()
+  const index = matchesData.findIndex((item) => String(item.id) === String(matchId))
+  if (index === -1) {
+    throw new ApiError(`Article match with ID ${matchId} not found (HTTP 404)`, 404)
+  }
+
+  const existing = matchesData[index]
+  const updated = {
+    ...existing,
+    review_status: reviewed ? 'reviewed' : existing.review_status,
+    match_label: match_label || existing.match_label,
+    reviewed_at: reviewed ? new Date().toISOString() : existing.reviewed_at,
+    reviewer_notes: reviewer_notes !== undefined ? reviewer_notes : existing.reviewer_notes,
+  }
+  matchesData[index] = updated
+  return updated
+}
+

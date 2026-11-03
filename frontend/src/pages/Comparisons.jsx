@@ -1,39 +1,29 @@
 import React from 'react'
 import PageHeader from '../components/PageHeader'
-import Card from '../components/Card'
 import StatusBadge from '../components/StatusBadge'
-import EmptyState from '../components/EmptyState'
+import ArticleMatchingSection from '../components/ArticleMatchingSection'
 
 /**
- * Comparisons Page Placeholder
+ * Comparisons Page
+ *
+ * Primary interface for reviewing article matching pairs and classifications:
+ * - Displays matched article pairs with SAME, RELATED, and DIFFERENT labels.
+ * - Allows side-by-side inspection of paired articles.
+ * - Explains similarity metrics and classification confidence separately.
+ * - Supports review actions and read-only mode according to backend capabilities.
  */
 export function Comparisons() {
   return (
-    <div className="page-comparisons">
+    <div className="page-comparisons" data-testid="page-comparisons">
       <PageHeader
         title="Comparisons"
-        description="Side-by-side news framing analysis comparing how diverse outlets cover identical events."
-        badge={<StatusBadge variant="primary">Comparative Analysis</StatusBadge>}
+        description="Review pairwise semantic matches, compare coverage side-by-side, and inspect SAME, RELATED, or DIFFERENT event classifications."
+        badge={<StatusBadge variant="primary">Pairwise Matching</StatusBadge>}
       />
 
-      <Card
-        title="Cross-Publisher Framing Comparison"
-        subtitle="Divergence in headline phrasing, tone, and focal points"
-        badge={<StatusBadge variant="warning">Awaiting API</StatusBadge>}
-      >
-        <EmptyState
-          icon={
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 3h5v5" />
-              <path d="m21 3-7 7" />
-              <path d="M8 21H3v-5" />
-              <path d="m3 21 7-7" />
-            </svg>
-          }
-          title="No comparisons completed yet"
-          description="Side-by-side event comparisons will be generated once multiple articles covering the same breaking story are clustered and evaluated by the NLP analysis service."
-        />
-      </Card>
+      <ArticleMatchingSection
+        title="Pairwise Matching & Classification Results"
+      />
     </div>
   )
 }
