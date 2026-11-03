@@ -140,12 +140,11 @@ class MockEmbeddingProvider(BaseEmbeddingProvider):
                 provider="mock",
             )
 
-        # Seed coordinates deterministically from SHA-256 hex digest
-        base_seed = int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:8], 16)
-        raw_values = []
-        for i in range(self._dimensions):
-            val = math.sin((base_seed + i) * 0.1)
-            raw_values.append(val)
+        # Seed coordinates deterministically from SHA-256 digest using random.Random
+        seed = int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big")
+        import random
+        rng = random.Random(seed)
+        raw_values = [rng.gauss(0.0, 1.0) for _ in range(self._dimensions)]
 
         # L2-normalize vector to unit length
         norm = math.sqrt(sum(x * x for x in raw_values))

@@ -39,6 +39,13 @@ from app.services.similarity import (
     ArticleSimilarityResponse,
     get_similarity_service,
 )
+from app.services.matching import (
+    ArticleMatchingService,
+    extract_salient_entities,
+    compute_entity_overlap,
+    cosine_similarity,
+    get_matching_service,
+)
 
 __all__ = [
     "ProcessedArticleText",
@@ -65,5 +72,10 @@ __all__ = [
     "ArticleSimilarityMatch",
     "ArticleSimilarityResponse",
     "get_similarity_service",
+    "ArticleMatchingService",
+    "extract_salient_entities",
+    "compute_entity_overlap",
+    "cosine_similarity",
+    "get_matching_service",
 ]
 

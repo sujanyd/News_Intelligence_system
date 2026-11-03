@@ -25,6 +25,13 @@ from app.schemas.embedding import (
     ArticleEmbeddingResultDetail,
     EmbeddingGenerateSummaryResponse,
 )
+from app.schemas.article_match import (
+    MatchLabelType,
+    ArticleMatchSignalDetail,
+    ArticleMatchResponse,
+    ArticleMatchRequest,
+    ArticleMatchSummaryResponse,
+)
 
 __all__ = [
     "HealthCheckResponse",
@@ -42,4 +49,9 @@ __all__ = [
     "EmbeddingGenerateRequest",
     "ArticleEmbeddingResultDetail",
     "EmbeddingGenerateSummaryResponse",
+    "MatchLabelType",
+    "ArticleMatchSignalDetail",
+    "ArticleMatchResponse",
+    "ArticleMatchRequest",
+    "ArticleMatchSummaryResponse",
 ]

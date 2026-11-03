@@ -5,7 +5,15 @@ Combines all sub-routers (health, sources, articles) into a single central route
 """
 
 from fastapi import APIRouter
-from app.api.v1.endpoints import health, sources, articles, ingestion, embeddings, similarity
+from app.api.v1.endpoints import (
+    health,
+    sources,
+    articles,
+    ingestion,
+    embeddings,
+    similarity,
+    matching,
+)
 
 api_v1_router = APIRouter()
 
@@ -16,3 +24,4 @@ api_v1_router.include_router(articles.router, prefix="/articles", tags=["Article
 api_v1_router.include_router(ingestion.router, prefix="/ingestion", tags=["RSS Ingestion"])
 api_v1_router.include_router(embeddings.router, prefix="/embeddings", tags=["Article Embeddings"])
 api_v1_router.include_router(similarity.router, prefix="/similarity", tags=["Similarity Search"])
+api_v1_router.include_router(matching.router, tags=["Article Matching & Classification"])

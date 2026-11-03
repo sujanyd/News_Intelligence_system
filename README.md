@@ -849,11 +849,81 @@ Or for local unit tests without running Docker, set `QDRANT_URL=":memory:"` in `
 }
 ```
 
+### Article Pair Matching & Classification Endpoints
+
+The matching service retrieves candidate articles via Qdrant vector search and evaluates multi-signal factual evidence to classify pairs into:
+- **`SAME`**: Both articles report the same underlying event or occurrence (e.g. Fed rate cut across Reuters and AP).
+- **`RELATED`**: Articles concern the same overarching story or domain, but report different events, stages, or sub-topics (e.g. rate cut vs. jobs report).
+- **`DIFFERENT`**: Articles discuss distinct subjects and unrelated events (e.g. economic policy vs. space telescope discoveries).
+
+#### Constraints & Guarantees:
+- **Canonical Ordering**: Stored with `article_id_1 < article_id_2` to strictly prevent self-matching and reverse duplicates.
+- **Deduplication**: Unique constraint `uq_article_matches_pair` prevents redundant records during repeated runs.
+- **Diagnostic Signals**: Computes headline similarity, body similarity, salient entity overlap, publication recency delta, and foreign-key event alignment.
+
+#### 1. Match and Classify Candidates for an Article
+- **Route**: `POST /api/articles/{article_id}/match` (or `POST /api/v1/articles/{article_id}/match`)
+- **Request Body**:
+```json
+{
+  "candidate_limit": 10,
+  "score_threshold": 0.2,
+  "force_reclassify": false
+}
+```
+- **Response** (`200 OK`):
+```json
+{
+  "query_article_id": 1,
+  "query_title": "Federal Reserve Cuts Benchmark Rates by 25 Basis Points",
+  "candidates_retrieved": 2,
+  "matches_created": 2,
+  "matches_updated": 0,
+  "matches_skipped": 0,
+  "matches": [
+    {
+      "id": 1,
+      "article_id_1": 1,
+      "article_id_2": 2,
+      "match_label": "SAME",
+      "similarity_score": 0.9245,
+      "confidence_score": 0.95,
+      "model_name": "multi_signal_classifier_v1",
+      "created_at": "2026-11-03T11:45:00Z",
+      "article_1_title": "Federal Reserve Cuts Benchmark Rates by 25 Basis Points",
+      "article_2_title": "US Central Bank Lowers Borrowing Costs as Inflation Cools",
+      "article_1_source": "Reuters",
+      "article_2_source": "Associated Press",
+      "signals": {
+        "headline_similarity": 0.8812,
+        "body_similarity": 0.8421,
+        "entity_overlap_score": 0.4286,
+        "shared_entities": ["federal reserve", "washington"],
+        "publication_time_diff_hours": 2.0,
+        "event_id_match": true,
+        "same_story_id": true,
+        "classification_method": "multi_signal_classifier_v1"
+      }
+    }
+  ]
+}
+```
+
+#### 2. Get All Matches for an Article
+- **Route**: `GET /api/articles/{article_id}/matches` (or `GET /api/v1/articles/{article_id}/matches`)
+- **Query Parameters**:
+  - `label` *(optional)*: Filter by `SAME`, `RELATED`, or `DIFFERENT`.
+  - `limit` *(optional, default 50)*: Number of records.
+  - `offset` *(optional, default 0)*: Pagination offset.
+
+#### 3. Get Match by ID
+- **Route**: `GET /api/matches/{match_id}` (or `GET /api/v1/matches/{match_id}`)
+
 ---
 
 ## 🧪 11. Running Automated Tests
 
-Run the full automated test suite (118 tests) using `pytest`:
+Run the full automated test suite (132 tests) using `pytest`:
 
 ```bash
 pytest -v
@@ -863,13 +933,14 @@ Expected output:
 ```text
 tests/test_api_endpoints.py ... PASSED
 tests/test_article_embeddings.py ... PASSED
+tests/test_article_matching.py ... PASSED
 tests/test_vector_db_and_similarity.py ... PASSED
 tests/test_database.py ... PASSED
 tests/test_health.py ... PASSED
 tests/test_rss_ingestion.py ... PASSED
 tests/test_text_preprocessing.py ... PASSED
 
-================== 117 passed, 1 skipped, 1 warning in 1.25s ==================
+================== 131 passed, 1 skipped, 1 warning in 1.55s ==================
 ```
 
 ```bash
