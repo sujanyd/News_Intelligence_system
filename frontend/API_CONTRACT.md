@@ -1,6 +1,6 @@
 # Frontend ↔ Backend Contract (Articles and Sources)
 
-## Integration status (updated 29 Oct 2026)
+## Integration status (updated 5 Nov 2026)
 
 | What | Status |
 | ---- | ------ |
@@ -61,6 +61,40 @@ With 51 real articles from 3 sources (from one news collection run):
 | View details from search results | ✅ Full content loads |
 | Phone layout | ✅ No sideways scrolling |
 
+### Article matching demo check (5 Nov 2026)
+
+Backend in Person A's standalone demo mode (SQLite, in-memory Qdrant, mock
+embeddings), 86 articles (seed data plus one real news collection run) and 168
+embeddings generated through `POST /api/embeddings/generate`:
+
+| Feature | Result |
+| ------- | ------ |
+| Dashboard, Sources, Articles pages | ✅ Real data, no errors |
+| Article details → Similar Articles | ✅ 5 nearest articles with similarity %, each with its stored label or "Not classified yet" |
+| "Classify these articles" | ✅ `POST /api/articles/{id}/match` (5 candidates, no cutoff); 4 cards went from "Not classified yet" to DIFFERENT |
+| Comparisons → pick an article | ✅ `GET /api/articles/40/matches`: All 10, SAME 0, RELATED 1, DIFFERENT 9, with real titles and sources |
+| Run matching (backend default cutoff 0.2) | ✅ "No candidate articles were found above the backend's similarity cutoff (0.2)" |
+| Run matching with "Include low-similarity candidates" | ✅ "Classified 10 candidate articles: 0 new, 0 updated, 10 already stored." |
+| Side-by-side comparison | ✅ Both articles' text, similarity 45%, confidence 67% |
+| Backend unreachable | ✅ Error message, **Try again** recovers |
+| Browser console | ✅ No errors or warnings |
+| Phone layout | ✅ No sideways scrolling |
+
+Notes for the demo:
+
+- With `EMBEDDING_PROVIDER=mock` the vectors are not semantic, so similarity
+  is low (about 5 to 7%) and most pairs are DIFFERENT. That is the backend's
+  real output; the frontend shows it as it is. A real embedding model is
+  needed for meaningful SAME / RELATED results.
+- There is no route that lists **all** matches, so Comparisons asks for one
+  article first.
+- There is no route for saving a manual review, so the review panel stays
+  read-only.
+- `docs/demo-readiness/FRONTEND_BACKEND_INTEGRATION.md` lists
+  `/api/articles/{id}/similar`, which does not exist; the real route is
+  `/api/similarity/article/{id}`. `RUN_PROJECT.md` mentions
+  `scripts/seed_demo_data.py`, which is not in the repository.
+
 ### Open backend issue (for Person A)
 
 The earlier `alembic.ini` URL problem is fixed. On a fresh database (checked
@@ -99,6 +133,11 @@ Pages never call `fetch` directly.
 | `createArticle()`   | POST   | `/api/articles`                                  |
 | `checkBackendHealth()` | GET | `/health` (exists today)                         |
 | `runNewsCollection()` | POST | `/api/ingestion/run` with body `{}`              |
+| `fetchArticleEmbeddings(id)` | GET | `/api/embeddings/article/{article_id}`     |
+| `fetchSimilarArticles(id)` | GET | `/api/similarity/article/{article_id}?embedding_type=headline&limit=5` |
+| `fetchMatches({ articleId })` | GET | `/api/articles/{article_id}/matches?limit=100` (+ `label`) |
+| `runArticleMatching(id)` | POST | `/api/articles/{article_id}/match` with `{ candidate_limit, score_threshold? }` |
+| `fetchMatch(id)`    | GET    | `/api/matches/{match_id}`                        |
 
 Pagination: the page shows 5 articles. It asks for `limit=6`, and if 6 come
 back it knows there is a next page. `offset = (page - 1) × 5`.
@@ -212,4 +251,4 @@ What the dashboard does with it:
 
 ## Not covered
 
-Semantic matching, AI analysis, comparison reports and ingestion history.
+AI analysis (bias and framing), comparison reports, saving manual match reviews and ingestion history.

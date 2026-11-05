@@ -171,6 +171,49 @@ describe('newsApi in live mode', () => {
     await expect(api.runNewsCollection()).rejects.toThrow('only works with the real backend')
   })
 
+  it('loads one article\'s matches from GET /api/articles/{id}/matches', async () => {
+    const fakeFetch = stubFetchJson(200, [
+      { id: 4, article_id_1: 1, article_id_2: 61, match_label: 'DIFFERENT',
+        article_1_title: 'A', article_2_title: 'B', article_1_source: 'Reuters', article_2_source: 'TechCrunch' },
+    ])
+    const api = await loadLiveApi()
+
+    const matches = await api.fetchMatches({ articleId: 1, label: 'DIFFERENT' })
+
+    expect(fakeFetch.mock.calls[0][0]).toBe('http://backend.test/api/articles/1/matches?label=DIFFERENT&limit=100')
+    expect(matches[0].article_b.source_name).toBe('TechCrunch')
+  })
+
+  it('needs an article for matches, because there is no route listing all of them', async () => {
+    const api = await loadLiveApi()
+    await expect(api.fetchMatches({})).rejects.toThrow('Choose an article first')
+  })
+
+  it('runs matching with POST /api/articles/{id}/match', async () => {
+    const fakeFetch = stubFetchJson(200, {
+      query_article_id: 5, query_title: 'T', candidates_retrieved: 0,
+      matches_created: 0, matches_updated: 0, matches_skipped: 0, matches: [],
+    })
+    const api = await loadLiveApi()
+
+    const summary = await api.runArticleMatching(5, { candidateLimit: 5, scoreThreshold: -1 })
+
+    const [url, options] = fakeFetch.mock.calls[0]
+    expect(url).toBe('http://backend.test/api/articles/5/match')
+    expect(options.method).toBe('POST')
+    expect(JSON.parse(options.body)).toEqual({ candidate_limit: 5, score_threshold: -1 })
+    expect(summary.candidates_retrieved).toBe(0)
+  })
+
+  it('leaves the cutoff to the backend when none is given', async () => {
+    const fakeFetch = stubFetchJson(200, { candidates_retrieved: 0, matches: [] })
+    const api = await loadLiveApi()
+
+    await api.runArticleMatching(5)
+
+    expect(JSON.parse(fakeFetch.mock.calls[0][1].body)).toEqual({ candidate_limit: 10 })
+  })
+
   it('passes other backend errors on unchanged', async () => {
     stubFetchJson(404, { detail: 'Article not found' })
     const api = await loadLiveApi()

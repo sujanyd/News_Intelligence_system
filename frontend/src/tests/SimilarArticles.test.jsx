@@ -15,7 +15,7 @@ import React from 'react'
 import SimilarArticleCard from '../components/SimilarArticleCard'
 import SimilarArticlesSection from '../components/SimilarArticlesSection'
 import ArticleDetails from '../components/ArticleDetails'
-import { fetchArticle, fetchSimilarArticles } from '../api/newsApi'
+import { fetchArticle, fetchMatches, fetchSimilarArticles, runArticleMatching } from '../api/newsApi'
 
 vi.mock('../api/newsApi', async (importOriginal) => {
   const realModule = await importOriginal()
@@ -24,6 +24,8 @@ vi.mock('../api/newsApi', async (importOriginal) => {
     fetchArticle: vi.fn(),
     fetchArticleEmbeddings: vi.fn().mockResolvedValue([]),
     fetchSimilarArticles: vi.fn(),
+    fetchMatches: vi.fn().mockResolvedValue([]),
+    runArticleMatching: vi.fn(),
   }
 })
 
@@ -97,7 +99,7 @@ describe('SimilarArticleCard component', () => {
     expect(within(pill).getByText('88%')).toBeDefined()
   })
 
-  it('does NOT label articles as SAME or RELATED (strict rule check)', () => {
+  it('never turns the similarity score into a SAME / RELATED label by itself', () => {
     const { container } = render(<SimilarArticleCard article={MATCH_1} />)
 
     expect(container.textContent).not.toMatch(/\bSAME\b/)
@@ -267,5 +269,71 @@ describe('ArticleDetails navigation with Similar Articles', () => {
     // Should return to article 101
     expect(await screen.findByText('The city council voted on Monday to approve a larger budget for buses and trains.')).toBeDefined()
     expect(screen.queryByRole('button', { name: 'Return to previous article' })).toBeNull()
+  })
+})
+
+describe('Similar articles with their classification', () => {
+  const SIMILARITY_RESPONSE = {
+    query_article_id: 101,
+    query_title: 'City council approves new budget for public transport',
+    embedding_type: 'headline',
+    model_name: 'all-MiniLM-L6-v2',
+    total_matches: 2,
+    matches: [MATCH_1, MATCH_2],
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    fetchSimilarArticles.mockResolvedValue(SIMILARITY_RESPONSE)
+  })
+
+  it('shows the stored label, or "Not classified yet" when there is no match', async () => {
+    fetchMatches.mockResolvedValue([
+      { id: 9, article_id_1: 101, article_id_2: 103, match_label: 'SAME' },
+    ])
+    render(<SimilarArticlesSection articleId={101} />)
+
+    const card103 = await screen.findByTestId('similar-article-card-103')
+    expect(await within(card103).findByText('SAME')).toBeDefined()
+    const card102 = screen.getByTestId('similar-article-card-102')
+    expect(within(card102).getByText('Not classified yet')).toBeDefined()
+    expect(fetchMatches).toHaveBeenCalledWith({ articleId: 101 })
+  })
+
+  it('classifies exactly the shown articles, then loads the labels again', async () => {
+    fetchMatches.mockResolvedValueOnce([])
+    fetchMatches.mockResolvedValueOnce([
+      { id: 9, article_id_1: 101, article_id_2: 102, match_label: 'RELATED' },
+    ])
+    runArticleMatching.mockResolvedValueOnce({ candidates_retrieved: 2, matches: [] })
+    render(<SimilarArticlesSection articleId={101} />)
+    await screen.findByTestId('similar-article-card-102')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Classify these articles' }))
+
+    const card102 = screen.getByTestId('similar-article-card-102')
+    expect(await within(card102).findByText('RELATED')).toBeDefined()
+    // Same search as the list: top 5 headline neighbours, no cutoff
+    expect(runArticleMatching).toHaveBeenCalledWith(101, { candidateLimit: 5, scoreThreshold: -1 })
+  })
+
+  it('still shows the similar articles when classifications cannot load', async () => {
+    fetchMatches.mockRejectedValueOnce(new Error('Matches route failed'))
+    render(<SimilarArticlesSection articleId={101} />)
+
+    expect(await screen.findByText('Classifications unavailable: Matches route failed')).toBeDefined()
+    expect(screen.getByTestId('similar-article-card-103')).toBeDefined()
+    expect(screen.queryByText('Not classified yet')).toBeNull()
+  })
+
+  it('shows an error when classifying fails', async () => {
+    runArticleMatching.mockRejectedValueOnce(new Error('Pairwise matching failed (HTTP 500)'))
+    render(<SimilarArticlesSection articleId={101} />)
+    await screen.findByTestId('similar-article-card-103')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Classify these articles' }))
+
+    expect(await screen.findByText('Classification failed.')).toBeDefined()
+    expect(screen.getByText('Pairwise matching failed (HTTP 500)')).toBeDefined()
   })
 })

@@ -1,6 +1,8 @@
 import React from 'react'
 import { formatDate } from '../utils/formatDate'
 import { formatSimilarityPercentage } from '../utils/formatSimilarity'
+import ClassificationBadge from './ClassificationBadge'
+import StatusBadge from './StatusBadge'
 
 /**
  * SimilarArticleCard Component
@@ -12,8 +14,9 @@ import { formatSimilarityPercentage } from '../utils/formatSimilarity'
  *   - Semantic similarity score (formatted as percentage, e.g. "Semantic similarity: 91%")
  *   - Action button to view the article's details
  *
- * NOTE: As per project rules, this component explicitly does NOT label articles
- * as SAME or RELATED, because pairwise classification has not yet been implemented.
+ * The SAME / RELATED / DIFFERENT badge comes from the backend's stored match for
+ * this pair (matchLabel). The similarity score alone is never turned into a label:
+ * without a stored match the card says "Not classified yet".
  *
  * @param {Object} props
  * @param {Object} props.article - Match object from similarity service
@@ -23,9 +26,11 @@ import { formatSimilarityPercentage } from '../utils/formatSimilarity'
  * @param {string} [props.article.published_at] - Publication timestamp ISO
  * @param {number} props.article.similarity_score - Cosine similarity score (0.0 - 1.0)
  * @param {string} [props.article.url] - External article URL
+ * @param {'SAME' | 'RELATED' | 'DIFFERENT' | null} [props.matchLabel] - Stored classification
+ * @param {boolean} [props.showMatchLabel=false] - false hides the badge (e.g. matches could not load)
  * @param {(articleId: number) => void} [props.onSelect] - Called when user clicks "View article"
  */
-export function SimilarArticleCard({ article, onSelect }) {
+export function SimilarArticleCard({ article, matchLabel = null, showMatchLabel = false, onSelect }) {
   if (!article) return null
 
   const similarityPercentage = formatSimilarityPercentage(article.similarity_score)
@@ -65,6 +70,16 @@ export function SimilarArticleCard({ article, onSelect }) {
             </div>
           )}
         </div>
+
+        {showMatchLabel && (
+          <div className="sac-classification" data-testid="similar-classification">
+            {matchLabel ? (
+              <ClassificationBadge label={matchLabel} size="sm" />
+            ) : (
+              <StatusBadge variant="pending">Not classified yet</StatusBadge>
+            )}
+          </div>
+        )}
 
         <div className="sac-meta">
           {article.source_name && (

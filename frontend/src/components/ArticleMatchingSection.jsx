@@ -3,20 +3,29 @@ import MatchedPairCard from './MatchedPairCard'
 import SideBySideComparison from './SideBySideComparison'
 import EmptyState from './EmptyState'
 import AlertMessage from './AlertMessage'
-import { fetchMatches, submitMatchReview, MATCH_REVIEW_AVAILABLE } from '../api/newsApi'
+import {
+  fetchMatches,
+  runArticleMatching,
+  submitMatchReview,
+  MATCH_REVIEW_AVAILABLE,
+} from '../api/newsApi'
 
 /**
  * ArticleMatchingSection Component
  *
- * Manages the matching results section:
- *   - Fetches and displays pairwise article matches with classification labels.
+ * Manages the matching results section for ONE article:
+ *   - Fetches its stored matches: GET /articles/{id}/matches
+ *     (the backend has no route that lists every match).
+ *   - "Run matching" classifies its nearest articles: POST /articles/{id}/match
+ *   - Displays the pairs with their SAME / RELATED / DIFFERENT labels.
  *   - Category filter tabs: All, SAME, RELATED, DIFFERENT.
  *   - Search input to filter pairs by article title or source.
  *   - Loading, Empty, and Error states with retry capability.
  *   - Side-by-side comparison modal/view when a pair is selected.
  *
  * @param {Object} props
- * @param {number|string} [props.articleId] - Optional query article ID filter
+ * @param {number|string} [props.articleId] - The article whose matches to show.
+ *   Without it, the section asks the user to choose an article.
  * @param {string} [props.title='Article Matching & Classification Review']
  * @param {boolean} [props.isReviewSupported=MATCH_REVIEW_AVAILABLE]
  */
@@ -25,9 +34,16 @@ export function ArticleMatchingSection({
   title = 'Article Matching & Classification Review',
   isReviewSupported = MATCH_REVIEW_AVAILABLE,
 }) {
+  const hasArticle = articleId !== undefined && articleId !== null && articleId !== ''
   const [matches, setMatches] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(hasArticle)
   const [error, setError] = useState(null)
+
+  // "Run matching" status
+  const [isRunning, setIsRunning] = useState(false)
+  const [runSummary, setRunSummary] = useState(null)
+  const [runError, setRunError] = useState('')
+  const [includeLowSimilarity, setIncludeLowSimilarity] = useState(false)
   const [filterLabel, setFilterLabel] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedMatch, setSelectedMatch] = useState(null)
@@ -36,6 +52,7 @@ export function ArticleMatchingSection({
 
   useEffect(() => {
     let isCancelled = false
+    if (!hasArticle) return
 
     fetchMatches({ articleId })
       .then((data) => {
@@ -51,7 +68,26 @@ export function ArticleMatchingSection({
     return () => {
       isCancelled = true
     }
-  }, [articleId, reloadKey])
+  }, [articleId, hasArticle, reloadKey])
+
+  async function handleRunMatching() {
+    if (isRunning) return // a run is already going
+    setIsRunning(true)
+    setRunSummary(null)
+    setRunError('')
+    try {
+      // 0 = classify the nearest articles even when their vector similarity is low
+      const summary = await runArticleMatching(articleId, {
+        scoreThreshold: includeLowSimilarity ? 0 : undefined,
+      })
+      setRunSummary(summary)
+      handleRetry() // load the stored matches again
+    } catch (err) {
+      setRunError(err.message || 'Matching failed.')
+    } finally {
+      setIsRunning(false)
+    }
+  }
 
   const handleRetry = useCallback(() => {
     setIsLoading(true)
@@ -99,6 +135,18 @@ export function ArticleMatchingSection({
       setSelectedMatch((prev) => ({ ...prev, ...updated }))
     }
     return updated
+  }
+
+  if (!hasArticle) {
+    return (
+      <section className="article-matching-section" data-testid="article-matching-section">
+        <h3 className="ams-title">{title}</h3>
+        <EmptyState
+          title="Choose an article"
+          description="Matches are stored per article. Pick an article to see its SAME, RELATED and DIFFERENT pairs."
+        />
+      </section>
+    )
   }
 
   // If a match is selected for side-by-side comparison, render comparison view
@@ -181,6 +229,54 @@ export function ArticleMatchingSection({
         </div>
       </div>
 
+      {/* Run matching for this article */}
+      <div className="ams-run-bar">
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleRunMatching}
+          disabled={isRunning}
+          aria-busy={isRunning}
+        >
+          {isRunning ? (
+            <span className="loading-spinner-wrap">
+              <span className="spinner" aria-hidden="true" /> Classifying...
+            </span>
+          ) : (
+            'Run matching'
+          )}
+        </button>
+        <label className="ams-run-option">
+          <input
+            type="checkbox"
+            checked={includeLowSimilarity}
+            onChange={(event) => setIncludeLowSimilarity(event.target.checked)}
+            disabled={isRunning}
+          />{' '}
+          Include low-similarity candidates
+        </label>
+      </div>
+
+      {runError && (
+        <AlertMessage type="error" title="Matching failed." message={runError} />
+      )}
+
+      {runSummary && runSummary.candidates_retrieved === 0 && (
+        <AlertMessage
+          type="info"
+          message={`No candidate articles were found above the backend's similarity cutoff${
+            includeLowSimilarity ? '' : ' (0.2). Tick "Include low-similarity candidates" to classify the nearest articles anyway'
+          }.`}
+        />
+      )}
+
+      {runSummary && runSummary.candidates_retrieved > 0 && (
+        <AlertMessage
+          type="success"
+          message={`Classified ${runSummary.candidates_retrieved} candidate articles: ${runSummary.matches_created} new, ${runSummary.matches_updated} updated, ${runSummary.matches_skipped} already stored.`}
+        />
+      )}
+
       {/* Loading State */}
       {isLoading && (
         <div className="ams-loading-box" data-testid="ams-loading">
@@ -209,7 +305,7 @@ export function ArticleMatchingSection({
             description={
               searchQuery || filterLabel !== 'ALL'
                 ? 'No pairs match the selected filter criteria. Try resetting filters or search query.'
-                : 'No article pairs have been evaluated for matching and classification yet. Ingest articles and generate embeddings to trigger pairwise matching.'
+                : 'This article has no stored matches yet. Click "Run matching" to classify its nearest articles.'
             }
           />
         </div>

@@ -24,7 +24,9 @@ import ClassificationBadge from '../components/ClassificationBadge'
 import MatchedPairCard from '../components/MatchedPairCard'
 import SideBySideComparison from '../components/SideBySideComparison'
 import ArticleMatchingSection from '../components/ArticleMatchingSection'
-import { fetchMatches, fetchArticle } from '../api/newsApi'
+import { fetchMatches, fetchArticle, runArticleMatching } from '../api/newsApi'
+import Comparisons from '../pages/Comparisons'
+import { toMatchRunSummary, toArticleMatch as normalizeMatch } from '../api/normalize'
 
 vi.mock('../api/newsApi', async (importOriginal) => {
   const realModule = await importOriginal()
@@ -32,6 +34,7 @@ vi.mock('../api/newsApi', async (importOriginal) => {
     ...realModule,
     fetchMatches: vi.fn(),
     fetchArticle: vi.fn(),
+    runArticleMatching: vi.fn(),
     submitMatchReview: vi.fn(),
     MATCH_REVIEW_AVAILABLE: false,
   }
@@ -414,14 +417,14 @@ describe('ArticleMatchingSection', () => {
 
   it('shows loading state while fetching matches', () => {
     fetchMatches.mockReturnValue(new Promise(() => {}))
-    render(<ArticleMatchingSection />)
+    render(<ArticleMatchingSection articleId={101} />)
     expect(screen.getByTestId('ams-loading')).toBeDefined()
     expect(screen.getByText(/Loading matched article pairs/i)).toBeDefined()
   })
 
   it('renders SAME, RELATED, and DIFFERENT matches in the list', async () => {
     fetchMatches.mockResolvedValueOnce([MATCH_SAME, MATCH_RELATED, MATCH_DIFFERENT])
-    render(<ArticleMatchingSection />)
+    render(<ArticleMatchingSection articleId={101} />)
     expect(await screen.findByTestId('matched-pair-card-1')).toBeDefined()
     expect(screen.getByTestId('matched-pair-card-2')).toBeDefined()
     expect(screen.getByTestId('matched-pair-card-3')).toBeDefined()
@@ -432,14 +435,14 @@ describe('ArticleMatchingSection', () => {
 
   it('shows empty state when no matches are returned', async () => {
     fetchMatches.mockResolvedValueOnce([])
-    render(<ArticleMatchingSection />)
+    render(<ArticleMatchingSection articleId={101} />)
     expect(await screen.findByTestId('ams-empty')).toBeDefined()
     expect(screen.getByText('No matched article pairs found')).toBeDefined()
   })
 
   it('shows error state and retry button on API failure', async () => {
     fetchMatches.mockRejectedValueOnce(new Error('Network error'))
-    render(<ArticleMatchingSection />)
+    render(<ArticleMatchingSection articleId={101} />)
     expect(await screen.findByTestId('ams-error')).toBeDefined()
     expect(screen.getByText('Network error')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Try again' })).toBeDefined()
@@ -447,7 +450,7 @@ describe('ArticleMatchingSection', () => {
 
   it('filters to SAME matches when SAME tab is clicked', async () => {
     fetchMatches.mockResolvedValueOnce([MATCH_SAME, MATCH_RELATED, MATCH_DIFFERENT])
-    render(<ArticleMatchingSection />)
+    render(<ArticleMatchingSection articleId={101} />)
     await screen.findByTestId('matched-pair-card-1')
 
     fireEvent.click(screen.getByRole('tab', { name: /SAME/ }))
@@ -459,7 +462,7 @@ describe('ArticleMatchingSection', () => {
 
   it('filters to RELATED matches when RELATED tab is clicked', async () => {
     fetchMatches.mockResolvedValueOnce([MATCH_SAME, MATCH_RELATED, MATCH_DIFFERENT])
-    render(<ArticleMatchingSection />)
+    render(<ArticleMatchingSection articleId={101} />)
     await screen.findByTestId('matched-pair-card-2')
 
     fireEvent.click(screen.getByRole('tab', { name: /RELATED/ }))
@@ -471,7 +474,7 @@ describe('ArticleMatchingSection', () => {
 
   it('filters to DIFFERENT matches when DIFFERENT tab is clicked', async () => {
     fetchMatches.mockResolvedValueOnce([MATCH_SAME, MATCH_RELATED, MATCH_DIFFERENT])
-    render(<ArticleMatchingSection />)
+    render(<ArticleMatchingSection articleId={101} />)
     await screen.findByTestId('matched-pair-card-3')
 
     fireEvent.click(screen.getByRole('tab', { name: /DIFFERENT/ }))
@@ -483,7 +486,7 @@ describe('ArticleMatchingSection', () => {
 
   it('shows all pairs when All tab is selected', async () => {
     fetchMatches.mockResolvedValueOnce([MATCH_SAME, MATCH_RELATED, MATCH_DIFFERENT])
-    render(<ArticleMatchingSection />)
+    render(<ArticleMatchingSection articleId={101} />)
     await screen.findByTestId('matched-pair-card-1')
 
     // Switch to SAME then back to ALL
@@ -497,7 +500,7 @@ describe('ArticleMatchingSection', () => {
 
   it('filters by title search query', async () => {
     fetchMatches.mockResolvedValueOnce([MATCH_SAME, MATCH_DIFFERENT])
-    render(<ArticleMatchingSection />)
+    render(<ArticleMatchingSection articleId={101} />)
     await screen.findByTestId('matched-pair-card-1')
 
     const searchInput = screen.getByRole('searchbox', {
@@ -512,7 +515,7 @@ describe('ArticleMatchingSection', () => {
   it('navigates to SideBySideComparison when Compare is clicked and returns to list', async () => {
     fetchMatches.mockResolvedValueOnce([MATCH_SAME])
     fetchArticle.mockResolvedValue({ id: 101, title: 'x', content: null })
-    render(<ArticleMatchingSection />)
+    render(<ArticleMatchingSection articleId={101} />)
     await screen.findByTestId('matched-pair-card-1')
 
     const compareBtn = screen.getByRole('button', { name: /Compare Side-by-Side/i })
@@ -601,7 +604,7 @@ describe('normalize.toArticleMatch', () => {
   })
 
   it('normalizes null similarity_score gracefully', () => {
-    const result = toArticleMatch({
+    const result = normalizeMatch({
       id: 4,
       article_id_1: 104,
       article_id_2: 105,
@@ -612,7 +615,7 @@ describe('normalize.toArticleMatch', () => {
   })
 
   it('normalizes null review_status to "unreviewed"', () => {
-    const result = toArticleMatch({
+    const result = normalizeMatch({
       id: 4,
       article_id_1: 104,
       article_id_2: 105,
@@ -668,5 +671,156 @@ describe('normalize.toArticleMatch', () => {
     }
     const result = toArticleMatchList(wrapped)
     expect(result[0].match_label).toBe('DIFFERENT')
+  })
+})
+
+// ── Matching with the real backend routes ──────────────────────────────────────
+
+// A promise we can finish later, to look at the screen while a request runs
+function createPendingPromise() {
+  let resolve
+  const promise = new Promise((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
+const RUN_SUMMARY = {
+  query_article_id: 101,
+  candidates_retrieved: 3,
+  matches_created: 2,
+  matches_updated: 0,
+  matches_skipped: 1,
+  matches: [],
+}
+
+describe('ArticleMatchingSection with one article', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('asks for an article and sends no request when none is chosen', () => {
+    render(<ArticleMatchingSection />)
+    expect(screen.getByText('Choose an article')).toBeDefined()
+    expect(fetchMatches).not.toHaveBeenCalled()
+  })
+
+  it('loads the matches of the chosen article', async () => {
+    fetchMatches.mockResolvedValueOnce([MATCH_SAME])
+    render(<ArticleMatchingSection articleId={101} />)
+    await screen.findByTestId('ams-pairs-grid')
+    expect(fetchMatches).toHaveBeenCalledWith({ articleId: 101 })
+  })
+
+  it('runs matching, disables the button meanwhile, then shows the counts and reloads', async () => {
+    const pendingRun = createPendingPromise()
+    runArticleMatching.mockReturnValueOnce(pendingRun.promise)
+    fetchMatches.mockResolvedValue([MATCH_SAME])
+    render(<ArticleMatchingSection articleId={101} />)
+    await screen.findByTestId('ams-pairs-grid')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run matching' }))
+    const busyButton = screen.getByRole('button', { name: /Classifying/ })
+    expect(busyButton.disabled).toBe(true)
+    fireEvent.click(busyButton)
+    expect(runArticleMatching).toHaveBeenCalledTimes(1)
+    // The backend's own cutoff is used unless the box is ticked
+    expect(runArticleMatching).toHaveBeenCalledWith(101, { scoreThreshold: undefined })
+
+    pendingRun.resolve(RUN_SUMMARY)
+
+    expect(
+      await screen.findByText('Classified 3 candidate articles: 2 new, 0 updated, 1 already stored.')
+    ).toBeDefined()
+    await waitFor(() => expect(fetchMatches).toHaveBeenCalledTimes(2))
+  })
+
+  it('sends cutoff 0 when low-similarity candidates are included', async () => {
+    fetchMatches.mockResolvedValue([])
+    runArticleMatching.mockResolvedValueOnce(RUN_SUMMARY)
+    render(<ArticleMatchingSection articleId={101} />)
+    await screen.findByTestId('ams-empty')
+
+    fireEvent.click(screen.getByLabelText('Include low-similarity candidates'))
+    fireEvent.click(screen.getByRole('button', { name: 'Run matching' }))
+
+    await screen.findByText(/Classified 3 candidate articles/)
+    expect(runArticleMatching).toHaveBeenCalledWith(101, { scoreThreshold: 0 })
+  })
+
+  it('explains when no candidates pass the similarity cutoff', async () => {
+    fetchMatches.mockResolvedValue([])
+    runArticleMatching.mockResolvedValueOnce({ ...RUN_SUMMARY, candidates_retrieved: 0, matches_created: 0, matches_skipped: 0 })
+    render(<ArticleMatchingSection articleId={101} />)
+    await screen.findByTestId('ams-empty')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run matching' }))
+
+    expect(await screen.findByText(/No candidate articles were found above the backend's similarity cutoff \(0.2\)/)).toBeDefined()
+  })
+
+  it('shows an error when matching fails', async () => {
+    fetchMatches.mockResolvedValue([])
+    runArticleMatching.mockRejectedValueOnce(new Error('Vector database unavailable (HTTP 503)'))
+    render(<ArticleMatchingSection articleId={101} />)
+    await screen.findByTestId('ams-empty')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run matching' }))
+
+    expect(await screen.findByText('Matching failed.')).toBeDefined()
+    expect(screen.getByText('Vector database unavailable (HTTP 503)')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Run matching' }).disabled).toBe(false)
+  })
+})
+
+describe('Comparisons page', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('lists real articles to pick from, then shows the chosen article\'s matches', async () => {
+    fetchMatches.mockResolvedValue([MATCH_SAME])
+    render(<Comparisons />)
+
+    expect(screen.getByText('Loading articles...')).toBeDefined()
+    const picker = await screen.findByLabelText('Article to compare')
+    expect(screen.getByText(/Matches are stored per article/)).toBeDefined()
+    expect(fetchMatches).not.toHaveBeenCalled()
+
+    fireEvent.change(picker, { target: { value: '101' } })
+
+    await screen.findByTestId('ams-pairs-grid')
+    expect(fetchMatches).toHaveBeenCalledWith({ articleId: '101' })
+  })
+})
+
+describe('Normalizing the real backend match reply', () => {
+  it('reads article_1_title, article_2_title and the source fields', () => {
+    const result = normalizeMatch({
+      id: 4,
+      article_id_1: 1,
+      article_id_2: 61,
+      match_label: 'DIFFERENT',
+      similarity_score: 0.4486,
+      confidence_score: 0.8206,
+      model_name: 'multi_signal_classifier_v1',
+      created_at: '2026-11-05T02:38:29.358712',
+      article_1_title: 'World Leaders Finalize Landmark Clean Energy Transition Pact',
+      article_2_title: 'OpenAI is already trying to shape the 2028 election',
+      article_1_source: 'Reuters',
+      article_2_source: 'TechCrunch',
+      signals: null,
+    })
+    expect(result.article_a.title).toBe('World Leaders Finalize Landmark Clean Energy Transition Pact')
+    expect(result.article_b.title).toBe('OpenAI is already trying to shape the 2028 election')
+    expect(result.article_a.source_name).toBe('Reuters')
+    expect(result.article_b.source_name).toBe('TechCrunch')
+  })
+
+  it('checks the matching run summary', () => {
+    const summary = toMatchRunSummary({ ...RUN_SUMMARY, matches: [MATCH_SAME] })
+    expect(summary.candidates_retrieved).toBe(3)
+    expect(summary.matches[0].match_label).toBe('SAME')
+    expect(() => toMatchRunSummary({ matches: [] })).toThrow('unexpected format')
   })
 })

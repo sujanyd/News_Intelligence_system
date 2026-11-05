@@ -243,6 +243,8 @@ export function toArticleMatch(raw) {
     title:
       typeof rawArtA.title === 'string'
         ? rawArtA.title
+        : typeof raw.article_1_title === 'string'
+        ? raw.article_1_title
         : typeof raw.article_a_title === 'string'
         ? raw.article_a_title
         : typeof raw.title_1 === 'string'
@@ -253,6 +255,8 @@ export function toArticleMatch(raw) {
         ? rawArtA.source_name
         : typeof rawArtA.source?.name === 'string'
         ? rawArtA.source.name
+        : typeof raw.article_1_source === 'string'
+        ? raw.article_1_source
         : typeof raw.source_name_a === 'string'
         ? raw.source_name_a
         : typeof raw.source_1 === 'string'
@@ -287,6 +291,8 @@ export function toArticleMatch(raw) {
     title:
       typeof rawArtB.title === 'string'
         ? rawArtB.title
+        : typeof raw.article_2_title === 'string'
+        ? raw.article_2_title
         : typeof raw.article_b_title === 'string'
         ? raw.article_b_title
         : typeof raw.title_2 === 'string'
@@ -299,6 +305,8 @@ export function toArticleMatch(raw) {
         ? rawArtB.source_name
         : typeof rawArtB.source?.name === 'string'
         ? rawArtB.source.name
+        : typeof raw.article_2_source === 'string'
+        ? raw.article_2_source
         : typeof raw.source_name_b === 'string'
         ? raw.source_name_b
         : typeof raw.source_name === 'string'
@@ -365,3 +373,26 @@ export function toArticleMatchList(raw) {
   throw new ApiError('The backend sent the article matches list in an unexpected format.')
 }
 
+
+/**
+ * Checks the reply of POST /articles/{id}/match (ArticleMatchSummaryResponse
+ * in app/schemas/article_match.py).
+ *
+ * @returns {{ query_article_id: number, candidates_retrieved: number,
+ *   matches_created: number, matches_updated: number, matches_skipped: number,
+ *   matches: Array }}
+ */
+export function toMatchRunSummary(raw) {
+  if (!isObject(raw) || !Number.isInteger(raw.candidates_retrieved)) {
+    throw new ApiError('The backend sent the matching result in an unexpected format.')
+  }
+  const count = (value) => (Number.isInteger(value) ? value : 0)
+  return {
+    query_article_id: raw.query_article_id ?? null,
+    candidates_retrieved: raw.candidates_retrieved,
+    matches_created: count(raw.matches_created),
+    matches_updated: count(raw.matches_updated),
+    matches_skipped: count(raw.matches_skipped),
+    matches: Array.isArray(raw.matches) ? raw.matches.map(toArticleMatch) : [],
+  }
+}

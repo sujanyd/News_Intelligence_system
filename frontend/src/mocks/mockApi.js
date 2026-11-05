@@ -188,7 +188,31 @@ export async function getMatch(id) {
 }
 
 /**
- * Pretend: PATCH /matches/{id}/review
+ * Pretend: POST /articles/{id}/match
+ * Classifies nothing new: it reports the stored sample matches as "already stored".
+ */
+export async function postArticleMatch(articleId) {
+  await wait()
+  const article = articles.find((item) => String(item.id) === String(articleId))
+  if (!article) {
+    throw new ApiError(`Article with ID ${articleId} not found (HTTP 404)`, 404)
+  }
+  const stored = matchesData.filter(
+    (m) => String(m.article_id_1) === String(articleId) || String(m.article_id_2) === String(articleId)
+  )
+  return {
+    query_article_id: article.id,
+    query_title: article.title,
+    candidates_retrieved: stored.length,
+    matches_created: 0,
+    matches_updated: 0,
+    matches_skipped: stored.length,
+    matches: stored,
+  }
+}
+
+/**
+ * Pretend: saving a manual review (the real backend has no route for this yet)
  */
 export async function updateMatchReview(matchId, { reviewed, match_label, reviewer_notes } = {}) {
   await wait()

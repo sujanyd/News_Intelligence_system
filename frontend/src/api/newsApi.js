@@ -21,6 +21,7 @@ import {
   toEmbeddingResultList,
   toIngestionResult,
   toList,
+  toMatchRunSummary,
   toSimilarArticlesResponse,
   toSource,
 } from './normalize'
@@ -37,10 +38,16 @@ export const ENDPOINTS = {
   article: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}`,
   articleEmbeddings: (id) => `${API_PREFIX}/embeddings/article/${encodeURIComponent(id)}`,
   similarArticles: (id) => `${API_PREFIX}/similarity/article/${encodeURIComponent(id)}`,
-  matches: `${API_PREFIX}/matches`,
+  // Matching (app/api/v1/endpoints/matching.py). There is no route that lists
+  // every match: the backend lists the matches of ONE article.
+  articleMatches: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/matches`,
+  runArticleMatch: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/match`,
   match: (id) => `${API_PREFIX}/matches/${encodeURIComponent(id)}`,
-  matchReview: (id) => `${API_PREFIX}/matches/${encodeURIComponent(id)}/review`,
 }
+
+// Matching compares an article with its nearest articles before it answers,
+// so allow more time than a normal request
+export const MATCHING_TIMEOUT_MS = 60000
 
 // News collection (RSS ingestion): POST /ingestion/run (built by Person A).
 // It reads every configured RSS feed before it answers, so it can take much
@@ -190,20 +197,44 @@ export async function runNewsCollection() {
 export const MATCH_REVIEW_AVAILABLE = false
 
 /**
- * Gets article pairwise matches with classification labels (SAME, RELATED, DIFFERENT).
- * Endpoint: GET /matches?article_id=&label=
+ * Gets the stored SAME / RELATED / DIFFERENT matches of one article.
+ * Endpoint: GET /articles/{article_id}/matches?label=&limit=
  *
- * @param {Object} [options]
- * @param {number | string} [options.articleId] - Filter pairs containing this article
- * @param {'SAME' | 'RELATED' | 'DIFFERENT'} [options.label] - Filter by classification label
+ * @param {Object} options
+ * @param {number | string} options.articleId - The article (required: the
+ *   backend has no route that lists all matches)
+ * @param {'SAME' | 'RELATED' | 'DIFFERENT'} [options.label] - Only this label
  * @returns {Promise<Array<Object>>} List of normalized ArticleMatch objects
  */
 export async function fetchMatches({ articleId, label } = {}) {
-  const query = { article_id: articleId, label }
+  if (articleId === undefined || articleId === null || articleId === '') {
+    throw new ApiError('Choose an article first: the backend lists matches for one article at a time.')
+  }
   const data = USE_MOCK_DATA
     ? await mockApi.getMatches({ articleId, label })
-    : await apiGet(ENDPOINTS.matches, query)
+    : await apiGet(ENDPOINTS.articleMatches(articleId), { label, limit: 100 })
   return toArticleMatchList(data)
+}
+
+/**
+ * Finds the nearest articles to one article and classifies each pair as
+ * SAME, RELATED or DIFFERENT. The backend saves the results.
+ * Endpoint: POST /articles/{article_id}/match
+ *
+ * @param {number | string} articleId
+ * @param {Object} [options]
+ * @param {number} [options.candidateLimit=10] - How many nearest articles to classify
+ * @param {number} [options.scoreThreshold] - Lowest vector similarity to consider.
+ *   Leave it out to use the backend's own default (0.2).
+ * @returns {Promise<Object>} counts and the classified matches
+ */
+export async function runArticleMatching(articleId, { candidateLimit = 10, scoreThreshold } = {}) {
+  const body = { candidate_limit: candidateLimit }
+  if (scoreThreshold !== undefined) body.score_threshold = scoreThreshold
+  const data = USE_MOCK_DATA
+    ? await mockApi.postArticleMatch(articleId, body)
+    : await apiPost(ENDPOINTS.runArticleMatch(articleId), body, { timeoutMs: MATCHING_TIMEOUT_MS })
+  return toMatchRunSummary(data)
 }
 
 /**
@@ -222,7 +253,8 @@ export async function fetchMatch(matchId) {
 
 /**
  * Submits a manual review or classification correction for an article match.
- * Endpoint: PATCH /matches/{id}/review (if supported by backend).
+ * The backend has NO review route yet, so in live mode this always fails
+ * with a clear message (only the mock backend can save a review).
  *
  * @param {number | string} matchId
  * @param {Object} reviewData
@@ -237,9 +269,7 @@ export async function submitMatchReview(matchId, reviewData = {}) {
       'Manual review persistence is not currently supported by the backend. The interface is operating in read-only mode.'
     )
   }
-  const data = USE_MOCK_DATA
-    ? await mockApi.updateMatchReview(matchId, reviewData)
-    : await apiPost(ENDPOINTS.matchReview(matchId), reviewData)
+  const data = await mockApi.updateMatchReview(matchId, reviewData)
   return toArticleMatch(data)
 }
 

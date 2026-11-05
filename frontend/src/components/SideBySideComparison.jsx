@@ -392,7 +392,7 @@ export function SideBySideComparison({
               <div>
                 <strong>Read-Only Review Mode</strong>
                 <p className="rp-ro-text">
-                  The backend has not yet implemented review update persistence endpoints (e.g. <code>PATCH /api/matches/{'{id}'}/review</code>).
+                  The backend has no endpoint for saving a manual review yet.
                   Classification labels, similarity scores, and metadata are presented in read-only mode.
                   Review changes cannot be saved to the database at this time.
                 </p>

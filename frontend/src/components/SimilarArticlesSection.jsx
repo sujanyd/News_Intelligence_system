@@ -4,7 +4,21 @@ import LoadingState from './LoadingState'
 import EmptyState from './EmptyState'
 import AlertMessage from './AlertMessage'
 import StatusBadge from './StatusBadge'
-import { fetchSimilarArticles } from '../api/newsApi'
+import { fetchMatches, fetchSimilarArticles, runArticleMatching } from '../api/newsApi'
+
+// How many similar articles to show (and to classify)
+const SIMILAR_LIMIT = 5
+
+// Turns the stored matches of an article into { otherArticleId: 'SAME' | 'RELATED' | 'DIFFERENT' }
+function labelsByOtherArticle(matchList, articleId) {
+  const labels = {}
+  for (const match of matchList) {
+    const otherId =
+      String(match.article_id_1) === String(articleId) ? match.article_id_2 : match.article_id_1
+    labels[String(otherId)] = match.match_label
+  }
+  return labels
+}
 
 /**
  * Checks whether an error is due to missing embeddings (HTTP 404 from backend)
@@ -38,6 +52,9 @@ function isVectorDbUnavailableError(error) {
  *   - No similar articles found (empty state)
  *   - API errors (missing embeddings, Qdrant offline, network errors) with retry
  *   - Navigation callback to open any matched article
+ *   - The SAME / RELATED / DIFFERENT label of each similar article, from the
+ *     stored matches (GET /articles/{id}/matches). "Classify these articles"
+ *     runs POST /articles/{id}/match for exactly the articles shown.
  *
  * @param {Object} props
  * @param {number | string} props.articleId - Currently inspected article ID
@@ -49,12 +66,59 @@ export function SimilarArticlesSection({ articleId, onSelectArticle }) {
   const [error, setError] = useState(null)
   const [reloadCount, setReloadCount] = useState(0)
 
+  // Stored classification labels for the similar articles
+  const [matchLabels, setMatchLabels] = useState({})
+  const [matchesError, setMatchesError] = useState('')
+  const [matchesReloadCount, setMatchesReloadCount] = useState(0)
+  const [isClassifying, setIsClassifying] = useState(false)
+  const [classifyError, setClassifyError] = useState('')
+
   const [prevArticleId, setPrevArticleId] = useState(articleId)
   if (articleId !== prevArticleId) {
     setPrevArticleId(articleId)
     setIsLoading(Boolean(articleId))
     setError(null)
     setSimilarityData(null)
+    setMatchLabels({})
+    setMatchesError('')
+    setClassifyError('')
+  }
+
+  // Load the stored SAME / RELATED / DIFFERENT labels (a failure only hides the badges)
+  useEffect(() => {
+    let isCurrentRequest = true
+    if (!articleId) return
+
+    fetchMatches({ articleId })
+      .then((matchList) => {
+        if (isCurrentRequest) {
+          setMatchLabels(labelsByOtherArticle(matchList, articleId))
+          setMatchesError('')
+        }
+      })
+      .catch((err) => {
+        if (isCurrentRequest) setMatchesError(err.message || 'Could not load classifications.')
+      })
+
+    return () => {
+      isCurrentRequest = false
+    }
+  }, [articleId, matchesReloadCount])
+
+  async function handleClassify() {
+    if (isClassifying) return // already running
+    setIsClassifying(true)
+    setClassifyError('')
+    try {
+      // Same search as the list above (headline, top 5, no cutoff), so exactly
+      // the shown articles are classified
+      await runArticleMatching(articleId, { candidateLimit: SIMILAR_LIMIT, scoreThreshold: -1 })
+      setMatchesReloadCount((count) => count + 1)
+    } catch (err) {
+      setClassifyError(err.message || 'Classification failed.')
+    } finally {
+      setIsClassifying(false)
+    }
   }
 
   useEffect(() => {
@@ -62,7 +126,7 @@ export function SimilarArticlesSection({ articleId, onSelectArticle }) {
 
     if (!articleId) return
 
-    fetchSimilarArticles(articleId, { limit: 5 })
+    fetchSimilarArticles(articleId, { limit: SIMILAR_LIMIT })
       .then((data) => {
         if (isCurrentRequest) {
           setSimilarityData(data)
@@ -157,14 +221,41 @@ export function SimilarArticlesSection({ articleId, onSelectArticle }) {
     return (
       <div className="similar-articles-list" data-testid="similar-articles-list">
         <p className="similar-articles-disclaimer">
-          Discovered via vector embeddings nearest-neighbor search. Semantic similarity reflects shared terminology and theme; it does not confirm identical event identity.
+          Discovered via vector embeddings nearest-neighbor search. Semantic similarity reflects shared terminology and theme; it does not confirm identical event identity. The SAME / RELATED / DIFFERENT label comes from the separate matching classifier.
         </p>
+
+        <div className="similar-classify-bar">
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={handleClassify}
+            disabled={isClassifying}
+            aria-busy={isClassifying}
+          >
+            {isClassifying ? (
+              <span className="loading-spinner-wrap">
+                <span className="spinner" aria-hidden="true" /> Classifying...
+              </span>
+            ) : (
+              'Classify these articles'
+            )}
+          </button>
+          {matchesError && (
+            <span className="form-hint">Classifications unavailable: {matchesError}</span>
+          )}
+        </div>
+
+        {classifyError && (
+          <AlertMessage type="error" title="Classification failed." message={classifyError} />
+        )}
 
         <div className="similar-articles-grid">
           {matches.map((match) => (
             <SimilarArticleCard
               key={match.article_id}
               article={match}
+              matchLabel={matchLabels[String(match.article_id)] || null}
+              showMatchLabel={!matchesError}
               onSelect={onSelectArticle}
             />
           ))}

@@ -2609,3 +2609,30 @@
 
 
 
+
+/* Matching: "Run matching" button and its option */
+.ams-run-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin: 1rem 0;
+}
+
+.ams-run-option {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+/* Similar articles: classify button and the label on each card */
+.similar-classify-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.sac-classification {
+  margin: 0.35rem 0;
+}
