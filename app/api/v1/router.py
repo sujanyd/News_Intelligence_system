@@ -13,6 +13,8 @@ from app.api.v1.endpoints import (
     embeddings,
     similarity,
     matching,
+    stories,
+    events,
 )
 
 api_v1_router = APIRouter()
@@ -25,3 +27,5 @@ api_v1_router.include_router(ingestion.router, prefix="/ingestion", tags=["RSS I
 api_v1_router.include_router(embeddings.router, prefix="/embeddings", tags=["Article Embeddings"])
 api_v1_router.include_router(similarity.router, prefix="/similarity", tags=["Similarity Search"])
 api_v1_router.include_router(matching.router, tags=["Article Matching & Classification"])
+api_v1_router.include_router(stories.router, prefix="/stories", tags=["Stories"])
+api_v1_router.include_router(events.router, prefix="/events", tags=["Events"])
