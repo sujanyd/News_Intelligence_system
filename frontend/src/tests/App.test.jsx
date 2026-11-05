@@ -94,3 +94,13 @@ describe('News Bias and Framing Analysis System - Dashboard & Navigation Tests',
     expect(endpoint).toBe(`${API_BASE_URL.replace(/\/+$/, '')}/api/v1/health`)
   })
 })
+
+describe('Stories navigation', () => {
+  it('opens the Stories page from the sidebar and explains that it needs the real backend', () => {
+    const { container } = render(<App />)
+    fireEvent.click(container.querySelector('#nav-stories'))
+    expect(screen.getByRole('heading', { level: 1, name: 'Stories' })).toBeDefined()
+    // Tests run in mock mode, which has no sample stories on purpose
+    expect(screen.getByText('Stories need the real backend.')).toBeDefined()
+  })
+})

@@ -2636,3 +2636,33 @@
 .sac-classification {
   margin: 0.35rem 0;
 }
+
+/* ==========================================================
+   Stories page: stories, events and their articles
+   ========================================================== */
+
+/* Space between the cards of the stories page */
+.stories-section {
+  margin-top: 1.5rem;
+}
+
+/* "← All stories" and "← Back to story" buttons */
+.story-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.story-back {
+  margin-bottom: 1rem;
+}
+
+.story-nav .story-back {
+  margin-bottom: 0;
+}
+
+/* The "Sources" item can be long, so it gets a whole row */
+.details-list-wide {
+  grid-column: 1 / -1;
+}

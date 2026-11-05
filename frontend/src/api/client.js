@@ -153,7 +153,10 @@ export function apiGet(path, query) {
   return apiRequest(path, { query })
 }
 
-/** Shortcut for a POST request with a JSON body. */
-export function apiPost(path, body, { timeoutMs } = {}) {
-  return apiRequest(path, { method: 'POST', body, timeoutMs })
+/**
+ * Shortcut for a POST request with a JSON body.
+ * "query" adds values to the URL, e.g. { limit: 200 } gives ?limit=200
+ */
+export function apiPost(path, body, { timeoutMs, query } = {}) {
+  return apiRequest(path, { method: 'POST', body, query, timeoutMs })
 }

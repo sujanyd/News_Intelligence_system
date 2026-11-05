@@ -67,6 +67,8 @@ export function toArticle(raw) {
     title: raw.title,
     source_id: raw.source_id ?? null,
     source_name: typeof raw.source_name === 'string' ? raw.source_name : null,
+    // The event this article reports (null when it is not in a story yet)
+    event_id: Number.isInteger(raw.event_id) ? raw.event_id : null,
     url: typeof raw.url === 'string' ? raw.url : '',
     published_at: raw.published_at ?? null,
     retrieved_at: raw.retrieved_at ?? null,
@@ -395,4 +397,98 @@ export function toMatchRunSummary(raw) {
     matches_skipped: count(raw.matches_skipped),
     matches: Array.isArray(raw.matches) ? raw.matches.map(toArticleMatch) : [],
   }
+}
+
+// ---------------------------------------------------------------------------
+// Stories and events (app/schemas/story_event.py)
+//
+// A story is one news topic. An event is one thing that happened inside a
+// story. Each article belongs to at most one event.
+// The backend has NO story description and NO event title, so these
+// functions do not make one up.
+// ---------------------------------------------------------------------------
+
+// The values event_time_precision can have
+export const EVENT_TIME_PRECISIONS = ['exact', 'date', 'range', 'unknown']
+
+// A count from the backend, or 0 when it is missing
+function toCount(value) {
+  return Number.isInteger(value) && value >= 0 ? value : 0
+}
+
+// A list of articles inside a story or event reply (missing = empty list)
+function toArticleArray(value) {
+  return Array.isArray(value) ? value.map(toArticle) : []
+}
+
+/**
+ * Checks one event.
+ * Required: id. event_time may be null. Unknown precision values become 'unknown'.
+ */
+export function toEvent(raw) {
+  if (!isObject(raw) || !Number.isInteger(raw.id)) {
+    throw new ApiError('The backend sent an event in an unexpected format.')
+  }
+  return {
+    id: raw.id,
+    story_id: Number.isInteger(raw.story_id) ? raw.story_id : null,
+    story_title: typeof raw.story_title === 'string' ? raw.story_title : null,
+    event_time: typeof raw.event_time === 'string' ? raw.event_time : null,
+    event_time_precision: EVENT_TIME_PRECISIONS.includes(raw.event_time_precision)
+      ? raw.event_time_precision
+      : 'unknown',
+    event_time_disagreement: raw.event_time_disagreement === true,
+    article_count: toCount(raw.article_count),
+    // Only GET /events/{id} sends the articles
+    articles: toArticleArray(raw.articles),
+  }
+}
+
+/**
+ * Checks one story.
+ * Required: id and title. GET /stories/{id} also sends events and articles.
+ */
+export function toStory(raw) {
+  if (!isObject(raw) || !Number.isInteger(raw.id) || typeof raw.title !== 'string') {
+    throw new ApiError('The backend sent a story in an unexpected format.')
+  }
+  return {
+    id: raw.id,
+    title: raw.title,
+    created_at: typeof raw.created_at === 'string' ? raw.created_at : null,
+    event_count: toCount(raw.event_count),
+    article_count: toCount(raw.article_count),
+    events: Array.isArray(raw.events) ? raw.events.map(toEvent) : [],
+    articles: toArticleArray(raw.articles),
+  }
+}
+
+/**
+ * Checks the reply of POST /stories/group/batch: one result per article.
+ * Adds up how many stories and events were created or reused.
+ *
+ * @returns {{ articlesGrouped: number, storiesCreated: number, storiesReused: number,
+ *   eventsCreated: number, eventsReused: number }}
+ */
+export function toGroupingSummary(raw) {
+  if (!Array.isArray(raw)) {
+    throw new ApiError('The backend sent the grouping result in an unexpected format.')
+  }
+  const summary = {
+    articlesGrouped: raw.length,
+    storiesCreated: 0,
+    storiesReused: 0,
+    eventsCreated: 0,
+    eventsReused: 0,
+  }
+  for (const result of raw) {
+    if (!isObject(result)) {
+      throw new ApiError('The backend sent the grouping result in an unexpected format.')
+    }
+    if (result.story_action === 'created') summary.storiesCreated += 1
+    if (result.story_action === 'reused') summary.storiesReused += 1
+    if (result.event_action === 'created') summary.eventsCreated += 1
+    if (result.event_action === 'reused') summary.eventsReused += 1
+  }
+  return summary
 }

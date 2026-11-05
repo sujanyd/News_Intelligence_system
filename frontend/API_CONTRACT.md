@@ -9,7 +9,7 @@
 | `GET /api/sources`, `POST /api/sources`, `GET /api/sources/{id}` | ✅ **Implemented & tested** (also mounted at `/api/v1/sources`) |
 | `GET /api/articles` (+ `source_id`, `limit`, `offset`), `GET /api/articles/{id}`, `POST /api/articles` | ✅ **Implemented & tested** (also mounted at `/api/v1/articles`) |
 | `POST /api/ingestion/run`, `GET /api/ingestion/feeds` | ✅ **Implemented** by Person A; the dashboard's **Run News Collection** button uses `POST /api/ingestion/run` |
-| Stories and events (`/api/stories…`, `/api/events…`) | ✅ **Implemented** by Person A (commit `3bd8623`) and checked on 5 Nov 2026; the frontend does not use them yet (see [Stories and events](#stories-and-events)) |
+| Stories and events (`/api/stories…`, `/api/events…`) | ✅ **Implemented** by Person A (commit `3bd8623`) and checked on 5 Nov 2026; used by the **Stories** page (see [Stories and events](#stories-and-events)) |
 
 **Real integration is operational.** The backend routes are fully functional and pass 36 unit/integration tests. Both `/api/...` and `/api/v1/...` prefixes are active.
 
@@ -251,9 +251,9 @@ Story  ──has many──▶  Event  ──has many──▶  Article
 ```
 
 Person A added these routes in commit `3bd8623` (5 Nov 2026). Like the other
-routes, they work under both `/api` and `/api/v1`. The frontend has **no
-Stories pages yet**; this section records what the backend really sends, so
-the pages can be built against it.
+routes, they work under both `/api` and `/api/v1`. The **Stories** page
+uses them (see "What the Stories page calls" below); this section records
+what the backend really sends.
 
 ### Routes the Stories pages would use
 
@@ -275,6 +275,23 @@ them by hand. The frontend does not need them.
 **Paging uses `skip`, not `offset`.** `GET /api/articles` uses `offset`, but
 these two lists use `skip` (`limit` is 1 to 100, default 50). An `offset`
 value is silently ignored, so the frontend must send `skip`.
+
+### What the Stories page calls
+
+| View | Calls |
+| ---- | ----- |
+| Stories list | `GET /api/stories?limit=11&skip=…` (10 per page; the 11th says there is a next page), then `GET /api/stories/{id}` for each story on the page to list its sources |
+| "Group articles" button | `POST /api/stories/group/batch?limit=200` (waits up to 2 minutes), then reloads the list |
+| Story details | `GET /api/stories/{id}` |
+| Event details | `GET /api/events/{id}`; "View" on an article uses `GET /api/articles/{id}` |
+
+Not used: `GET /api/stories/{id}/events`, `GET /api/stories/{id}/articles`,
+`GET /api/events`, `GET /api/events/{id}/articles` (the detail replies already
+contain the same data), and the two create routes.
+
+In mock mode (`VITE_USE_MOCK_DATA=true`) the page shows "Stories need the
+real backend" and calls nothing. There are no sample stories, so nothing made
+up is ever shown.
 
 ### Reply shapes (real replies, 5 Nov 2026)
 
@@ -358,6 +375,17 @@ articles, SQLite, mock embeddings). `pytest`: 144 passed, 1 skipped.
   Result: **67 stories** for 84 articles. Most stories have 1 article; the
   largest has 5 articles, all from The Guardian, each in its own event.
 - Unknown story or event ids returned `404` as described above.
+
+**Stories page in the browser** (same backend, fresh copy of the database):
+"Group articles" answered "Grouped 83 articles: 65 new stories, 18 added to
+existing stories, 83 new events." The list then showed 10 stories per page
+with their sources. Opening the story with 4 events, one of its events, and
+an article from that event all worked, as did both back buttons. With the
+backend stopped, the list showed "Could not load stories" and "Try again".
+No console errors; no sideways scrolling at phone width (375 px).
+
+The list page sends one extra request per story (10 per page) only to show
+sources; question 5 below would remove them.
 
 ### Open questions for Person A
 

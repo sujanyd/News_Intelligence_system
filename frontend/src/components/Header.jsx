@@ -19,6 +19,8 @@ export function Header({ activeTab, onToggleMobileMenu }) {
         return 'Dashboard'
       case 'articles':
         return 'Articles'
+      case 'stories':
+        return 'Stories'
       case 'sources':
         return 'Sources'
       case 'comparisons':

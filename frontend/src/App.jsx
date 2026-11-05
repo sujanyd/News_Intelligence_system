@@ -5,6 +5,7 @@ import Footer from './components/Footer'
 import Dashboard from './pages/Dashboard'
 import Articles from './pages/Articles'
 import Sources from './pages/Sources'
+import Stories from './pages/Stories'
 import Comparisons from './pages/Comparisons'
 import Reports from './pages/Reports'
 import './styles/App.css'
@@ -15,7 +16,7 @@ import './styles/App.css'
  * Manages active navigation state and coordinates the responsive layout shell:
  * - Left Sidebar (desktop) & Slide-out drawer (mobile)
  * - Top Header bar with project title and breadcrumb
- * - Main view area for Dashboard, Articles, Sources, Comparisons, Reports
+ * - Main view area for Dashboard, Articles, Stories, Sources, Comparisons, Reports
  * - Footer with environment status
  */
 export function App() {
@@ -28,6 +29,8 @@ export function App() {
         return <Dashboard onNavigate={setActiveTab} />
       case 'articles':
         return <Articles />
+      case 'stories':
+        return <Stories />
       case 'sources':
         return <Sources />
       case 'comparisons':

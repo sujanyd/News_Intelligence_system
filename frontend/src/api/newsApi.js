@@ -19,11 +19,14 @@ import {
   toArticleMatch,
   toArticleMatchList,
   toEmbeddingResultList,
+  toEvent,
+  toGroupingSummary,
   toIngestionResult,
   toList,
   toMatchRunSummary,
   toSimilarArticlesResponse,
   toSource,
+  toStory,
 } from './normalize'
 import * as mockApi from '../mocks/mockApi'
 
@@ -43,7 +46,21 @@ export const ENDPOINTS = {
   articleMatches: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/matches`,
   runArticleMatch: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/match`,
   match: (id) => `${API_PREFIX}/matches/${encodeURIComponent(id)}`,
+  // Stories and events (app/api/v1/endpoints/stories.py and events.py)
+  stories: `${API_PREFIX}/stories`,
+  story: (id) => `${API_PREFIX}/stories/${encodeURIComponent(id)}`,
+  event: (id) => `${API_PREFIX}/events/${encodeURIComponent(id)}`,
+  groupArticles: `${API_PREFIX}/stories/group/batch`,
 }
+
+// Stories and events only exist in the real backend. There is no mock
+// version on purpose: the pages must never show made-up stories or events.
+export const STORIES_AVAILABLE = !USE_MOCK_DATA
+
+// Grouping looks at every ungrouped article before it answers, so allow
+// more time than a normal request. 200 is the most the backend groups in one call.
+export const GROUPING_TIMEOUT_MS = 120000
+export const GROUPING_BATCH_LIMIT = 200
 
 // Matching compares an article with its nearest articles before it answers,
 // so allow more time than a normal request
@@ -273,3 +290,61 @@ export async function submitMatchReview(matchId, reviewData = {}) {
   return toArticleMatch(data)
 }
 
+
+// Used by the story and event functions below when mock mode is on
+function requireStoriesBackend() {
+  if (!STORIES_AVAILABLE) {
+    throw new ApiError('Stories and events only work with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+}
+
+/**
+ * Gets one page of stories, newest first.
+ * Endpoint: GET /stories?skip=&limit=
+ * Note: this route pages with "skip". It ignores "offset".
+ *
+ * @param {Object} [options]
+ * @param {number} [options.limit] - How many stories to get (1 to 100)
+ * @param {number} [options.skip] - How many stories to skip first
+ * @returns {Promise<Array>} list of stories (without events or articles)
+ */
+export async function fetchStories({ limit, skip } = {}) {
+  requireStoriesBackend()
+  const data = await apiGet(ENDPOINTS.stories, { limit, skip })
+  return toList(data, 'story').items.map(toStory)
+}
+
+/**
+ * Gets one story with its events and its articles.
+ * Endpoint: GET /stories/{story_id}
+ */
+export async function fetchStory(storyId) {
+  requireStoriesBackend()
+  return toStory(await apiGet(ENDPOINTS.story(storyId)))
+}
+
+/**
+ * Gets one event with its story title and its articles.
+ * Endpoint: GET /events/{event_id}
+ */
+export async function fetchEvent(eventId) {
+  requireStoriesBackend()
+  return toEvent(await apiGet(ENDPOINTS.event(eventId)))
+}
+
+/**
+ * Puts every article that is not in a story yet into a story and an event.
+ * News collection does not do this by itself.
+ * Endpoint: POST /stories/group/batch?limit=200
+ *
+ * @returns {Promise<Object>} how many articles were grouped and how many
+ *   stories and events were created or reused
+ */
+export async function groupArticlesIntoStories() {
+  requireStoriesBackend()
+  const data = await apiPost(ENDPOINTS.groupArticles, {}, {
+    timeoutMs: GROUPING_TIMEOUT_MS,
+    query: { limit: GROUPING_BATCH_LIMIT },
+  })
+  return toGroupingSummary(data)
+}
