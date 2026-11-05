@@ -1,4 +1,4 @@
-# Frontend ↔ Backend Contract (Articles and Sources)
+# Frontend ↔ Backend Contract (Articles, Sources, Stories and Events)
 
 ## Integration status (updated 5 Nov 2026)
 
@@ -9,6 +9,7 @@
 | `GET /api/sources`, `POST /api/sources`, `GET /api/sources/{id}` | ✅ **Implemented & tested** (also mounted at `/api/v1/sources`) |
 | `GET /api/articles` (+ `source_id`, `limit`, `offset`), `GET /api/articles/{id}`, `POST /api/articles` | ✅ **Implemented & tested** (also mounted at `/api/v1/articles`) |
 | `POST /api/ingestion/run`, `GET /api/ingestion/feeds` | ✅ **Implemented** by Person A; the dashboard's **Run News Collection** button uses `POST /api/ingestion/run` |
+| Stories and events (`/api/stories…`, `/api/events…`) | ✅ **Implemented** by Person A (commit `3bd8623`) and checked on 5 Nov 2026; the frontend does not use them yet (see [Stories and events](#stories-and-events)) |
 
 **Real integration is operational.** The backend routes are fully functional and pass 36 unit/integration tests. Both `/api/...` and `/api/v1/...` prefixes are active.
 
@@ -237,6 +238,145 @@ What the dashboard does with it:
   redirects and then returns **404**, so that feed URL in `DEFAULT_RSS_FEEDS` needs changing.
 - BBC News and NPR News failed with "Connection reset by peer" on this test
   network; they may work on another network.
+
+## Stories and events
+
+A **story** is one news topic that keeps going (for example a trial).
+An **event** is one thing that happened inside that story. Each article
+belongs to at most one event (`event_id` on the article), so it also belongs
+to that event's story.
+
+```text
+Story  ──has many──▶  Event  ──has many──▶  Article
+```
+
+Person A added these routes in commit `3bd8623` (5 Nov 2026). Like the other
+routes, they work under both `/api` and `/api/v1`. The frontend has **no
+Stories pages yet**; this section records what the backend really sends, so
+the pages can be built against it.
+
+### Routes the Stories pages would use
+
+| What the page needs | Route | Reply |
+| ------------------- | ----- | ----- |
+| Stories list | `GET /api/stories?skip=&limit=` | Array of **Story** (newest first) |
+| One story | `GET /api/stories/{id}` | **Story** + `events` (array of **Event**) + `articles` (array of **Article summary**) |
+| Events of a story | `GET /api/stories/{id}/events` | Array of **Event** (oldest `event_time` first) |
+| Articles of a story | `GET /api/stories/{id}/articles` | Array of **Article summary** (newest first) |
+| Events list | `GET /api/events?story_id=&skip=&limit=` | Array of **Event** (newest `event_time` first) |
+| One event | `GET /api/events/{id}` | **Event** + `story_title` + `articles` (array of **Article summary**) |
+| Articles of an event | `GET /api/events/{id}/articles` | Array of **Article summary** (newest first) |
+| Put articles into stories | `POST /api/stories/group/batch?limit=` (1 to 200, default 50) | Array of **Grouping result**, one per article |
+| Put one article into a story | `POST /api/stories/group` with `{"article_id": 40, "force_regroup": false}` | One **Grouping result** |
+
+The backend also has `POST /api/stories` and `POST /api/events` for creating
+them by hand. The frontend does not need them.
+
+**Paging uses `skip`, not `offset`.** `GET /api/articles` uses `offset`, but
+these two lists use `skip` (`limit` is 1 to 100, default 50). An `offset`
+value is silently ignored, so the frontend must send `skip`.
+
+### Reply shapes (real replies, 5 Nov 2026)
+
+**Story** (`GET /api/stories`):
+
+```json
+{
+  "id": 1,
+  "title": "Global Clean Energy Summit 2026",
+  "created_at": "2026-11-05T02:37:03.327629",
+  "event_count": 1,
+  "article_count": 1
+}
+```
+
+**Event** (inside `GET /api/stories/{id}`, and `GET /api/events`):
+
+```json
+{
+  "id": 1,
+  "story_id": 1,
+  "event_time": "2026-10-24T14:30:00",
+  "event_time_precision": "exact",
+  "event_time_disagreement": false,
+  "article_count": 1
+}
+```
+
+- `event_time` can be `null`.
+- `event_time_precision` is one of `exact`, `date`, `range`, `unknown`.
+- `event_time_disagreement` is `true` when sources give different times.
+- `GET /api/events/{id}` adds `story_title` and `articles`.
+
+**Article summary** (inside story and event replies): the same fields as an
+article in `GET /api/articles`: `id`, `source_id`, `source_name`,
+`event_id`, `title`, `url`, `content_availability`, `published_at`,
+`retrieved_at`, `created_at`.
+
+**Grouping result** (`POST /api/stories/group`):
+
+```json
+{
+  "article_id": 40,
+  "story_id": 2,
+  "story_title": "Beau Lamarre-Condon trial live updates: …",
+  "story_action": "created",
+  "event_id": 2,
+  "event_action": "created",
+  "reason": "No suitable existing story found …",
+  "matched_article_id": null
+}
+```
+
+`story_action` and `event_action` are `"created"` or `"reused"`.
+
+**Errors:** an unknown id returns `404` with
+`{"detail": "Story with ID 999 does not exist."}` (or `Event with ID …`).
+A `limit` above 100 returns `422`.
+
+### What the backend does not send
+
+The Stories task asks for some things the backend has no field for. The
+frontend must not invent them:
+
+| Asked for | What exists instead |
+| --------- | ------------------- |
+| Story description | Nothing. A story has only `id`, `title`, `created_at` and the two counts. |
+| Event title or description | Nothing. An event has only an id, its time fields and `article_count`. The page can label it "Event 48" and show its articles' headlines. |
+| Sources on the Stories list | Not in `GET /api/stories`. `GET /api/stories/{id}` has `source_name` on each article, so the **details** page can list the sources. |
+
+### Checked against the real backend (5 Nov 2026)
+
+Backend at commit `3bd8623`, on a copy of the demo database (84 collected
+articles, SQLite, mock embeddings). `pytest`: 144 passed, 1 skipped.
+
+- Before grouping: 1 story and 1 event, both from the seed script.
+- News collection does **not** group articles. Nothing calls the grouping
+  code except the two `POST /api/stories/group…` routes, so new articles stay
+  out of every story until someone calls one of them.
+- `POST /api/stories/group/batch?limit=100` grouped every article in one call.
+  Result: **67 stories** for 84 articles. Most stories have 1 article; the
+  largest has 5 articles, all from The Guardian, each in its own event.
+- Unknown story or event ids returned `404` as described above.
+
+### Open questions for Person A
+
+1. **`event_time` is the publishing time.** Grouping copies the article's
+   `published_at` into `event_time` and marks it `exact`.
+   `docs/STORY_EVENT_GROUPING.md` says these should stay separate. Should the
+   page show it as "when it happened", or should the precision be something
+   other than `exact` until the real time is known?
+2. **No publish date means "now".** An article without `published_at` gets
+   the current time as `event_time`, with precision `unknown`. Could
+   `event_time` stay `null` in that case?
+3. **When should grouping run?** Should news collection call it, or should
+   the frontend have a "Group articles" button that calls
+   `POST /api/stories/group/batch`?
+4. **`skip` or `offset`?** Could the story and event lists also accept
+   `offset`, like `GET /api/articles`?
+5. **Source names on the list.** Could `GET /api/stories` include
+   `source_names` (a list of names), so the Stories page can show sources
+   without loading every story?
 
 ## Error handling in the frontend
 
