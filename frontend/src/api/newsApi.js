@@ -12,11 +12,12 @@
  * In both modes the reply is checked by normalize.js before the pages use it.
  */
 
-import { ApiError, apiGet, apiPost } from './client'
+import { ApiError, apiGet, apiPost, apiRequest } from './client'
 import { API_PREFIX } from './config'
 import {
   toArticle,
   toArticleMatch,
+  toArticleInsights,
   toArticleMatchList,
   toEmbeddingResultList,
   toEvent,
@@ -51,7 +52,18 @@ export const ENDPOINTS = {
   story: (id) => `${API_PREFIX}/stories/${encodeURIComponent(id)}`,
   event: (id) => `${API_PREFIX}/events/${encodeURIComponent(id)}`,
   groupArticles: `${API_PREFIX}/stories/group/batch`,
+  // Content extraction (app/api/v1/endpoints/content_extraction.py)
+  articleExtraction: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/extraction`,
+  runArticleExtraction: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/extract`,
 }
+
+// Extracted topics, entities, facts and quotes only exist in the real
+// backend. There is no mock version on purpose: nothing made up is shown.
+export const INSIGHTS_AVAILABLE = !USE_MOCK_DATA
+
+// The first time an article is asked for, the backend extracts its insights
+// before it answers, so allow a little more time than a normal request
+export const EXTRACTION_TIMEOUT_MS = 30000
 
 // Stories and events only exist in the real backend. There is no mock
 // version on purpose: the pages must never show made-up stories or events.
@@ -347,4 +359,39 @@ export async function groupArticlesIntoStories() {
     query: { limit: GROUPING_BATCH_LIMIT },
   })
   return toGroupingSummary(data)
+}
+
+/**
+ * Gets the topics, entities, facts and quotes the backend extracted from
+ * one article. If the article was never analysed, the backend analyses it
+ * first and saves the result, then answers.
+ * Endpoint: GET /articles/{article_id}/extraction
+ *
+ * @param {number | string} articleId
+ * @returns {Promise<Object>} the checked insights (see toArticleInsights)
+ */
+export async function fetchArticleInsights(articleId) {
+  if (!INSIGHTS_AVAILABLE) {
+    throw new ApiError('Article insights only work with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+  const data = await apiRequest(ENDPOINTS.articleExtraction(articleId), {
+    timeoutMs: EXTRACTION_TIMEOUT_MS,
+  })
+  return toArticleInsights(data)
+}
+
+/**
+ * Analyses the article again and replaces its insights with the new result.
+ * Endpoint: POST /articles/{article_id}/extract with { force_reanalyze: true }
+ */
+export async function rerunArticleInsights(articleId) {
+  if (!INSIGHTS_AVAILABLE) {
+    throw new ApiError('Article insights only work with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+  const data = await apiPost(
+    ENDPOINTS.runArticleExtraction(articleId),
+    { force_reanalyze: true },
+    { timeoutMs: EXTRACTION_TIMEOUT_MS }
+  )
+  return toArticleInsights(data)
 }

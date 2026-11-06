@@ -206,3 +206,38 @@ describe('story and event requests in live mode', () => {
     expect(summary.storiesCreated).toBe(1)
   })
 })
+
+describe('article insights requests', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+    vi.resetModules()
+  })
+
+  it('refuses in mock mode instead of showing made-up insights', async () => {
+    const api = await import('../api/newsApi')
+    await expect(api.fetchArticleInsights(1)).rejects.toThrow('only work with the real backend')
+  })
+
+  it('uses GET /extraction and POST /extract in live mode', async () => {
+    vi.stubEnv('VITE_USE_MOCK_DATA', 'false')
+    vi.resetModules()
+    const api = await import('../api/newsApi')
+    const fakeFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ id: 1, status: 'completed', topics: [{ id: 1, topic_name: 'Energy' }] }),
+    })
+    vi.stubGlobal('fetch', fakeFetch)
+
+    const insights = await api.fetchArticleInsights(7)
+    expect(fakeFetch.mock.calls[0][0]).toBe('http://backend.test/api/articles/7/extraction')
+    expect(insights.topics[0].name).toBe('Energy')
+
+    await api.rerunArticleInsights(7)
+    const [url, options] = fakeFetch.mock.calls[1]
+    expect(url).toBe('http://backend.test/api/articles/7/extract')
+    expect(options.method).toBe('POST')
+    expect(JSON.parse(options.body)).toEqual({ force_reanalyze: true })
+  })
+})

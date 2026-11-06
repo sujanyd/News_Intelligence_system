@@ -1,4 +1,4 @@
-# Frontend ↔ Backend Contract (Articles, Sources, Stories and Events)
+# Frontend ↔ Backend Contract (Articles, Sources, Stories, Events and Insights)
 
 ## Integration status (updated 5 Nov 2026)
 
@@ -10,6 +10,7 @@
 | `GET /api/articles` (+ `source_id`, `limit`, `offset`), `GET /api/articles/{id}`, `POST /api/articles` | ✅ **Implemented & tested** (also mounted at `/api/v1/articles`) |
 | `POST /api/ingestion/run`, `GET /api/ingestion/feeds` | ✅ **Implemented** by Person A; the dashboard's **Run News Collection** button uses `POST /api/ingestion/run` |
 | Stories and events (`/api/stories…`, `/api/events…`) | ✅ **Implemented** by Person A (commit `3bd8623`) and checked on 5 Nov 2026; used by the **Stories** page (see [Stories and events](#stories-and-events)) |
+| Article insights (`GET /api/articles/{id}/extraction`, `POST /api/articles/{id}/extract`) | ✅ **Implemented** by Person A (commit `ed831d4`) and checked on 6 Nov 2026; used by **Article Insights** in the article details (see [Article insights](#article-insights-topics-entities-facts-quotes)) |
 
 **Real integration is operational.** The backend routes are fully functional and pass 36 unit/integration tests. Both `/api/...` and `/api/v1/...` prefixes are active.
 
@@ -405,6 +406,69 @@ sources; question 5 below would remove them.
 5. **Source names on the list.** Could `GET /api/stories` include
    `source_names` (a list of names), so the Stories page can show sources
    without loading every story?
+
+## Article insights (topics, entities, facts, quotes)
+
+Person A added content extraction in commit `ed831d4` (6 Nov 2026). The
+**Article Insights** part of the article details uses two routes:
+
+| What | Route | Notes |
+| ---- | ----- | ----- |
+| Load the insights | `GET /api/articles/{id}/extraction` | If the article was never analysed, the backend analyses it **first and saves the result**, then answers. Unknown article: `404` `{"detail": "Article with ID 9999 not found."}` |
+| "Analyse again" button | `POST /api/articles/{id}/extract` with `{"force_reanalyze": true}` | Saves a new analysis; the GET then returns the newest one |
+
+The backend also has `GET /api/articles/{id}/topics`, `/entities`, `/facts`
+and `/quotes`. The frontend does not need them: the `/extraction` reply
+already contains all four lists.
+
+In mock mode the section shows "Insights need the real backend" and calls
+nothing. There are no sample insights.
+
+### Reply fields the frontend uses
+
+```text
+{ id, status, pipeline_version, created_at,
+  topics:   [{ id, topic_name, relevance_score, evidence_text }],
+  entities: [{ id, entity_name, entity_type, mention_count, salience_score, role }],
+  facts:    [{ id, fact_statement, verification_status, confidence_score }],
+  quotes:   [{ id, quote_text, speaker_name, speaker_title, is_opinion }] }
+```
+
+- `entity_type` is `PERSON`, `ORGANIZATION`, `LOCATION` or `CONCEPT`.
+  The page groups them as People, Organizations, Locations and Other.
+- `verification_status` is `unverified` for every extracted fact; the page
+  shows it as "Not checked".
+- A quote's `speaker_name` and `speaker_title` can be `null`; the page then
+  says "Speaker not identified".
+- **Not shown on purpose:** `bias_score`, `bias_label`, `sentiment_score`,
+  `sentiment_label` and `is_opinion`. The extraction step always fills them
+  with the same values (`center`, `neutral`, `true`), so they say nothing
+  about the article.
+
+### Checked against the real backend (6 Nov 2026)
+
+Backend at commit `ed831d4` on a copy of the demo database (84 articles:
+76 summary only, 8 full text). `pytest`: 158 passed, 1 skipped. In the
+browser, opening an article that was never analysed showed its topics,
+entities, facts and quotes; "Analyse again" replaced them; the seeded article
+showed its quote with the speaker. No console errors; no sideways scrolling at
+375 px. React's development mode sends the first GET twice; the backend still
+saved only one analysis.
+
+### Open questions for Person A
+
+1. **Entity types are often wrong.** Examples: "Real Madrid" as `PERSON`,
+   "Getty Images" and "Morning Edition" as `PERSON`, and a sentence fragment
+   ("Condon Is Accused Of Fatally Shooting …") as `ORGANIZATION`.
+2. **Photo credits and page text get extracted.** Topics include
+   "Getty Images" and "Considered". One fact contained
+   "Get our breaking news email, free app or daily news podcast".
+3. **Quotes without a speaker.** Most real quotes have no `speaker_name`.
+4. **The seeded analysis is hand-written.** Article 1's analysis comes from
+   the seed script (`pipeline_version` `v1.0.0`, fact `verified`), not from
+   the extractor. Should it be removed, so every insight is really extracted?
+5. **A GET that saves data.** `GET …/extraction` writes an analysis when
+   there is none. Should the first analysis be started by the POST only?
 
 ## Error handling in the frontend
 

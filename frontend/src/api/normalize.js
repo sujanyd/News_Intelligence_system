@@ -492,3 +492,86 @@ export function toGroupingSummary(raw) {
   }
   return summary
 }
+
+// ---------------------------------------------------------------------------
+// Article insights: topics, entities, facts and quotes
+// (GET /articles/{id}/extraction, app/schemas/content_extraction.py)
+//
+// The backend also sends bias and sentiment fields, but the extraction step
+// always fills them with the same fixed values ("center", "neutral"), so
+// they are left out here on purpose.
+// ---------------------------------------------------------------------------
+
+// A number between 0 and 1, or null when it is missing or out of range
+function toScore(value) {
+  return typeof value === 'number' && value >= 0 && value <= 1 ? value : null
+}
+
+function toText(value) {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null
+}
+
+// Keeps the items of a list that pass "check"; a missing list becomes []
+function keepValid(list, check) {
+  return Array.isArray(list) ? list.filter((item) => isObject(item) && check(item)) : []
+}
+
+/**
+ * Checks the extraction reply of one article.
+ * Required: the four lists may be missing (= empty), but the reply must be an object.
+ * Items without their main text (topic name, entity name, fact, quote) are skipped.
+ *
+ * @returns {{ analysis_id: number | null, status: string | null,
+ *   pipeline_version: string | null, created_at: string | null,
+ *   topics: Array, entities: Array, facts: Array, quotes: Array }}
+ */
+export function toArticleInsights(raw) {
+  if (!isObject(raw)) {
+    throw new ApiError('The backend sent the article insights in an unexpected format.')
+  }
+
+  const topics = keepValid(raw.topics, (topic) => toText(topic.topic_name)).map((topic) => ({
+    id: topic.id,
+    name: toText(topic.topic_name),
+    relevance_score: toScore(topic.relevance_score),
+    evidence_text: toText(topic.evidence_text),
+  }))
+
+  const entities = keepValid(raw.entities, (entity) => toText(entity.entity_name)).map(
+    (entity) => ({
+      id: entity.id,
+      name: toText(entity.entity_name),
+      // e.g. "PERSON", "ORGANIZATION", "LOCATION", "CONCEPT"
+      type: toText(entity.entity_type)?.toUpperCase() ?? 'OTHER',
+      mention_count: Number.isInteger(entity.mention_count) ? entity.mention_count : null,
+      salience_score: toScore(entity.salience_score),
+      role: toText(entity.role),
+    })
+  )
+
+  const facts = keepValid(raw.facts, (fact) => toText(fact.fact_statement)).map((fact) => ({
+    id: fact.id,
+    statement: toText(fact.fact_statement),
+    verification_status: toText(fact.verification_status),
+    confidence_score: toScore(fact.confidence_score),
+  }))
+
+  const quotes = keepValid(raw.quotes, (quote) => toText(quote.quote_text)).map((quote) => ({
+    id: quote.id,
+    text: toText(quote.quote_text),
+    speaker_name: toText(quote.speaker_name),
+    speaker_title: toText(quote.speaker_title),
+    is_opinion: typeof quote.is_opinion === 'boolean' ? quote.is_opinion : null,
+  }))
+
+  return {
+    analysis_id: Number.isInteger(raw.id) ? raw.id : null,
+    status: toText(raw.status),
+    pipeline_version: toText(raw.pipeline_version),
+    created_at: toText(raw.created_at),
+    topics,
+    entities,
+    facts,
+    quotes,
+  }
+}

@@ -2666,3 +2666,144 @@
 .details-list-wide {
   grid-column: 1 / -1;
 }
+
+/* ==========================================================
+   ArticleDetails – Article Insights (topics, entities, facts, quotes)
+   ========================================================== */
+
+/* Two blocks side by side on wide screens, one column on phones */
+.ai-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ai-block {
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: rgba(31, 41, 55, 0.25);
+  min-width: 0;
+}
+
+.ai-block-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.625rem;
+}
+
+/* Small grey "No topics found." text */
+.ai-none {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Topic and entity "chips" */
+.ai-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ai-chip {
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.ai-chip-extra {
+  color: var(--color-text-muted);
+}
+
+.ai-entity-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ai-entity-group-title {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.375rem;
+}
+
+/* Facts: one statement per row, its badge underneath */
+.ai-fact-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.ai-fact {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.ai-fact .status-badge {
+  flex-shrink: 0;
+}
+
+/* Quotes */
+.ai-quote-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.ai-quote {
+  margin: 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--color-primary);
+}
+
+.ai-quote blockquote {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.ai-quote figcaption {
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-primary);
+}
+
+.ai-quote figcaption.ai-speaker-missing {
+  color: var(--color-text-muted);
+}
+
+.ai-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.ai-footer .ad-section-note {
+  flex: 1 1 18rem;
+}
+
+@media (max-width: 1024px) {
+  .ai-grid {
+    grid-template-columns: 1fr;
+  }
+}

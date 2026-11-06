@@ -6,6 +6,7 @@ import LoadingState from './LoadingState'
 import AlertMessage from './AlertMessage'
 import ProcessingStatusPanel from './ProcessingStatusPanel'
 import SimilarArticlesSection from './SimilarArticlesSection'
+import ArticleInsightsSection from './ArticleInsightsSection'
 import { fetchArticle, fetchArticleEmbeddings } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
 
@@ -17,10 +18,11 @@ import { formatDate } from '../utils/formatDate'
  *
  *   1. Article Information   – title, source, dates, URL
  *   2. Article Content       – full text, summary, or headline-only notice
- *   3. Processing Status     – lifecycle status from collection to embeddings
- *   4. Similar Articles      – semantically similar articles via vector search
- *   5. Source Information    – source name from the backend
- *   6. Analysis              – placeholder for future AI features
+ *   3. Article Insights      – extracted topics, entities, facts and quotes
+ *   4. Processing Status     – lifecycle status from collection to embeddings
+ *   5. Similar Articles      – semantically similar articles via vector search
+ *   6. Source Information    – source name from the backend
+ *   7. Analysis              – placeholder for future AI features
  *
  * States handled: loading, API error, article-not-found (HTTP 404),
  * missing content (null / empty string), summary-only, headline-only.
@@ -323,7 +325,14 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
           {renderContentBody()}
         </section>
 
-        {/* ── Section 3: Processing Status ──────────────────────────────── */}
+        {/* ── Section 3: Article Insights ──────────────────────────────── */}
+        <ArticleInsightsSection
+          key={activeArticleId}
+          articleId={activeArticleId}
+          contentAvailability={article.content_availability}
+        />
+
+        {/* ── Section 4: Processing Status ──────────────────────────────── */}
         <section
           className="ad-section"
           aria-labelledby="ad-section-processing"
@@ -338,13 +347,13 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
           />
         </section>
 
-        {/* ── Section 4: Similar Articles ────────────────────────────────── */}
+        {/* ── Section 5: Similar Articles ────────────────────────────────── */}
         <SimilarArticlesSection
           articleId={activeArticleId}
           onSelectArticle={handleSelectSimilar}
         />
 
-        {/* ── Section 5: Source Information ─────────────────────────────── */}
+        {/* ── Section 6: Source Information ─────────────────────────────── */}
         <section className="ad-section" aria-labelledby="ad-section-source">
           <h4 className="ad-section-title" id="ad-section-source">
             Source Information
@@ -367,7 +376,7 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
           </p>
         </section>
 
-        {/* ── Section 6: Analysis (future features) ────────────────────── */}
+        {/* ── Section 7: Analysis (future features) ────────────────────── */}
         <section
           className="ad-section ad-analysis-section"
           aria-labelledby="ad-section-analysis"
@@ -403,12 +412,6 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
                 icon: '🖼️',
                 title: 'Framing Analysis',
                 desc: 'How the story is framed — economic, human-interest, conflict or morality.',
-              },
-              {
-                id: 'topics',
-                icon: '🏷️',
-                title: 'Topics & Key Facts',
-                desc: 'Automatically extracted topics, named entities and verifiable claims.',
               },
               {
                 id: 'comparison',
