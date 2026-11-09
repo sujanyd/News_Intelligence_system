@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import ClassificationBadge from './ClassificationBadge'
 import ContentAvailabilityBadge from './ContentAvailabilityBadge'
 import AlertMessage from './AlertMessage'
+import PoliticalCoverageComparison from './PoliticalCoverageComparison'
 import { formatDate } from '../utils/formatDate'
 import { formatSimilarityPercentage } from '../utils/formatSimilarity'
 import { fetchArticle, MATCH_REVIEW_AVAILABLE } from '../api/newsApi'
@@ -374,6 +375,9 @@ export function SideBySideComparison({
           </div>
         </section>
       </div>
+
+      {/* Political coverage of the two articles (only when both have an id) */}
+      {artA.id && artB.id && <PoliticalCoverageComparison articleA={artA} articleB={artB} />}
 
       {/* Review Functionality Section */}
       <section className="review-panel" aria-label="Classification Review and Feedback">

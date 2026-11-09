@@ -575,3 +575,68 @@ export function toArticleInsights(raw) {
     quotes,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Political analysis (GET /articles/{id}/political-signals,
+// app/schemas/political_signal.py)
+//
+// Left out on purpose:
+// - political_leaning, slant_score, partisanship_score: one article is not
+//   enough to say anything about a publisher's politics, and these come from
+//   a fixed table of how left or right each known party is.
+// - confidence_score: the backend gives every signal the same value (0.82)
+//   and every article 0.85 or 0.90, so it is not a measured confidence.
+// ---------------------------------------------------------------------------
+
+export const POLITICAL_CATEGORIES = ['POLITICIAN', 'POLITICAL_PARTY', 'POLITICAL_ORGANIZATION']
+export const PRESENTATIONS = ['favorable', 'unfavorable', 'mixed', 'neutral']
+
+// A known value, or the fallback when the backend sent something else
+function oneOf(value, allowed, fallback) {
+  return allowed.includes(value) ? value : fallback
+}
+
+/**
+ * Checks the political analysis of one article.
+ * Required: an object. Entities and signals without a name or evidence are skipped.
+ *
+ * @returns {{ article_id: number | null, analyzed_at: string | null,
+ *   entities: Array, signals: Array }}
+ */
+export function toPoliticalAnalysis(raw) {
+  if (!isObject(raw)) {
+    throw new ApiError('The backend sent the political analysis in an unexpected format.')
+  }
+
+  const entities = keepValid(raw.political_entities, (entity) => toText(entity.name)).map(
+    (entity) => ({
+      id: entity.id,
+      name: toText(entity.name),
+      political_category: oneOf(entity.political_category, POLITICAL_CATEGORIES, null),
+      affiliation: toText(entity.ideological_affiliation),
+      mention_count: Number.isInteger(entity.mention_count) ? entity.mention_count : null,
+      // 'neutral' is also what the backend sends when it found no signal at all
+      presentation: oneOf(entity.presentation, PRESENTATIONS, 'neutral'),
+    })
+  )
+
+  const signals = keepValid(
+    raw.signals,
+    (signal) => toText(signal.entity_name) && toText(signal.evidence_text)
+  ).map((signal, index) => ({
+    id: index, // the backend sends no id for signals
+    entity_name: toText(signal.entity_name),
+    political_category: oneOf(signal.political_category, POLITICAL_CATEGORIES, null),
+    treatment: oneOf(signal.treatment, PRESENTATIONS, 'neutral'),
+    framing_technique: toText(signal.framing_technique),
+    evidence_text: toText(signal.evidence_text),
+    explanation: toText(signal.explanation),
+  }))
+
+  return {
+    article_id: Number.isInteger(raw.article_id) ? raw.article_id : null,
+    analyzed_at: toText(raw.analyzed_at),
+    entities,
+    signals,
+  }
+}

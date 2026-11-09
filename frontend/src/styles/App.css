@@ -2807,3 +2807,150 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================
+   Political analysis (article details) and political coverage
+   (comparison of two articles)
+   ========================================================== */
+
+.pol-subheading {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0.25rem 0 0.625rem;
+}
+
+.pol-subheading:not(:first-child) {
+  margin-top: 1.25rem;
+}
+
+.pol-signal-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* One signal: coloured edge by category, evidence below */
+.pol-signal {
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--color-border);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  background-color: rgba(31, 41, 55, 0.25);
+  min-width: 0;
+}
+
+.pol-signal-favorable {
+  border-left-color: var(--color-success);
+}
+
+.pol-signal-unfavorable {
+  border-left-color: #ef4444; /* same red as the "danger" badge */
+}
+
+.pol-signal-mixed {
+  border-left-color: var(--color-warning);
+}
+
+.pol-signal-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.pol-technique {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.pol-evidence-label {
+  margin-top: 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.pol-evidence {
+  margin: 0.25rem 0 0;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--color-border-subtle);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  font-style: italic;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.pol-explanation {
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* Comparison of two articles */
+.pol-coverage {
+  background-color: var(--color-bg-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pol-compare-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pol-compare-row {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.875rem;
+}
+
+.pol-compare-entity {
+  margin-bottom: 0.5rem;
+}
+
+.pol-compare-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.pol-side-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.375rem;
+}
+
+.pol-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.pol-cell .pol-signal-list {
+  width: 100%;
+}
+
+.pol-only-list {
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .pol-compare-sides,
+  .pol-only-list {
+    grid-template-columns: 1fr;
+  }
+}

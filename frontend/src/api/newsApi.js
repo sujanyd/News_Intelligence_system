@@ -25,6 +25,7 @@ import {
   toIngestionResult,
   toList,
   toMatchRunSummary,
+  toPoliticalAnalysis,
   toSimilarArticlesResponse,
   toSource,
   toStory,
@@ -55,7 +56,13 @@ export const ENDPOINTS = {
   // Content extraction (app/api/v1/endpoints/content_extraction.py)
   articleExtraction: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/extraction`,
   runArticleExtraction: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/extract`,
+  // Political signals (app/api/v1/endpoints/political_signal.py)
+  articlePolitical: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/political-signals`,
 }
+
+// Political analysis only exists in the real backend. There is no mock
+// version on purpose: no made-up politicians or signals are ever shown.
+export const POLITICAL_AVAILABLE = !USE_MOCK_DATA
 
 // Extracted topics, entities, facts and quotes only exist in the real
 // backend. There is no mock version on purpose: nothing made up is shown.
@@ -394,4 +401,31 @@ export async function rerunArticleInsights(articleId) {
     { timeoutMs: EXTRACTION_TIMEOUT_MS }
   )
   return toArticleInsights(data)
+}
+
+/**
+ * Gets the political entities and presentation signals of one article.
+ * If the article was never analysed, the backend analyses it first and
+ * saves the result, then answers.
+ * Endpoint: GET /articles/{article_id}/political-signals
+ *
+ * @param {number | string} articleId
+ * @returns {Promise<Object>} the checked analysis (see toPoliticalAnalysis)
+ */
+export async function fetchPoliticalAnalysis(articleId) {
+  if (!POLITICAL_AVAILABLE) {
+    throw new ApiError('Political analysis only works with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+  // Workaround for a backend problem (see API_CONTRACT.md, 9 Nov 2026):
+  // if the political analysis runs BEFORE the content extraction, the
+  // article's topics, facts and quotes stay empty for good. So make sure the
+  // extraction has run first. If that fails, carry on anyway.
+  await apiRequest(ENDPOINTS.articleExtraction(articleId), {
+    timeoutMs: EXTRACTION_TIMEOUT_MS,
+  }).catch(() => null)
+
+  const data = await apiRequest(ENDPOINTS.articlePolitical(articleId), {
+    timeoutMs: EXTRACTION_TIMEOUT_MS,
+  })
+  return toPoliticalAnalysis(data)
 }

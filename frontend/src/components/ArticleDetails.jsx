@@ -7,6 +7,7 @@ import AlertMessage from './AlertMessage'
 import ProcessingStatusPanel from './ProcessingStatusPanel'
 import SimilarArticlesSection from './SimilarArticlesSection'
 import ArticleInsightsSection from './ArticleInsightsSection'
+import PoliticalAnalysisSection from './PoliticalAnalysisSection'
 import { fetchArticle, fetchArticleEmbeddings } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
 
@@ -19,10 +20,11 @@ import { formatDate } from '../utils/formatDate'
  *   1. Article Information   – title, source, dates, URL
  *   2. Article Content       – full text, summary, or headline-only notice
  *   3. Article Insights      – extracted topics, entities, facts and quotes
- *   4. Processing Status     – lifecycle status from collection to embeddings
- *   5. Similar Articles      – semantically similar articles via vector search
- *   6. Source Information    – source name from the backend
- *   7. Analysis              – placeholder for future AI features
+ *   4. Political Analysis    – political entities and how they are worded
+ *   5. Processing Status     – lifecycle status from collection to embeddings
+ *   6. Similar Articles      – semantically similar articles via vector search
+ *   7. Source Information    – source name from the backend
+ *   8. Analysis              – placeholder for future AI features
  *
  * States handled: loading, API error, article-not-found (HTTP 404),
  * missing content (null / empty string), summary-only, headline-only.
@@ -332,7 +334,10 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
           contentAvailability={article.content_availability}
         />
 
-        {/* ── Section 4: Processing Status ──────────────────────────────── */}
+        {/* ── Section 4: Political Analysis ────────────────────────────── */}
+        <PoliticalAnalysisSection key={`political-${activeArticleId}`} articleId={activeArticleId} />
+
+        {/* ── Section 5: Processing Status ──────────────────────────────── */}
         <section
           className="ad-section"
           aria-labelledby="ad-section-processing"
@@ -347,13 +352,13 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
           />
         </section>
 
-        {/* ── Section 5: Similar Articles ────────────────────────────────── */}
+        {/* ── Section 6: Similar Articles ────────────────────────────────── */}
         <SimilarArticlesSection
           articleId={activeArticleId}
           onSelectArticle={handleSelectSimilar}
         />
 
-        {/* ── Section 6: Source Information ─────────────────────────────── */}
+        {/* ── Section 7: Source Information ─────────────────────────────── */}
         <section className="ad-section" aria-labelledby="ad-section-source">
           <h4 className="ad-section-title" id="ad-section-source">
             Source Information
@@ -376,7 +381,7 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
           </p>
         </section>
 
-        {/* ── Section 7: Analysis (future features) ────────────────────── */}
+        {/* ── Section 8: Analysis (future features) ────────────────────── */}
         <section
           className="ad-section ad-analysis-section"
           aria-labelledby="ad-section-analysis"

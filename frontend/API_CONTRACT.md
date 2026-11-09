@@ -1,6 +1,6 @@
 # Frontend ↔ Backend Contract (Articles, Sources, Stories, Events and Insights)
 
-## Integration status (updated 7 Nov 2026)
+## Integration status (updated 9 Nov 2026)
 
 | What | Status |
 | ---- | ------ |
@@ -11,7 +11,8 @@
 | `POST /api/ingestion/run`, `GET /api/ingestion/feeds` | ✅ **Implemented** by Person A; the dashboard's **Run News Collection** button uses `POST /api/ingestion/run` |
 | Stories and events (`/api/stories…`, `/api/events…`) | ✅ **Implemented** by Person A (commit `3bd8623`) and checked on 5 Nov 2026; used by the **Stories** page (see [Stories and events](#stories-and-events)) |
 | Article insights (`GET /api/articles/{id}/extraction`, `POST /api/articles/{id}/extract`) | ✅ **Implemented** by Person A (commit `ed831d4`) and checked on 6 Nov 2026; used by **Article Insights** in the article details (see [Article insights](#article-insights-topics-entities-facts-quotes)) |
-| Tone, headline framing, article framing signals | ❌ **Not available yet**: no route sends them (checked 7 Nov 2026). The frontend shows nothing for them; see [Tone and framing analysis](#tone-and-framing-analysis-waiting-for-the-backend) |
+| Tone, headline framing, article framing signals | ⚠️ Person A added a backend for these on 7 Nov 2026 (commit `b02dfbb`) after the check below; **the frontend does not use it yet** (see [Tone and framing analysis](#tone-and-framing-analysis-waiting-for-the-backend)) |
+| Political entities and wording signals (`GET /api/articles/{id}/political-signals`) | ✅ **Implemented** by Person A (commit `ad097af`) and checked on 9 Nov 2026; used by **Political Analysis** in the article details and by the political coverage panel of a matched pair (see [Political analysis](#political-analysis)) |
 
 **Real integration is operational.** The backend routes are fully functional and pass 36 unit/integration tests. Both `/api/...` and `/api/v1/...` prefixes are active.
 
@@ -473,6 +474,11 @@ saved only one analysis.
 
 ## Tone and framing analysis (waiting for the backend)
 
+> **Update 9 Nov 2026:** Person A pushed `feat(backend): implement tone and
+> framing analysis` (`b02dfbb`) on 7 Nov, after this section was written. The
+> frontend has not been connected to it yet; this section describes the
+> backend as it was on 7 Nov.
+
 The frontend task is to show an article's **tone**, its **headline framing**
 and its **article framing signals**, each with the text that supports it.
 **The backend cannot send any of these yet**, so the frontend shows nothing
@@ -564,6 +570,102 @@ The values above only show the **shape**. They are not real results.
    there a real confidence value?
 4. Could the extraction step send `null` for `sentiment_label` and
    `sentiment_score` until a real tone step exists?
+
+## Political analysis
+
+Person A added political signal analysis in commit `ad097af` (8 Nov 2026).
+The frontend uses one route:
+
+| What | Route | Used by |
+| ---- | ----- | ------- |
+| Political entities and wording signals of one article | `GET /api/articles/{id}/political-signals` | **Political Analysis** in the article details, and the **political coverage** panel under a matched pair on the Comparisons page (called once for each article) |
+
+Not used: `/political-entities` and `/political-evidence` (the same data is in
+`/political-signals`), `POST …/political-signals/analyze`, and
+`GET /api/comparisons/{id}/political-signals` (see below).
+
+In mock mode both parts show "needs the real backend" and call nothing.
+
+### Reply fields the frontend uses
+
+```text
+{ article_id, analyzed_at,
+  political_entities: [{ id, name, political_category, ideological_affiliation,
+                         mention_count, presentation }],
+  signals: [{ entity_name, political_category, treatment, framing_technique,
+              evidence_text, explanation }] }
+```
+
+- `political_category`: `POLITICIAN`, `POLITICAL_PARTY` or
+  `POLITICAL_ORGANIZATION`.
+- `presentation` / `treatment`: `favorable`, `unfavorable`, `mixed` or
+  `neutral`. The page calls them "Favorable wording", "Critical wording",
+  "Mixed wording" and "No clear signal", because `neutral` is also what the
+  backend sends when it found nothing.
+
+**Not shown on purpose:**
+
+- `political_leaning`, `slant_score`, `partisanship_score`: the task says not
+  to label a publisher from one article, and these come from a fixed table of
+  how left or right each known party is. 83 of 84 demo articles came out
+  `center`, which is simply the default when nothing is found.
+- `confidence_score`: every signal gets `0.82` and every article `0.85` or
+  `0.90`, so it is not a measured confidence. The page says so.
+
+### Comparing sources
+
+`GET /api/comparisons/{id}/political-signals` needs a comparison id, and there
+is no route that lists or creates comparisons. The only one is the seeded
+comparison 1, which holds one Reuters article. So the frontend compares
+**matched article pairs** instead: for a pair on the Comparisons page, it loads
+the political analysis of both articles and shows, for each entity named in
+both, how each article words it, with each article's evidence. It also lists
+the entities named in only one of them. The panel says that it compares two
+articles, not two publishers.
+
+### Backend problem found (please fix, Person A)
+
+**If the political analysis runs before the content extraction, the article's
+topics, facts and quotes stay empty for good.** The political analysis saves a
+new `article_analyses` row (`political-analysis-v1.0`) when the article has
+none. `GET /api/articles/{id}/extraction` returns the newest row, finds one,
+and never runs the extraction. Reproduced on a fresh demo database:
+
+| Order | Result of `GET …/extraction` |
+| ----- | ---------------------------- |
+| extraction, then political | `content-extract-v1.0`, 3 topics (correct) |
+| political, then extraction | `political-analysis-v1.0`, 0 topics, 0 facts, 0 quotes |
+
+The article page loads both at the same time, so this would happen to real
+users. **Frontend workaround:** before asking for the political analysis, the
+frontend asks for `GET …/extraction` and waits for it. Once the backend is
+fixed, that extra request can be removed (`fetchPoliticalAnalysis` in
+`src/api/newsApi.js`).
+
+### Checked against the real backend (9 Nov 2026)
+
+Backend at `ad097af`, on a copy of the demo database. `pytest`: 185 passed,
+1 skipped. Of 84 articles, 30 have political entities and 2 have wording
+signals. In the browser:
+
+- Article 50 (The Guardian) shows Donald Trump with "Critical wording", the
+  full sentence as evidence, and the reason ("cue 'condemned'").
+- A never-analysed article (82) showed both its insights and its political
+  entities, and the backend kept one analysis row.
+- A matched pair (BBC News and NPR News) showed the Democratic Party in both,
+  and the entities named in only one of them.
+- No console errors; no sideways scrolling at 375 px.
+
+### Questions for Person A
+
+1. Can the extraction and the political analysis share one analysis row, so
+   the order does not matter (see the problem above)?
+2. Wrong entities: "said voters" (as `POLITICIAN`) and "for UN" were found.
+3. A cue word anywhere in a sentence counts for every name in it. Could the
+   word be checked against the name it is about?
+4. Will there be a route to list or create comparisons, so the comparison
+   route can be used with real data?
+5. Is a real confidence value planned? Until then, could it be `null`?
 
 ## Error handling in the frontend
 
