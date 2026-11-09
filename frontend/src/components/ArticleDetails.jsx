@@ -8,6 +8,7 @@ import ProcessingStatusPanel from './ProcessingStatusPanel'
 import SimilarArticlesSection from './SimilarArticlesSection'
 import ArticleInsightsSection from './ArticleInsightsSection'
 import PoliticalAnalysisSection from './PoliticalAnalysisSection'
+import ToneFramingSection from './ToneFramingSection'
 import { fetchArticle, fetchArticleEmbeddings } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
 
@@ -337,7 +338,14 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
         {/* ── Section 4: Political Analysis ────────────────────────────── */}
         <PoliticalAnalysisSection key={`political-${activeArticleId}`} articleId={activeArticleId} />
 
-        {/* ── Section 5: Processing Status ──────────────────────────────── */}
+        {/* ── Section 5: Tone and Framing ──────────────────────────────── */}
+        <ToneFramingSection
+          key={`tone-${activeArticleId}`}
+          articleId={activeArticleId}
+          contentAvailability={article.content_availability}
+        />
+
+        {/* ── Section 6: Processing Status ──────────────────────────────── */}
         <section
           className="ad-section"
           aria-labelledby="ad-section-processing"
@@ -352,13 +360,13 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
           />
         </section>
 
-        {/* ── Section 6: Similar Articles ────────────────────────────────── */}
+        {/* ── Section 7: Similar Articles ────────────────────────────────── */}
         <SimilarArticlesSection
           articleId={activeArticleId}
           onSelectArticle={handleSelectSimilar}
         />
 
-        {/* ── Section 7: Source Information ─────────────────────────────── */}
+        {/* ── Section 8: Source Information ─────────────────────────────── */}
         <section className="ad-section" aria-labelledby="ad-section-source">
           <h4 className="ad-section-title" id="ad-section-source">
             Source Information
@@ -381,7 +389,7 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
           </p>
         </section>
 
-        {/* ── Section 8: Analysis (future features) ────────────────────── */}
+        {/* ── Section 9: Analysis (future features) ────────────────────── */}
         <section
           className="ad-section ad-analysis-section"
           aria-labelledby="ad-section-analysis"
@@ -405,18 +413,6 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
                 icon: '🤖',
                 title: 'AI-Generated Content Detection',
                 desc: 'Probability score and indicators that the article was written by an AI system.',
-              },
-              {
-                id: 'tone',
-                icon: '🎭',
-                title: 'Tone Analysis',
-                desc: 'Sentiment classification (positive / neutral / negative) across article sections.',
-              },
-              {
-                id: 'framing',
-                icon: '🖼️',
-                title: 'Framing Analysis',
-                desc: 'How the story is framed — economic, human-interest, conflict or morality.',
               },
               {
                 id: 'comparison',

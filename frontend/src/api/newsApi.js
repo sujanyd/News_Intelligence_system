@@ -26,6 +26,7 @@ import {
   toList,
   toMatchRunSummary,
   toPoliticalAnalysis,
+  toToneFraming,
   toSimilarArticlesResponse,
   toSource,
   toStory,
@@ -58,7 +59,13 @@ export const ENDPOINTS = {
   runArticleExtraction: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/extract`,
   // Political signals (app/api/v1/endpoints/political_signal.py)
   articlePolitical: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/political-signals`,
+  // Tone and framing (app/api/v1/endpoints/tone_framing.py)
+  articleToneFraming: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/tone-framing`,
 }
+
+// Tone and framing only exist in the real backend. There is no mock version
+// on purpose: no made-up tone labels or framing signals are ever shown.
+export const TONE_AVAILABLE = !USE_MOCK_DATA
 
 // Political analysis only exists in the real backend. There is no mock
 // version on purpose: no made-up politicians or signals are ever shown.
@@ -368,6 +375,30 @@ export async function groupArticlesIntoStories() {
   return toGroupingSummary(data)
 }
 
+// One extraction request per article at a time. The article page opens the
+// insights, political and tone sections together, and all three need the
+// extraction; they now share one request instead of sending three.
+const extractionRequests = new Map()
+
+function loadExtraction(articleId) {
+  const key = String(articleId)
+  if (!extractionRequests.has(key)) {
+    const request = apiRequest(ENDPOINTS.articleExtraction(articleId), {
+      timeoutMs: EXTRACTION_TIMEOUT_MS,
+    }).finally(() => extractionRequests.delete(key))
+    extractionRequests.set(key, request)
+  }
+  return extractionRequests.get(key)
+}
+
+// Workaround for a backend problem (see API_CONTRACT.md, 9 Nov 2026): if the
+// political or the tone analysis runs BEFORE the content extraction, the
+// article's topics, facts and quotes stay empty for good. So make sure the
+// extraction has run first. If it fails, carry on anyway.
+function extractionFirst(articleId) {
+  return loadExtraction(articleId).catch(() => null)
+}
+
 /**
  * Gets the topics, entities, facts and quotes the backend extracted from
  * one article. If the article was never analysed, the backend analyses it
@@ -381,9 +412,7 @@ export async function fetchArticleInsights(articleId) {
   if (!INSIGHTS_AVAILABLE) {
     throw new ApiError('Article insights only work with the real backend (VITE_USE_MOCK_DATA=false).')
   }
-  const data = await apiRequest(ENDPOINTS.articleExtraction(articleId), {
-    timeoutMs: EXTRACTION_TIMEOUT_MS,
-  })
+  const data = await loadExtraction(articleId)
   return toArticleInsights(data)
 }
 
@@ -416,16 +445,30 @@ export async function fetchPoliticalAnalysis(articleId) {
   if (!POLITICAL_AVAILABLE) {
     throw new ApiError('Political analysis only works with the real backend (VITE_USE_MOCK_DATA=false).')
   }
-  // Workaround for a backend problem (see API_CONTRACT.md, 9 Nov 2026):
-  // if the political analysis runs BEFORE the content extraction, the
-  // article's topics, facts and quotes stay empty for good. So make sure the
-  // extraction has run first. If that fails, carry on anyway.
-  await apiRequest(ENDPOINTS.articleExtraction(articleId), {
-    timeoutMs: EXTRACTION_TIMEOUT_MS,
-  }).catch(() => null)
+  await extractionFirst(articleId)
 
   const data = await apiRequest(ENDPOINTS.articlePolitical(articleId), {
     timeoutMs: EXTRACTION_TIMEOUT_MS,
   })
   return toPoliticalAnalysis(data)
+}
+
+/**
+ * Tone and framing of one article: its overall tone, how the headline is
+ * framed, and the framing signals found in the text (with evidence).
+ * The first time, the backend analyses the article before it answers.
+ *
+ * @param {number | string} articleId
+ * @returns {Promise<Object>} the checked analysis (see toToneFraming)
+ */
+export async function fetchToneFraming(articleId) {
+  if (!TONE_AVAILABLE) {
+    throw new ApiError('Tone and framing only work with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+  await extractionFirst(articleId)
+
+  const data = await apiRequest(ENDPOINTS.articleToneFraming(articleId), {
+    timeoutMs: EXTRACTION_TIMEOUT_MS,
+  })
+  return toToneFraming(data)
 }

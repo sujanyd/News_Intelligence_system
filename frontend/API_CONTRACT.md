@@ -1,4 +1,4 @@
-# Frontend ↔ Backend Contract (Articles, Sources, Stories, Events and Insights)
+# Frontend ↔ Backend Contract (Articles, Sources, Stories, Events and Analysis)
 
 ## Integration status (updated 9 Nov 2026)
 
@@ -11,7 +11,7 @@
 | `POST /api/ingestion/run`, `GET /api/ingestion/feeds` | ✅ **Implemented** by Person A; the dashboard's **Run News Collection** button uses `POST /api/ingestion/run` |
 | Stories and events (`/api/stories…`, `/api/events…`) | ✅ **Implemented** by Person A (commit `3bd8623`) and checked on 5 Nov 2026; used by the **Stories** page (see [Stories and events](#stories-and-events)) |
 | Article insights (`GET /api/articles/{id}/extraction`, `POST /api/articles/{id}/extract`) | ✅ **Implemented** by Person A (commit `ed831d4`) and checked on 6 Nov 2026; used by **Article Insights** in the article details (see [Article insights](#article-insights-topics-entities-facts-quotes)) |
-| Tone, headline framing, article framing signals | ⚠️ Person A added a backend for these on 7 Nov 2026 (commit `b02dfbb`) after the check below; **the frontend does not use it yet** (see [Tone and framing analysis](#tone-and-framing-analysis-waiting-for-the-backend)) |
+| Tone, headline framing, article framing signals (`GET /api/articles/{id}/tone-framing`) | ✅ **Implemented** by Person A (commit `b02dfbb`) and checked on 9 Nov 2026; used by **Tone and Framing** in the article details (see [Tone and framing analysis](#tone-and-framing-analysis)) |
 | Political entities and wording signals (`GET /api/articles/{id}/political-signals`) | ✅ **Implemented** by Person A (commit `ad097af`) and checked on 9 Nov 2026; used by **Political Analysis** in the article details and by the political coverage panel of a matched pair (see [Political analysis](#political-analysis)) |
 
 **Real integration is operational.** The backend routes are fully functional and pass 36 unit/integration tests. Both `/api/...` and `/api/v1/...` prefixes are active.
@@ -472,104 +472,89 @@ saved only one analysis.
 5. **A GET that saves data.** `GET …/extraction` writes an analysis when
    there is none. Should the first analysis be started by the POST only?
 
-## Tone and framing analysis (waiting for the backend)
+## Tone and framing analysis
 
-> **Update 9 Nov 2026:** Person A pushed `feat(backend): implement tone and
-> framing analysis` (`b02dfbb`) on 7 Nov, after this section was written. The
-> frontend has not been connected to it yet; this section describes the
-> backend as it was on 7 Nov.
+Person A added tone and framing analysis in commit `b02dfbb` (7 Nov 2026).
+The frontend uses one route:
 
-The frontend task is to show an article's **tone**, its **headline framing**
-and its **article framing signals**, each with the text that supports it.
-**The backend cannot send any of these yet**, so the frontend shows nothing
-for them. Nothing is made up. This section records what exists and what the
-frontend needs from Person A.
+| What | Route | Used by |
+| ---- | ----- | ------- |
+| Tone, headline framing and framing signals of one article | `GET /api/articles/{id}/tone-framing` | **Tone and Framing** in the article details |
 
-### What the backend has today (checked 7 Nov 2026, commit `e8abc91`)
+Not used: `/tone`, `/headline-framing` and `/framing-signals` (the same data is
+in `/tone-framing`), and `POST …/tone-framing/analyze`.
 
-Checked against the backend's own OpenAPI list (28 routes under `/api`) and
-its source code:
+In mock mode the section shows "needs the real backend" and calls nothing.
+The "Tone Analysis" and "Framing Analysis" cards were removed from the
+"Coming soon" list.
 
-| Needed | What exists | Usable? |
-| ------ | ----------- | ------- |
-| Tone | `sentiment_label` and `sentiment_score` in `GET /api/articles/{id}/extraction` | **No.** The extraction step always saves `neutral` and `0.0` (`app/services/content_extraction.py`). In the demo database, 7 of 8 analyses say `neutral`; the 8th (`positive`) was written by hand in the seed script. |
-| Tone confidence | `confidence_score` in the same reply | **No.** It is the confidence of the whole extraction run (always `0.9`), not of a tone result. |
-| Headline framing | Nothing: no database field, no route | **No.** |
-| Article framing signals | Table `analysis_framing_signals`: `frame_type`, `intensity_score`, `evidence_text`, `start_char`, `end_char`, `explanation` | **No.** No code fills it except the seed script (1 row, `cooperative_progress`), and no route sends it. |
+### Reply fields the frontend uses
 
-### What the frontend needs (a suggestion for Person A)
-
-The simplest option is to add these fields to the existing
-`GET /api/articles/{id}/extraction` reply, which the article page already
-loads. A separate route such as `GET /api/articles/{id}/framing` would work
-too.
-
-```json
-{
-  "tone": {
-    "label": "negative",
-    "confidence": 0.72,
-    "method": "lexicon-v1",
-    "evidence": [
-      { "text": "a devastating blow to the community", "start_char": 120, "end_char": 155 }
-    ]
-  },
-  "headline_framing": {
-    "frame_type": "conflict",
-    "confidence": 0.64,
-    "evidence_text": "Leaders clash over …",
-    "explanation": "The headline presents the story as a fight between two sides."
-  },
-  "framing_signals": [
-    {
-      "id": 1,
-      "frame_type": "economic",
-      "intensity_score": 0.8,
-      "evidence_text": "will cost taxpayers $2 billion",
-      "start_char": 340,
-      "end_char": 370,
-      "explanation": "Describes the policy mainly by its cost."
-    }
-  ]
-}
+```text
+{ article_id, headline,
+  tone: { tone, tone_score, confidence, explanation },
+  headline_framing: { primary_frame, detected_frames, evidence_phrases,
+                      confidence, explanation },
+  framing_signals: [{ id, frame_type, evidence_text, start_char, explanation }] }
 ```
 
-The values above only show the **shape**. They are not real results.
+- `tone`: `neutral`, `positive`, `optimistic`, `negative`, `critical`,
+  `alarming` or `contentious`. Each gets a plain-words meaning on the page.
+  `tone_score` (−1 to +1) is drawn on a bar.
+- Headline framing: `neutral_reporting` is what the backend sends when no cue
+  word matched, so the page says "No framing cue was found" instead of calling
+  the headline neutral.
+- A framing signal whose `evidence_text` is the headline and whose
+  `start_char` is 0 is marked "Found in the headline".
 
-- `framing_signals` can come straight from the existing
-  `analysis_framing_signals` table. It only needs code that fills it and a
-  route (or reply field) that sends it.
-- `headline_framing` needs new storage, for example a new `frame_type` row
-  with a marker that it belongs to the headline, or new columns.
-- `tone` needs a real tone step. Until then, the extraction step should send
-  `null` instead of the fixed `neutral` / `0.0`, so nobody mistakes the
-  default for a result.
-- Each result should say **how** it was produced (`method`, or the existing
-  `pipeline_version`), and `confidence` should be `null` when the method has
-  none.
-- Please list the possible `label` and `frame_type` values, so the page can
-  explain each one in plain words.
+**Shown, with a warning:** the two `confidence` values. The task asks for
+confidence when available, but they come from the same word-count rules (for
+example `neutral` gets `0.88` exactly when no tone word was found), so the
+page says they are not a measured accuracy.
 
-### How the frontend will show it (once the data exists)
+**Not shown on purpose:**
 
-- Every result will be labelled as an **automatic analysis**, not a checked
-  fact, with the method and confidence next to it.
-- The tone panel will say that **tone is not bias**: a negative tone can
-  simply mean the news itself is bad.
-- Each framing signal will show its **category** (for example "Economic")
-  and, separately, the **quoted text** that supports it.
-- An article with no analysis yet will say so. Missing tone or framing will
-  never be filled in with a default.
+- `intensity_score`: fixed per frame type (`0.75`, `0.8` or `0.85`).
+- `subjectivity_score` and `summary`: they repeat the tone result.
+
+### Backend problem found (please fix, Person A)
+
+**The same ordering problem as the political analysis (see below):** if
+`GET …/tone-framing` runs before the content extraction, it saves a
+`tone-framing-v1.0` analysis row, and `GET …/extraction` then returns that
+empty row for good (reproduced on article 2: 0 topics, 0 facts, 0 quotes).
+The frontend uses the same workaround: it waits for `GET …/extraction` first.
+
+### Checked against the real backend (9 Nov 2026)
+
+Backend at `8249707` (main), on a copy of the demo database. Of 84 articles:
+
+| Result | Count |
+| ------ | ----- |
+| Tone `neutral` | 73 |
+| Tone `critical` / `alarming` / `positive` / `optimistic` | 6 / 3 / 1 / 1 |
+| Headline with a framing cue | 8 |
+| Articles with at least one framing signal | 19 |
+
+In the browser, never-analysed article 2 ("'This is a disaster': Angry
+Republicans blame Trump…") showed tone "Alarming" (−0.80, 76%), headline
+framing "Blame" and "Emotional language" with the matched words "blame" and
+"disaster", and one signal with the headline as evidence. Its insights (5
+topics) and political entities also loaded; the backend sent one extraction
+request and kept one `content-extract-v1.0` row. No console errors; no
+sideways scrolling at 375 px.
 
 ### Questions for Person A
 
-1. Will tone and framing be added to `GET /api/articles/{id}/extraction`, or
-   get their own route?
-2. Which tone labels and framing types will the backend use?
-3. How will they be produced (rules, a word list, or a language model)? Is
-   there a real confidence value?
-4. Could the extraction step send `null` for `sentiment_label` and
-   `sentiment_score` until a real tone step exists?
+1. Can tone and framing reuse the extraction's analysis row, so the order does
+   not matter?
+2. Word matches without context: "bear attack" and "cyber-attack" count as
+   `conflict_emphasis`; "disaster" inside a quote makes the whole article
+   `alarming`. Could cues inside quotes, or with non-political subjects, be
+   skipped?
+3. Is a real confidence value planned? Until then, could it be `null`?
+4. `GET …/tone-framing` analyses again on every call and averages the stored
+   `confidence_score` each time. Should a GET only read?
 
 ## Political analysis
 
@@ -637,9 +622,10 @@ and never runs the extraction. Reproduced on a fresh demo database:
 | political, then extraction | `political-analysis-v1.0`, 0 topics, 0 facts, 0 quotes |
 
 The article page loads both at the same time, so this would happen to real
-users. **Frontend workaround:** before asking for the political analysis, the
-frontend asks for `GET …/extraction` and waits for it. Once the backend is
-fixed, that extra request can be removed (`fetchPoliticalAnalysis` in
+users. **Frontend workaround:** before asking for the political (or tone and
+framing) analysis, the frontend asks for `GET …/extraction` and waits for it.
+The insights, political and tone sections share that one request. Once the
+backend is fixed, the wait can be removed (`extractionFirst` in
 `src/api/newsApi.js`).
 
 ### Checked against the real backend (9 Nov 2026)

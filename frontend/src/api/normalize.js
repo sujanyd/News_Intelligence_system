@@ -640,3 +640,71 @@ export function toPoliticalAnalysis(raw) {
     signals,
   }
 }
+
+export const TONES = ['neutral', 'positive', 'optimistic', 'negative', 'critical', 'alarming', 'contentious']
+
+// A number between -1 and +1 (the tone score), or null
+function toValence(value) {
+  return typeof value === 'number' && value >= -1 && value <= 1 ? value : null
+}
+
+/**
+ * Checks the tone and framing reply of one article
+ * (GET /articles/{id}/tone-framing).
+ * Required: an object. Framing signals without evidence are skipped.
+ *
+ * Left out on purpose:
+ *   - intensity_score: fixed per frame type (0.75, 0.8 or 0.85), not measured
+ *   - subjectivity_score and the summary sentence: they repeat the tone result
+ *
+ * @returns {{ article_id: number | null, headline: string | null,
+ *   tone: { label, score, confidence, explanation },
+ *   headline_framing: { primary_frame, frames, evidence_phrases, confidence, explanation },
+ *   signals: Array<{ id, frame_type, evidence_text, from_headline, explanation }> }}
+ */
+export function toToneFraming(raw) {
+  if (!isObject(raw)) {
+    throw new ApiError('The backend sent the tone and framing analysis in an unexpected format.')
+  }
+  const headline = toText(raw.headline)
+  const tone = isObject(raw.tone) ? raw.tone : {}
+  const framing = isObject(raw.headline_framing) ? raw.headline_framing : {}
+
+  const frames = Array.isArray(framing.detected_frames)
+    ? framing.detected_frames.map(toText).filter(Boolean)
+    : []
+  const evidencePhrases = Array.isArray(framing.evidence_phrases)
+    ? framing.evidence_phrases.map(toText).filter(Boolean)
+    : []
+
+  const signals = keepValid(raw.framing_signals, (signal) => toText(signal.evidence_text)).map(
+    (signal, index) => ({
+      id: Number.isInteger(signal.id) ? signal.id : `signal-${index}`,
+      frame_type: toText(signal.frame_type),
+      evidence_text: toText(signal.evidence_text),
+      // The backend puts the headline in the list too, as a sentence at 0
+      from_headline: toText(signal.evidence_text) === headline && signal.start_char === 0,
+      explanation: toText(signal.explanation),
+    })
+  )
+
+  return {
+    article_id: Number.isInteger(raw.article_id) ? raw.article_id : null,
+    headline,
+    tone: {
+      label: oneOf(tone.tone, TONES, null),
+      score: toValence(tone.tone_score),
+      confidence: toScore(tone.confidence),
+      explanation: toText(tone.explanation),
+    },
+    headline_framing: {
+      primary_frame: toText(framing.primary_frame),
+      // 'neutral_reporting' is what the backend says when no cue word matched
+      frames: frames.filter((frame) => frame !== 'neutral_reporting'),
+      evidence_phrases: evidencePhrases,
+      confidence: toScore(framing.confidence),
+      explanation: toText(framing.explanation),
+    },
+    signals,
+  }
+}

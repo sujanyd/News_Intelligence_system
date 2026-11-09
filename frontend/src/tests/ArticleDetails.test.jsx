@@ -281,7 +281,7 @@ describe('ArticleDetails component', () => {
   })
 
   // ── Analysis placeholder ──────────────────────────────────────────────────
-  it('shows the analysis placeholder message and the four future feature cards', async () => {
+  it('shows the analysis placeholder message and the future feature cards', async () => {
     render(<ArticleDetails {...DEFAULT_PROPS} />)
     await screen.findByText('City council approves new budget for public transport')
 
@@ -293,8 +293,9 @@ describe('ArticleDetails component', () => {
     ).toBeDefined()
 
     expect(screen.getByTestId('analysis-card-ai-detection')).toBeDefined()
-    expect(screen.getByTestId('analysis-card-tone')).toBeDefined()
-    expect(screen.getByTestId('analysis-card-framing')).toBeDefined()
+    // Tone and framing are real now (Tone and Framing section)
+    expect(screen.queryByTestId('analysis-card-tone')).toBeNull()
+    expect(screen.queryByTestId('analysis-card-framing')).toBeNull()
     // Topics and facts are real now (Article Insights), so they are no longer "coming soon"
     expect(screen.queryByTestId('analysis-card-topics')).toBeNull()
     expect(screen.getByTestId('analysis-card-comparison')).toBeDefined()
