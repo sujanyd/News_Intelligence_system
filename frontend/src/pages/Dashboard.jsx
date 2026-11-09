@@ -13,8 +13,12 @@ import IngestionPanel from '../components/IngestionPanel'
 import DataModeBadge from '../components/DataModeBadge'
 import {
   INGESTION_AVAILABLE,
+  STORIES_AVAILABLE,
   USE_MOCK_DATA,
   checkBackendHealth,
+  countArticles,
+  countEvents,
+  fetchAllStories,
   fetchArticles,
   fetchSources,
   runNewsCollection,
@@ -24,6 +28,17 @@ import { getSourceName } from '../utils/getSourceName'
 
 // How many of the newest articles the dashboard shows
 const RECENT_ARTICLES_COUNT = 5
+
+// 84 -> "84"; when the count stopped early (very large database) -> "2000+"
+function formatCount(result) {
+  if (!result) return '--'
+  return result.isComplete ? String(result.count) : `${result.count}+`
+}
+
+// The value of one settled request, or null when it failed
+function settledValue(result) {
+  return result.status === 'fulfilled' ? result.value : null
+}
 
 /**
  * Dashboard Page Component
@@ -51,6 +66,41 @@ export function Dashboard({ onNavigate }) {
   const [isLoadingSources, setIsLoadingSources] = useState(true)
   const [sourcesError, setSourcesError] = useState('')
   const [sourcesReloadCount, setSourcesReloadCount] = useState(0)
+
+  // Totals for the metric cards. The backend has no count route, so the
+  // lists are read page by page (see readAllPages in newsApi.js).
+  const [totals, setTotals] = useState(null) // { articles, stories, events, comparable }
+  const [totalsError, setTotalsError] = useState('')
+  const [totalsReloadCount, setTotalsReloadCount] = useState(0)
+
+  useEffect(() => {
+    let isCurrentRequest = true
+    Promise.allSettled([
+      countArticles(),
+      STORIES_AVAILABLE ? fetchAllStories() : Promise.resolve(null),
+      STORIES_AVAILABLE ? countEvents() : Promise.resolve(null),
+    ]).then(([articleResult, storyResult, eventResult]) => {
+      if (!isCurrentRequest) return
+      const failed = [articleResult, storyResult, eventResult].find(
+        (result) => result.status === 'rejected'
+      )
+      setTotalsError(failed ? failed.reason.message : '')
+      const stories = settledValue(storyResult)
+      setTotals({
+        articles: settledValue(articleResult),
+        stories: stories && { count: stories.items.length, isComplete: stories.isComplete },
+        events: settledValue(eventResult),
+        // Stories with 2 or more articles can be compared and reported on
+        comparable: stories && {
+          count: stories.items.filter((story) => story.article_count >= 2).length,
+          isComplete: stories.isComplete,
+        },
+      })
+    })
+    return () => {
+      isCurrentRequest = false
+    }
+  }, [totalsReloadCount])
 
   // Load the newest articles (again whenever articlesReloadCount goes up)
   useEffect(() => {
@@ -111,6 +161,7 @@ export function Dashboard({ onNavigate }) {
   function handleCollectionFinished() {
     reloadArticles()
     reloadSources()
+    setTotalsReloadCount(totalsReloadCount + 1)
   }
 
   function openPage(tab) {
@@ -269,13 +320,23 @@ export function Dashboard({ onNavigate }) {
         </div>
       )}
 
-      {/* 4 Metric Cards (Total articles, News sources, Stories and events, Comparisons completed) */}
+      {/* 4 Metric Cards (Total articles, News sources, Stories and events, Comparable stories) */}
+      {totalsError && (
+        <AlertMessage
+          type="warning"
+          title="Some totals could not be counted."
+          message={totalsError}
+          onRetry={() => setTotalsReloadCount(totalsReloadCount + 1)}
+        />
+      )}
+
       <section className="grid-metrics" aria-label="Key Performance Indicators">
         <MetricCard
           title="Total articles"
-          value="--"
-          subtitle="Collected news stories"
-          helperText="No total from backend yet"
+          value={formatCount(totals?.articles)}
+          subtitle="Collected news articles"
+          helperText={totals?.articles ? 'Counted from the article list' : totals ? 'Could not count' : 'Counting...'}
+          isPlaceholder={USE_MOCK_DATA || !totals?.articles}
           icon={
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Z" />
@@ -303,9 +364,18 @@ export function Dashboard({ onNavigate }) {
 
         <MetricCard
           title="Stories and events"
-          value="--"
-          subtitle="Semantic clusters"
-          helperText="Vector similarity groupings"
+          value={`${formatCount(totals?.stories)} / ${formatCount(totals?.events)}`}
+          subtitle="Stories / events"
+          helperText={
+            !STORIES_AVAILABLE
+              ? 'Needs the real backend'
+              : totals?.stories && totals?.events
+              ? 'Grouped by the backend'
+              : totals
+              ? 'Could not count'
+              : 'Counting...'
+          }
+          isPlaceholder={!totals?.stories || !totals?.events}
           icon={
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -316,10 +386,19 @@ export function Dashboard({ onNavigate }) {
         />
 
         <MetricCard
-          title="Comparisons completed"
-          value="--"
-          subtitle="Cross-outlet evaluations"
-          helperText="Bias & framing divergence"
+          title="Comparable stories"
+          value={formatCount(totals?.comparable)}
+          subtitle="Stories with 2 or more articles"
+          helperText={
+            !STORIES_AVAILABLE
+              ? 'Needs the real backend'
+              : totals?.comparable
+              ? 'Open them in Comparisons or Reports'
+              : totals
+              ? 'Could not count'
+              : 'Counting...'
+          }
+          isPlaceholder={!totals?.comparable}
           icon={
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M16 3h5v5" />

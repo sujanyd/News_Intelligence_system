@@ -414,12 +414,6 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
                 title: 'AI-Generated Content Detection',
                 desc: 'Probability score and indicators that the article was written by an AI system.',
               },
-              {
-                id: 'comparison',
-                icon: '↔️',
-                title: 'Similar Article Comparison',
-                desc: 'How other sources covered the same event and where their framing differs.',
-              },
             ].map((feature) => (
               <div key={feature.id} className="ad-analysis-card" data-testid={`analysis-card-${feature.id}`}>
                 <span className="ad-analysis-icon" aria-hidden="true">

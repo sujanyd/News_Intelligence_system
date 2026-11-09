@@ -27,6 +27,7 @@ import {
   toMatchRunSummary,
   toPoliticalAnalysis,
   toToneFraming,
+  toFeed,
   toSimilarArticlesResponse,
   toSource,
   toStory,
@@ -52,6 +53,7 @@ export const ENDPOINTS = {
   // Stories and events (app/api/v1/endpoints/stories.py and events.py)
   stories: `${API_PREFIX}/stories`,
   story: (id) => `${API_PREFIX}/stories/${encodeURIComponent(id)}`,
+  events: `${API_PREFIX}/events`,
   event: (id) => `${API_PREFIX}/events/${encodeURIComponent(id)}`,
   groupArticles: `${API_PREFIX}/stories/group/batch`,
   // Content extraction (app/api/v1/endpoints/content_extraction.py)
@@ -61,6 +63,8 @@ export const ENDPOINTS = {
   articlePolitical: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/political-signals`,
   // Tone and framing (app/api/v1/endpoints/tone_framing.py)
   articleToneFraming: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/tone-framing`,
+  // RSS feeds the news collection reads (app/api/v1/endpoints/ingestion.py)
+  ingestionFeeds: `${API_PREFIX}/ingestion/feeds`,
 }
 
 // Tone and framing only exist in the real backend. There is no mock version
@@ -471,4 +475,121 @@ export async function fetchToneFraming(articleId) {
     timeoutMs: EXTRACTION_TIMEOUT_MS,
   })
   return toToneFraming(data)
+}
+
+// ---------------------------------------------------------------------------
+// Totals and whole lists
+//
+// The backend has no "count" route, and its list routes send at most 100
+// items per call. So a total is found by reading the list page by page until
+// a page comes back short. MAX_PAGES stops this on a very large database:
+// then the result says it is not complete ("2000+").
+// ---------------------------------------------------------------------------
+
+const PAGE_SIZE = 100
+const MAX_PAGES = 20
+
+/**
+ * Reads a list page by page.
+ *
+ * @param {(page: { limit: number, start: number }) => Promise<Array>} loadPage
+ * @returns {Promise<{ items: Array, isComplete: boolean }>}
+ *   isComplete is false when MAX_PAGES was reached and more may exist
+ */
+export async function readAllPages(loadPage) {
+  const items = []
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const pageItems = await loadPage({ limit: PAGE_SIZE, start: page * PAGE_SIZE })
+    items.push(...pageItems)
+    if (pageItems.length < PAGE_SIZE) return { items, isComplete: true }
+  }
+  return { items, isComplete: false }
+}
+
+/**
+ * How many articles the backend has.
+ * Reads GET /articles?limit=100&offset=... until a short page.
+ *
+ * @returns {Promise<{ count: number, isComplete: boolean }>}
+ */
+export async function countArticles() {
+  const { items, isComplete } = await readAllPages(async ({ limit, start }) => {
+    const result = await fetchArticles({ limit, offset: start })
+    return result.articles
+  })
+  return { count: items.length, isComplete }
+}
+
+/**
+ * Every story (without its events and articles).
+ * Reads GET /stories?limit=100&skip=... until a short page.
+ *
+ * @returns {Promise<{ items: Array, isComplete: boolean }>}
+ */
+export async function fetchAllStories() {
+  return readAllPages(({ limit, start }) => fetchStories({ limit, skip: start }))
+}
+
+/**
+ * How many events the backend has.
+ * Reads GET /events?limit=100&skip=... until a short page.
+ *
+ * @returns {Promise<{ count: number, isComplete: boolean }>}
+ */
+export async function countEvents() {
+  requireStoriesBackend()
+  const { items, isComplete } = await readAllPages(async ({ limit, start }) => {
+    const data = await apiGet(ENDPOINTS.events, { limit, skip: start })
+    return toList(data, 'event').items
+  })
+  return { count: items.length, isComplete }
+}
+
+/**
+ * The RSS feeds the news collection reads by default.
+ * Endpoint: GET /ingestion/feeds (real backend only)
+ *
+ * @returns {Promise<Array<{ source_name, base_url, feed_url }>>}
+ */
+export async function fetchIngestionFeeds() {
+  if (!INGESTION_AVAILABLE) {
+    throw new ApiError('The RSS feed list only works with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+  const data = await apiGet(ENDPOINTS.ingestionFeeds)
+  return toList(data, 'feed').items.map(toFeed)
+}
+
+// ---------------------------------------------------------------------------
+// All analyses of one article (used by Comparisons and Reports)
+// ---------------------------------------------------------------------------
+
+/**
+ * Loads the insights, tone and framing, and political analysis of one
+ * article. One failing analysis does not stop the others: it comes back as
+ * null, with its error message.
+ *
+ * @param {number | string} articleId
+ * @returns {Promise<{ insights: Object | null, tone: Object | null,
+ *   political: Object | null, errors: { insights?: string, tone?: string, political?: string } }>}
+ */
+export async function fetchArticleAnalyses(articleId) {
+  // The extraction first (see extractionFirst), then the other two together
+  const [insights] = await Promise.allSettled([fetchArticleInsights(articleId)])
+  const [tone, political] = await Promise.allSettled([
+    fetchToneFraming(articleId),
+    fetchPoliticalAnalysis(articleId),
+  ])
+
+  const errors = {}
+  const valueOf = (result, name) => {
+    if (result.status === 'fulfilled') return result.value
+    errors[name] = result.reason?.message || 'Unknown error'
+    return null
+  }
+  return {
+    insights: valueOf(insights, 'insights'),
+    tone: valueOf(tone, 'tone'),
+    political: valueOf(political, 'political'),
+    errors,
+  }
 }

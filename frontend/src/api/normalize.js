@@ -708,3 +708,18 @@ export function toToneFraming(raw) {
     signals,
   }
 }
+
+/**
+ * Checks one RSS feed of GET /ingestion/feeds.
+ * Required: source_name. The two addresses may be missing.
+ */
+export function toFeed(raw) {
+  if (!isObject(raw) || !toText(raw.source_name)) {
+    throw new ApiError('The backend sent an RSS feed in an unexpected format.')
+  }
+  return {
+    source_name: toText(raw.source_name),
+    base_url: toText(raw.base_url),
+    feed_url: toText(raw.feed_url),
+  }
+}

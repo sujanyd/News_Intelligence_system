@@ -7,13 +7,15 @@ import AlertMessage from '../components/AlertMessage'
 import DataTable from '../components/DataTable'
 import DataModeBadge from '../components/DataModeBadge'
 import AddSourceForm from '../components/AddSourceForm'
+import RssFeedList from '../components/RssFeedList'
 import { fetchSources } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
 
 /**
  * Sources Page
  *
- * Shows the list of news sources and a form to add a new one.
+ * Shows the list of news sources, a form to add a new one, and the RSS feeds
+ * the news collection reads.
  */
 export function Sources() {
   const [sources, setSources] = useState([])
@@ -108,6 +110,10 @@ export function Sources() {
         <Card title="Add a Source" subtitle="Fields marked * are required">
           <AddSourceForm onSourceAdded={handleSourceAdded} />
         </Card>
+      </div>
+
+      <div style={{ marginTop: '1.5rem' }}>
+        <RssFeedList />
       </div>
     </div>
   )

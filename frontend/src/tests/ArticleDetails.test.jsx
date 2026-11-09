@@ -298,7 +298,8 @@ describe('ArticleDetails component', () => {
     expect(screen.queryByTestId('analysis-card-framing')).toBeNull()
     // Topics and facts are real now (Article Insights), so they are no longer "coming soon"
     expect(screen.queryByTestId('analysis-card-topics')).toBeNull()
-    expect(screen.getByTestId('analysis-card-comparison')).toBeDefined()
+    // Cross-source comparison is real now (Comparisons page)
+    expect(screen.queryByTestId('analysis-card-comparison')).toBeNull()
   })
 
   it('shows "Coming soon" badge in the Analysis section', async () => {

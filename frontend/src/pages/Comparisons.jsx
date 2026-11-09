@@ -6,6 +6,7 @@ import LoadingState from '../components/LoadingState'
 import AlertMessage from '../components/AlertMessage'
 import EmptyState from '../components/EmptyState'
 import ArticleMatchingSection from '../components/ArticleMatchingSection'
+import StoryComparison from '../components/StoryComparison'
 import { fetchArticles } from '../api/newsApi'
 
 // How many of the newest articles the picker lists (the backend sends at most 100)
@@ -14,7 +15,10 @@ const PICKER_ARTICLE_LIMIT = 100
 /**
  * Comparisons Page
  *
- * Primary interface for reviewing article matching pairs and classifications:
+ * 1. Compare coverage of a story: two articles of one story, from different
+ *    publishers when possible (headlines, framing, tone, shared and missing
+ *    names, facts, political coverage). See StoryComparison.
+ * 2. Pairwise matching:
  * - The backend stores matches per article, so the user first picks an article.
  * - Displays its matched pairs with SAME, RELATED, and DIFFERENT labels.
  * - "Run matching" classifies the article's nearest articles.
@@ -103,11 +107,15 @@ export function Comparisons() {
     <div className="page-comparisons" data-testid="page-comparisons">
       <PageHeader
         title="Comparisons"
-        description="Review pairwise semantic matches, compare coverage side-by-side, and inspect SAME, RELATED, or DIFFERENT event classifications."
-        badge={<StatusBadge variant="primary">Pairwise Matching</StatusBadge>}
+        description="Compare how two articles cover the same story, review pairwise semantic matches, and inspect SAME, RELATED, or DIFFERENT event classifications."
+        badge={<StatusBadge variant="primary">Cross-source</StatusBadge>}
       />
 
-      <Card title="Choose an article" subtitle="Matches are stored for one article at a time">
+      <div style={{ marginBottom: '1.5rem' }}>
+        <StoryComparison />
+      </div>
+
+      <Card title="Pairwise matching: choose an article" subtitle="Matches are stored for one article at a time">
         {renderPicker()}
       </Card>
 
