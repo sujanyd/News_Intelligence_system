@@ -14,7 +14,8 @@
 | Tone, headline framing, article framing signals (`GET /api/articles/{id}/tone-framing`) | ✅ **Implemented** by Person A (commit `b02dfbb`) and checked on 9 Nov 2026; used by **Tone and Framing** in the article details (see [Tone and framing analysis](#tone-and-framing-analysis)) |
 | Political entities and wording signals (`GET /api/articles/{id}/political-signals`) | ✅ **Implemented** by Person A (commit `ad097af`) and checked on 9 Nov 2026; used by **Political Analysis** in the article details and by the political coverage panel of a matched pair (see [Political analysis](#political-analysis)) |
 | RSS feeds (`GET /api/ingestion/feeds`), events list (`GET /api/events`) | ✅ Used since 9 Nov 2026: the feed list on the **Sources** page, and the event total on the **Dashboard** |
-| Totals, reports, comparisons list | ❌ **Not in the backend.** The frontend counts by reading the lists page by page, and builds reports and story comparisons in the browser from real data (see `docs/milestone-70/API_INTEGRATION_STATUS.md`) |
+| Comparisons (`/api/comparisons`), reports (`/api/reports`, `/reports/generate`), AI detection (`/api/articles/{id}/ai-detection`) | ✅ **Implemented** by Person A (`0701cfa`, `71ebed4`) and used since 10 Nov 2026 by **Comparisons**, **Reports** and the article's **AI Detection** section (see `docs/milestone-90/API_INTEGRATION_STATUS.md`) |
+| Totals (count routes), headline tone, fact matching | ❌ **Not in the backend.** Totals are counted by reading the lists page by page |
 
 **Real integration is operational.** The backend routes are fully functional and pass 36 unit/integration tests. Both `/api/...` and `/api/v1/...` prefixes are active.
 
