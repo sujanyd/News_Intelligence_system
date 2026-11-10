@@ -261,3 +261,4 @@ This document provides complete, canonical documentation for the REST API of the
 
 ### `GET /api/v1/events`
 - **Description**: Concrete real-world occurrences grouping articles from multiple publishers.
+

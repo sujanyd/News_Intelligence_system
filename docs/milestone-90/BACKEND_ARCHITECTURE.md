@@ -119,3 +119,4 @@ flowchart TD
 ### 11. Evidence-Based Reports (`app/services/report.py`)
 - Synthesizes comparative findings into comprehensive intelligence reports (`reports`).
 - Produces Markdown, HTML, and JSON outputs with verbatim citations, coverage tables, political signals, AI estimates, and explicit methodological limitations.
+

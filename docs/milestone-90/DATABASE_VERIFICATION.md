@@ -102,3 +102,4 @@ The system strictly enforces the 21-table normalized third-normal-form (3NF) rel
 - **URL**: `postgresql://[user]:[password]@[host]:5432/news_intelligence`
 - **Integrity**: Enforces cascading deletes, unique constraints, and check constraints (`ck_articles_content_availability`, `ck_ai_detection_results_likelihood_range`, `ck_comparison_evidences_char_range`).
 - **Connection Test**: Handled gracefully with fallback skips in test environments where local PG daemon is offline.
+

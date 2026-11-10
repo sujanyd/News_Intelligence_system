@@ -83,3 +83,4 @@ $$P_{final} = \text{clamp}(S_{raw}, 0.02, 0.95)$$
    Legal statutes or regulatory filings written by humans may naturally exhibit high uniformity and low lexical variety, potentially triggering false-positive AI flags. Human review is required before publishing such determinations.
 3. **Paraphrased / Hybrid Content**:
    Human journalists who edit LLM drafts or use automated grammar enhancement tools produce hybrid signals that cannot be definitively disentangled by statistical heuristics alone.
+

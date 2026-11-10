@@ -221,3 +221,4 @@ class TestAIDetectionEndpoints:
         response = client.get("/api/articles/999999/ai-detection")
         assert response.status_code == 404
         assert "999999" in response.json()["detail"]
+

@@ -78,3 +78,4 @@ class AnalyzeAIDetectionRequest(BaseModel):
         le=1.0,
         description="Likelihood threshold at which is_flagged_for_review is set to True",
     )
+

@@ -93,3 +93,4 @@ python -m app.workers.scheduler
 The backend exposes health and status endpoints:
 - `GET /health`: Basic liveness check returning `{"status": "ok"}`.
 - `GET /api/v1/system/status`: Detailed subsystem readiness (Database connectivity, Qdrant cluster status, queue latency).
+

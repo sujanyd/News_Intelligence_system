@@ -325,3 +325,4 @@ def get_ai_detection_service() -> AIDetectionService:
     if _ai_detection_service is None:
         _ai_detection_service = AIDetectionService()
     return _ai_detection_service
+
