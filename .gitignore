@@ -62,7 +62,9 @@ frontend/dist-ssr/
 frontend/.env.local
 frontend/.env.*.local
 
-# Local databases
+# Local databases and vector stores
 *.db
 *.sqlite
 *.sqlite3
+qdrant_data/
+*.qdrant/

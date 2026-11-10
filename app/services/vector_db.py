@@ -79,23 +79,37 @@ class VectorDatabaseService:
     def _init_client(self) -> Any:
         """
         Creates and returns a QdrantClient based on settings.
+        Supports:
+        - In-memory mode (':memory:')
+        - Persistent local directory storage (via settings.QDRANT_PATH or local path in settings.QDRANT_URL)
+        - Remote HTTP/gRPC server
         """
         if not QDRANT_AVAILABLE:
             raise RuntimeError(
                 "qdrant-client is not installed. Install via `pip install qdrant-client`."
             )
 
-        # Check if custom QDRANT_URL is provided (e.g., ':memory:' or cloud URL)
+        # Check if custom QDRANT_URL is provided (e.g., ':memory:' or remote cloud URL)
         if settings.QDRANT_URL:
             if settings.QDRANT_URL == ":memory:":
                 logger.info("Initializing in-memory Qdrant client for local testing/development.")
                 return QdrantClient(":memory:")
+            # If QDRANT_URL points to a local directory path
+            if settings.QDRANT_URL.startswith("./") or settings.QDRANT_URL.startswith("/"):
+                logger.info("Initializing persistent local file-backed Qdrant client at '%s'.", settings.QDRANT_URL)
+                return QdrantClient(path=settings.QDRANT_URL)
+
             return QdrantClient(
                 url=settings.QDRANT_URL,
                 api_key=settings.QDRANT_API_KEY if settings.QDRANT_API_KEY else None,
                 timeout=settings.QDRANT_TIMEOUT_SECONDS,
                 prefer_grpc=settings.QDRANT_PREFER_GRPC,
             )
+
+        # If QDRANT_PATH is specified and non-empty, use persistent local on-disk storage
+        if getattr(settings, "QDRANT_PATH", None):
+            logger.info("Initializing persistent local file-backed Qdrant client at '%s'.", settings.QDRANT_PATH)
+            return QdrantClient(path=settings.QDRANT_PATH)
 
         # Default host + port configuration
         return QdrantClient(
@@ -139,10 +153,11 @@ class VectorDatabaseService:
         dimensions: Optional[int] = None,
     ) -> bool:
         """
-        Verifies if collection exists in Qdrant; creates it if missing.
+        Verifies if collection exists in Qdrant with the expected dimensions;
+        creates it if missing, or recreates it if incompatible dimension detected.
 
         Returns:
-            True if created or already exists.
+            True if ready.
         """
         target_col = collection_name or self.collection_name
         target_dim = dimensions or self.dimensions
@@ -152,8 +167,28 @@ class VectorDatabaseService:
             existing_names = [c.name for c in collections]
 
             if target_col in existing_names:
-                logger.debug("Qdrant collection '%s' already exists.", target_col)
-                return True
+                # Verify existing collection dimensions
+                info = self._client.get_collection(target_col)
+                existing_dim = None
+                if hasattr(info, "config") and hasattr(info.config, "params"):
+                    vectors_config = getattr(info.config.params, "vectors", None)
+                    if hasattr(vectors_config, "size"):
+                        existing_dim = vectors_config.size
+                    elif isinstance(vectors_config, dict) and "" in vectors_config:
+                        existing_dim = getattr(vectors_config[""], "size", None)
+
+                if existing_dim and existing_dim != target_dim:
+                    logger.warning(
+                        "Dimension mismatch in Qdrant collection '%s': existing=%d, requested=%d. "
+                        "Recreating collection to prevent vector space contamination.",
+                        target_col,
+                        existing_dim,
+                        target_dim,
+                    )
+                    self._client.delete_collection(target_col)
+                else:
+                    logger.debug("Qdrant collection '%s' already exists with matching dimensions (%s).", target_col, existing_dim)
+                    return True
 
             distance = self._get_qdrant_distance()
             self._client.create_collection(

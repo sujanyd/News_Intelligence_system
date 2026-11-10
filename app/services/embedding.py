@@ -323,6 +323,99 @@ class GeminiEmbeddingProvider(BaseEmbeddingProvider):
 
 
 # =============================================================================
+# Local Sentence Transformers Provider
+# =============================================================================
+
+class SentenceTransformersProvider(BaseEmbeddingProvider):
+    """
+    Local neural embedding provider powered by sentence-transformers.
+    Produces high-fidelity dense semantic vectors using models like 'all-MiniLM-L6-v2'.
+    Runs entirely locally on CPU/GPU without external API keys or remote network calls.
+    """
+
+    _cached_models: dict = {}
+
+    def __init__(
+        self,
+        model_name: str = "all-MiniLM-L6-v2",
+        dimensions: Optional[int] = None,
+    ):
+        self._model_name = model_name
+        self._model = self._load_model(model_name)
+        # Determine actual model dimension dynamically
+        if hasattr(self._model, "get_embedding_dimension"):
+            test_dim = self._model.get_embedding_dimension()
+        elif hasattr(self._model, "get_sentence_embedding_dimension"):
+            test_dim = self._model.get_sentence_embedding_dimension()
+        else:
+            test_dim = None
+        self._dimensions = int(test_dim) if test_dim else (dimensions or 384)
+
+    @classmethod
+    def _load_model(cls, model_name: str):
+        if model_name not in cls._cached_models:
+            import os
+            # Prevent remote network poll retries when running offline or sandboxed
+            os.environ.setdefault("HF_HUB_OFFLINE", "1")
+            os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as exc:
+                raise RuntimeError(
+                    "sentence-transformers is not installed. "
+                    "Install via `pip install sentence-transformers`."
+                ) from exc
+            logger.info("Loading SentenceTransformer model '%s' (local cache)...", model_name)
+            try:
+                cls._cached_models[model_name] = SentenceTransformer(model_name, local_files_only=True)
+            except Exception:
+                # If local_files_only fails (first time download), fallback to standard load
+                cls._cached_models[model_name] = SentenceTransformer(model_name)
+        return cls._cached_models[model_name]
+
+    @property
+    def dimensions(self) -> int:
+        return self._dimensions
+
+    @property
+    def model_name(self) -> str:
+        return self._model_name
+
+    def embed_text(self, text: str) -> GeneratedVector:
+        if not text or not text.strip():
+            return GeneratedVector(
+                vector=[0.0] * self._dimensions,
+                dimensions=self._dimensions,
+                model_name=self._model_name,
+                provider="sentence-transformers",
+            )
+        vector = self._model.encode(text, normalize_embeddings=True)
+        return GeneratedVector(
+            vector=[round(float(x), 6) for x in vector],
+            dimensions=self._dimensions,
+            model_name=self._model_name,
+            provider="sentence-transformers",
+        )
+
+    def embed_batch(self, texts: List[str]) -> List[GeneratedVector]:
+        if not texts:
+            return []
+        cleaned = [t if t and t.strip() else "" for t in texts]
+        vectors = self._model.encode(cleaned, normalize_embeddings=True, show_progress_bar=False)
+        results = []
+        for vec in vectors:
+            results.append(
+                GeneratedVector(
+                    vector=[round(float(x), 6) for x in vec],
+                    dimensions=self._dimensions,
+                    model_name=self._model_name,
+                    provider="sentence-transformers",
+                )
+            )
+        return results
+
+
+# =============================================================================
 # Provider Factory
 # =============================================================================
 
@@ -340,7 +433,12 @@ def get_embedding_provider(
     selected_model = model_name or settings.EMBEDDING_MODEL_NAME
     selected_dims = dimensions or settings.EMBEDDING_DIMENSIONS
 
-    if selected_provider == "openai":
+    if selected_provider in ("sentence-transformers", "sentence_transformers", "local"):
+        return SentenceTransformersProvider(
+            model_name=selected_model,
+            dimensions=selected_dims,
+        )
+    elif selected_provider == "openai":
         return OpenAIEmbeddingProvider(
             api_key=api_key,
             model_name=selected_model,
@@ -358,13 +456,10 @@ def get_embedding_provider(
             dimensions=selected_dims,
         )
     else:
-        logger.warning(
-            "Unknown EMBEDDING_PROVIDER '%s'. Falling back to 'mock' deterministic provider.",
-            selected_provider,
-        )
-        return MockEmbeddingProvider(
-            model_name=selected_model,
-            dimensions=selected_dims,
+        raise ValueError(
+            f"Unsupported or unconfigured EMBEDDING_PROVIDER '{selected_provider}'. "
+            "Supported providers are 'sentence-transformers', 'openai', 'gemini', or 'mock' (test only). "
+            "Silent fallback to mock embeddings is prohibited to ensure semantic integrity."
         )
 
 

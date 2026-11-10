@@ -37,19 +37,20 @@ class Settings(BaseSettings):
     RSS_MAX_ARTICLES_PER_FEED: int = 30
 
     # Article Embedding Configuration
-    # Supported providers: 'mock', 'openai', 'gemini'
-    EMBEDDING_PROVIDER: str = "mock"
-    EMBEDDING_MODEL_NAME: str = "text-embedding-3-small"
-    EMBEDDING_DIMENSIONS: int = 1536
+    # Supported providers: 'sentence-transformers', 'openai', 'gemini', 'mock' (test only)
+    EMBEDDING_PROVIDER: str = "sentence-transformers"
+    EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
+    EMBEDDING_DIMENSIONS: int = 384
     EMBEDDING_API_KEY: str = ""
     EMBEDDING_BATCH_SIZE: int = 20
 
     # Vector Database Configuration (Qdrant)
-    # Mode: 'memory' for in-memory testing, or 'remote' for Docker/Cloud Qdrant server
+    # Mode: 'memory' for in-memory testing, path (e.g. './qdrant_storage') for local persistence, or remote host/port
     QDRANT_HOST: str = "localhost"
     QDRANT_PORT: int = 6333
     QDRANT_GRPC_PORT: int = 6334
-    QDRANT_URL: str = ""  # If set, used directly (e.g., http://localhost:6333 or cloud URL)
+    QDRANT_URL: str = ""  # If set, used directly (e.g., ':memory:', path to local storage directory, or http URL)
+    QDRANT_PATH: str = "./qdrant_data"  # Default directory for persistent local vector database
     QDRANT_API_KEY: str = ""
     QDRANT_COLLECTION_NAME: str = "article_embeddings"
     QDRANT_DISTANCE: str = "Cosine"  # Cosine, Dot, or Euclid
