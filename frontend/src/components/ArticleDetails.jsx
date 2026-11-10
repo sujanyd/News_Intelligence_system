@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import Card from './Card'
 import StatusBadge from './StatusBadge'
 import ContentAvailabilityBadge from './ContentAvailabilityBadge'
@@ -9,7 +9,9 @@ import SimilarArticlesSection from './SimilarArticlesSection'
 import ArticleInsightsSection from './ArticleInsightsSection'
 import PoliticalAnalysisSection from './PoliticalAnalysisSection'
 import ToneFramingSection from './ToneFramingSection'
-import { fetchArticle, fetchArticleEmbeddings } from '../api/newsApi'
+import AiDetectionSection from './AiDetectionSection'
+import { NavigationContext } from '../navigation'
+import { fetchArticle, fetchArticleEmbeddings, STORIES_AVAILABLE } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
 
 /**
@@ -18,14 +20,15 @@ import { formatDate } from '../utils/formatDate'
  * Loads one article from GET /api/articles/{id} and displays its full
  * information in clearly separated sections:
  *
- *   1. Article Information   – title, source, dates, URL
+ *   1. Article Information   – title, source, dates, URL, link to its event
  *   2. Article Content       – full text, summary, or headline-only notice
  *   3. Article Insights      – extracted topics, entities, facts and quotes
  *   4. Political Analysis    – political entities and how they are worded
- *   5. Processing Status     – lifecycle status from collection to embeddings
- *   6. Similar Articles      – semantically similar articles via vector search
- *   7. Source Information    – source name from the backend
- *   8. Analysis              – placeholder for future AI features
+ *   5. Tone and Framing      – tone, headline framing, framing signals
+ *   6. Processing Status     – lifecycle status from collection to embeddings
+ *   7. Similar Articles      – semantically similar articles via vector search
+ *   8. Source Information    – source name from the backend
+ *   9. AI Detection          – estimated likelihood of machine-generated text
  *
  * States handled: loading, API error, article-not-found (HTTP 404),
  * missing content (null / empty string), summary-only, headline-only.
@@ -40,6 +43,9 @@ import { formatDate } from '../utils/formatDate'
  * @param {(id: number) => void} [props.onSelectArticle] - Called when user navigates to an article
  */
 export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle }) {
+  // Opens other pages (null when rendered on its own, e.g. in a test)
+  const navigate = useContext(NavigationContext)
+
   // Navigation stack state
   const [activeArticleId, setActiveArticleId] = useState(articleId)
   const [history, setHistory] = useState([])
@@ -317,6 +323,24 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
               <span className="ad-url-missing">URL not available</span>
             )}
           </div>
+
+          {navigate && STORIES_AVAILABLE && (
+            <div className="ad-nav-row">
+              {article.event_id ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => navigate('stories', { name: 'event', eventId: article.event_id })}
+                >
+                  Open its event and story
+                </button>
+              ) : (
+                <span className="ad-url-missing">
+                  Not in a story yet: use &quot;Group articles&quot; on the Stories page.
+                </span>
+              )}
+            </div>
+          )}
         </section>
 
         {/* ── Section 2: Article Content ────────────────────────────────── */}
@@ -389,44 +413,12 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
           </p>
         </section>
 
-        {/* ── Section 9: Analysis (future features) ────────────────────── */}
-        <section
-          className="ad-section ad-analysis-section"
-          aria-labelledby="ad-section-analysis"
-          data-testid="analysis-section"
-        >
-          <h4 className="ad-section-title" id="ad-section-analysis">
-            Analysis
-            <StatusBadge variant="primary" className="ad-coming-soon">
-              Coming soon
-            </StatusBadge>
-          </h4>
-
-          <p className="ad-analysis-placeholder-msg">
-            Analysis has not been generated for this article yet.
-          </p>
-
-          <div className="ad-analysis-grid">
-            {[
-              {
-                id: 'ai-detection',
-                icon: '🤖',
-                title: 'AI-Generated Content Detection',
-                desc: 'Probability score and indicators that the article was written by an AI system.',
-              },
-            ].map((feature) => (
-              <div key={feature.id} className="ad-analysis-card" data-testid={`analysis-card-${feature.id}`}>
-                <span className="ad-analysis-icon" aria-hidden="true">
-                  {feature.icon}
-                </span>
-                <div>
-                  <p className="ad-analysis-card-title">{feature.title}</p>
-                  <p className="ad-analysis-card-desc">{feature.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        {/* ── Section 9: AI Detection ──────────────────────────────────── */}
+        <AiDetectionSection
+          key={`ai-${activeArticleId}`}
+          articleId={activeArticleId}
+          contentAvailability={article.content_availability}
+        />
       </>
     )
   }

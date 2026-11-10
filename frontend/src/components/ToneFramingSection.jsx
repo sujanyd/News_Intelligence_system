@@ -119,6 +119,10 @@ export function ToneFramingSection({ articleId, contentAvailability = null }) {
             <dt>Confidence</dt>
             <dd>{formatPercent(tone.confidence)}</dd>
           </div>
+          <div>
+            <dt>Headline tone</dt>
+            <dd>Not measured on its own: the backend gives one tone for the headline and text together</dd>
+          </div>
         </dl>
         {tone.explanation && <p className="pol-explanation">Why: {tone.explanation}</p>}
       </div>

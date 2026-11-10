@@ -723,3 +723,134 @@ export function toFeed(raw) {
     feed_url: toText(raw.feed_url),
   }
 }
+
+// ---------------------------------------------------------------------------
+// Comparisons, reports and AI detection (backend 90% milestone)
+// ---------------------------------------------------------------------------
+
+/**
+ * Checks one comparison in GET /comparisons (without its details).
+ * Required: id and title.
+ */
+export function toComparisonSummary(raw) {
+  if (!isObject(raw) || !Number.isInteger(raw.id) || !toText(raw.title)) {
+    throw new ApiError('The backend sent a comparison in an unexpected format.')
+  }
+  return {
+    id: raw.id,
+    event_id: Number.isInteger(raw.event_id) ? raw.event_id : null,
+    title: toText(raw.title),
+    description: toText(raw.description),
+    status: toText(raw.status),
+    article_count: toCount(raw.article_count),
+    created_at: toText(raw.created_at),
+  }
+}
+
+/**
+ * Checks one comparison with its details (GET /comparisons/{id}).
+ *
+ * Left out on purpose: political_signals (political_leaning and slant_score
+ * come from a fixed table of party positions; one article does not show a
+ * publisher's politics). The frontend loads each article's own political
+ * analysis instead.
+ *
+ * coverage_score is kept but renamed text_length_score: the backend
+ * computes it only from the length of the article text.
+ */
+export function toComparison(raw) {
+  const summary = toComparisonSummary(raw)
+  const coverages = keepValid(raw.coverages, (coverage) => Number.isInteger(coverage.article_id)).map(
+    (coverage) => ({
+      id: coverage.id,
+      article_id: coverage.article_id,
+      article_title: toText(coverage.article_title),
+      source_name: toText(coverage.source_name),
+      text_length_score: toScore(coverage.coverage_score),
+      tone_score: toValence(coverage.tone_score),
+      primary_frame: toText(coverage.primary_frame),
+      // The backend writes this sentence when nothing is missing
+      omitted_topics:
+        toText(coverage.omitted_topics) === 'No major omissions relative to peers.'
+          ? null
+          : toText(coverage.omitted_topics),
+    })
+  )
+  const evidences = keepValid(raw.evidences, (evidence) => toText(evidence.content)).map((evidence) => ({
+    id: evidence.id,
+    article_id: Number.isInteger(evidence.article_id) ? evidence.article_id : null,
+    evidence_type: toText(evidence.evidence_type),
+    claim_or_topic: toText(evidence.claim_or_topic),
+    content: toText(evidence.content),
+  }))
+  return {
+    ...summary,
+    articles: toArticleArray(raw.articles),
+    coverages,
+    evidences,
+    synthesis_summary: toText(raw.synthesis_summary),
+  }
+}
+
+export const REPORT_FORMATS = ['markdown', 'html', 'json']
+
+/**
+ * Checks one saved report (GET /reports, GET /reports/{id}).
+ * Required: id, comparison_id, title and content.
+ */
+export function toReport(raw) {
+  if (
+    !isObject(raw) ||
+    !Number.isInteger(raw.id) ||
+    !Number.isInteger(raw.comparison_id) ||
+    !toText(raw.title) ||
+    typeof raw.content !== 'string'
+  ) {
+    throw new ApiError('The backend sent a report in an unexpected format.')
+  }
+  return {
+    id: raw.id,
+    comparison_id: raw.comparison_id,
+    title: toText(raw.title),
+    summary: toText(raw.summary),
+    content: raw.content,
+    report_format: oneOf(raw.report_format, REPORT_FORMATS, 'markdown'),
+    created_at: toText(raw.created_at),
+  }
+}
+
+/**
+ * Checks the AI detection estimate of one article
+ * (GET /articles/{id}/ai-detection).
+ * Required: article_id and ai_likelihood between 0 and 1.
+ *
+ * too_little_text is true when the backend did not have enough text: it then
+ * sends a fixed likelihood (0.05) that is a default, not a measurement.
+ */
+export function toAiDetection(raw) {
+  if (!isObject(raw) || !Number.isInteger(raw.article_id) || toScore(raw.ai_likelihood) === null) {
+    throw new ApiError('The backend sent the AI detection result in an unexpected format.')
+  }
+  const metrics = isObject(raw.metrics) ? raw.metrics : null
+  const number = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : null)
+  return {
+    article_id: raw.article_id,
+    ai_likelihood: raw.ai_likelihood,
+    confidence: toScore(raw.confidence_score),
+    model_name: toText(raw.model_name),
+    model_version: toText(raw.model_version),
+    is_flagged_for_review: raw.is_flagged_for_review === true,
+    interpretation: toText(raw.interpretation),
+    limitations: toText(raw.limitations),
+    created_at: toText(raw.created_at),
+    too_little_text: metrics !== null && metrics.sentence_count === 0,
+    metrics: metrics && {
+      burstiness: number(metrics.burstiness_score),
+      lexical_uniformity: number(metrics.lexical_uniformity),
+      sentence_count: Number.isInteger(metrics.sentence_count) ? metrics.sentence_count : null,
+      average_sentence_length: number(metrics.average_sentence_length),
+      repetition_index: number(metrics.repetition_index),
+      methodology: toText(metrics.methodology),
+    },
+  }
+}

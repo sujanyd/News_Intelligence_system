@@ -14,6 +14,8 @@ import StatusBadge from './StatusBadge'
  * @param {string} [props.helperText] - Subtext explaining pipeline integration
  * @param {React.ReactNode} [props.icon] - Icon representing metric
  * @param {boolean} [props.isPlaceholder=true] - Marks card with a placeholder pill
+ * @param {string} [props.actionLabel] - Text of an optional button, e.g. "Open Reports"
+ * @param {() => void} [props.onAction] - What the button does
  */
 export function MetricCard({
   title,
@@ -22,6 +24,8 @@ export function MetricCard({
   helperText,
   icon,
   isPlaceholder = true,
+  actionLabel,
+  onAction,
 }) {
   return (
     <div className="card metric-card">
@@ -43,6 +47,11 @@ export function MetricCard({
         )}
         {helperText && <span className="metric-helper-text">{helperText}</span>}
       </div>
+      {actionLabel && onAction && (
+        <button type="button" className="btn btn-secondary metric-card-action" onClick={onAction}>
+          {actionLabel}
+        </button>
+      )}
     </div>
   )
 }

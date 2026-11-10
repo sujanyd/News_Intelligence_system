@@ -309,7 +309,7 @@
 /* Metric Cards Grid */
 .grid-metrics {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1.25rem;
   margin-bottom: 2rem;
 }
@@ -3131,4 +3131,89 @@
   .cmp-pickers {
     grid-template-columns: 1fr;
   }
+}
+
+/* ==========================================================
+   Milestone 90: AI detection, saved comparisons and reports
+   ========================================================== */
+
+.metric-card-action {
+  margin-top: 0.75rem;
+  align-self: flex-start;
+}
+
+.ad-nav-row {
+  margin-top: 0.75rem;
+}
+
+.aid-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.aid-bar {
+  position: relative;
+  height: 0.5rem;
+  max-width: 22rem;
+  margin: 0.5rem 0;
+  border-radius: 999px;
+  background-color: var(--color-border);
+  overflow: hidden;
+}
+
+.aid-bar-fill {
+  display: block;
+  height: 100%;
+  background-color: var(--color-warning);
+}
+
+.cmp-save-row,
+.cmp-report-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 1rem 0;
+}
+
+.cmp-report-row .form-input {
+  width: auto;
+  min-width: 10rem;
+  max-width: 100%;
+}
+
+.cmp-article-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.cmp-article-list > li {
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+
+.cmp-article-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.rep-raw {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  max-height: 24rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.8125rem;
+  background-color: rgba(31, 41, 55, 0.35);
+  border-radius: var(--radius-md);
 }

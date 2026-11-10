@@ -18,11 +18,16 @@ import { STORIES_AVAILABLE } from '../api/newsApi'
  *   { name: 'story', storyId: 4 }     -> one story with its events and articles
  *   { name: 'event', eventId: 12 }    -> one event with its articles
  *
+ * @param {Object} props
+ * @param {{ name: string, storyId?: number, eventId?: number } | null} [props.initialView]
+ *   the view to open first (for example an article's event)
+ *
  * Stories only come from the real backend. In mock mode the page says so
  * instead of showing made-up stories.
  */
-export function Stories() {
-  const [view, setView] = useState({ name: 'list' })
+export function Stories({ initialView = null }) {
+  // Another page can open a story or an event directly (see navigation.js)
+  const [view, setView] = useState(initialView || { name: 'list' })
 
   // Change the view and jump to the top, where the new view starts
   function goTo(newView) {

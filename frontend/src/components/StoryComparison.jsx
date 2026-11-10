@@ -6,6 +6,8 @@ import EmptyState from './EmptyState'
 import StatusBadge from './StatusBadge'
 import PoliticalCoverageComparison from './PoliticalCoverageComparison'
 import {
+  COMPARISONS_AVAILABLE,
+  createComparison,
   fetchAllStories,
   fetchArticleAnalyses,
   fetchStory,
@@ -132,8 +134,14 @@ function FactColumn({ article, letter, insights, error }) {
  * Data: GET /stories (all pages), GET /stories/{id}, and for each of the two
  * articles GET /extraction, /tone-framing and /political-signals.
  * Everything is real backend data; this component only lines it up.
+ *
+ * "Save" stores the comparison in the backend (POST /comparisons), so it can
+ * be opened again and turned into a report.
+ *
+ * @param {Object} props
+ * @param {(comparisonId: number) => void} [props.onSaved] - open the saved comparison
  */
-export function StoryComparison() {
+export function StoryComparison({ onSaved = null }) {
   const [stories, setStories] = useState([])
   const [isLoadingStories, setIsLoadingStories] = useState(STORIES_AVAILABLE)
   const [storiesError, setStoriesError] = useState('')
@@ -146,6 +154,9 @@ export function StoryComparison() {
 
   // The analyses of the two articles, with the pair they belong to
   const [comparison, setComparison] = useState(null) // { pairKey, a, b }
+
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   // 1. The stories that have 2 or more articles
   useEffect(() => {
@@ -212,6 +223,26 @@ export function StoryComparison() {
     setStoryError('')
     setComparison(null)
     setPairIds(['', ''])
+  }
+
+  async function handleSave(articleIds) {
+    setIsSaving(true)
+    setSaveError('')
+    try {
+      const publishers = [...new Set(story.articles
+        .filter((article) => articleIds.includes(article.id))
+        .map((article) => article.source_name || 'Unknown publisher'))]
+      const saved = await createComparison({
+        title: story.title,
+        description: `${articleIds.length} articles of story #${story.id} (${publishers.join(', ')})`,
+        articleIds,
+      })
+      if (onSaved) onSaved(saved.id)
+    } catch (error) {
+      setSaveError(error.message)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   function handleArticleChange(side, value) {
@@ -366,6 +397,30 @@ export function StoryComparison() {
             message={`Both articles are from ${articleA.source_name || 'the same publisher'}, so this compares two articles of one publisher, not two publishers.`}
           />
         )}
+        {COMPARISONS_AVAILABLE && (
+          <div className="cmp-save-row">
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={isSaving || idA === idB}
+              onClick={() => handleSave([Number(idA), Number(idB)])}
+            >
+              {isSaving ? 'Saving...' : 'Save these two as a comparison'}
+            </button>
+            {story.articles.length > 2 && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={isSaving}
+                onClick={() => handleSave(story.articles.map((article) => article.id))}
+              >
+                Save all {story.articles.length} articles as a comparison
+              </button>
+            )}
+            <span className="pol-technique">Saved comparisons can be opened again and turned into reports.</span>
+          </div>
+        )}
+        {saveError && <AlertMessage type="error" title="Could not save the comparison." message={saveError} />}
         {body}
         {idA !== idB && <PoliticalCoverageComparison key={`${idA}-${idB}`} articleA={articleA} articleB={articleB} />}
       </>

@@ -7,6 +7,8 @@ import AlertMessage from '../components/AlertMessage'
 import EmptyState from '../components/EmptyState'
 import ArticleMatchingSection from '../components/ArticleMatchingSection'
 import StoryComparison from '../components/StoryComparison'
+import SavedComparisonList from '../components/SavedComparisonList'
+import ComparisonView from '../components/ComparisonView'
 import { fetchArticles } from '../api/newsApi'
 
 // How many of the newest articles the picker lists (the backend sends at most 100)
@@ -15,6 +17,8 @@ const PICKER_ARTICLE_LIMIT = 100
 /**
  * Comparisons Page
  *
+ * 0. Saved comparisons (backend): list them and open one (ComparisonView),
+ *    which can also generate a report.
  * 1. Compare coverage of a story: two articles of one story, from different
  *    publishers when possible (headlines, framing, tone, shared and missing
  *    names, facts, political coverage). See StoryComparison.
@@ -23,8 +27,14 @@ const PICKER_ARTICLE_LIMIT = 100
  * - Displays its matched pairs with SAME, RELATED, and DIFFERENT labels.
  * - "Run matching" classifies the article's nearest articles.
  * - Allows side-by-side inspection of paired articles.
+ *
+ * @param {Object} props
+ * @param {number} [props.initialComparisonId] - open this saved comparison first
  */
-export function Comparisons() {
+export function Comparisons({ initialComparisonId = null }) {
+  // A saved comparison that is open (null = the page's normal view)
+  const [openComparisonId, setOpenComparisonId] = useState(initialComparisonId)
+
   const [articles, setArticles] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -53,6 +63,11 @@ export function Comparisons() {
     setIsLoading(true)
     setErrorMessage('')
     setReloadCount(reloadCount + 1)
+  }
+
+  function openComparison(comparisonId) {
+    setOpenComparisonId(comparisonId)
+    window.scrollTo(0, 0)
   }
 
   function renderPicker() {
@@ -107,25 +122,41 @@ export function Comparisons() {
     <div className="page-comparisons" data-testid="page-comparisons">
       <PageHeader
         title="Comparisons"
-        description="Compare how two articles cover the same story, review pairwise semantic matches, and inspect SAME, RELATED, or DIFFERENT event classifications."
+        description="Open saved comparisons, compare how articles cover the same story, review pairwise semantic matches, and inspect SAME, RELATED, or DIFFERENT event classifications."
         badge={<StatusBadge variant="primary">Cross-source</StatusBadge>}
       />
 
-      <div style={{ marginBottom: '1.5rem' }}>
-        <StoryComparison />
-      </div>
+      {openComparisonId !== null ? (
+        <Card title="Comparison">
+          <ComparisonView
+            key={openComparisonId}
+            comparisonId={openComparisonId}
+            onBack={() => setOpenComparisonId(null)}
+          />
+        </Card>
+      ) : (
+        <>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <SavedComparisonList onOpen={openComparison} />
+          </div>
 
-      <Card title="Pairwise matching: choose an article" subtitle="Matches are stored for one article at a time">
-        {renderPicker()}
-      </Card>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <StoryComparison onSaved={openComparison} />
+          </div>
 
-      <div style={{ marginTop: '1.5rem' }}>
-        <ArticleMatchingSection
-          key={selectedArticleId || 'none'}
-          articleId={selectedArticleId || undefined}
-          title="Pairwise Matching & Classification Results"
-        />
-      </div>
+          <Card title="Pairwise matching: choose an article" subtitle="Matches are stored for one article at a time">
+            {renderPicker()}
+          </Card>
+
+          <div style={{ marginTop: '1.5rem' }}>
+            <ArticleMatchingSection
+              key={selectedArticleId || 'none'}
+              articleId={selectedArticleId || undefined}
+              title="Pairwise Matching & Classification Results"
+            />
+          </div>
+        </>
+      )}
     </div>
   )
 }

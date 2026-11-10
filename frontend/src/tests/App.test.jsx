@@ -20,14 +20,14 @@ describe('News Bias and Framing Analysis System - Dashboard & Navigation Tests',
     expect(container.querySelector('#nav-reports')).toBeDefined()
   })
 
-  it('renders the 4 metric cards on Dashboard', async () => {
+  it('renders the metric cards on Dashboard', async () => {
     render(<App />)
     expect(screen.getByText('Total articles')).toBeDefined()
     expect(screen.getByText('News sources')).toBeDefined()
     expect(screen.getByText('Stories and events')).toBeDefined()
     expect(screen.getByText('Comparable stories')).toBeDefined()
     // Mock mode: stories need the real backend, so their cards say so
-    expect((await screen.findAllByText('Needs the real backend')).length).toBe(2)
+    expect((await screen.findAllByText('Needs the real backend')).length).toBe(4)
   })
 
   it('renders the recent articles section with articles from the API', async () => {

@@ -12,12 +12,15 @@ import ArticleDetails from '../components/ArticleDetails'
 import IngestionPanel from '../components/IngestionPanel'
 import DataModeBadge from '../components/DataModeBadge'
 import {
+  COMPARISONS_AVAILABLE,
   INGESTION_AVAILABLE,
   STORIES_AVAILABLE,
   USE_MOCK_DATA,
   checkBackendHealth,
   countArticles,
   countEvents,
+  fetchAllComparisons,
+  fetchAllReports,
   fetchAllStories,
   fetchArticles,
   fetchSources,
@@ -33,6 +36,11 @@ const RECENT_ARTICLES_COUNT = 5
 function formatCount(result) {
   if (!result) return '--'
   return result.isComplete ? String(result.count) : `${result.count}+`
+}
+
+// { items, isComplete } -> { count, isComplete }, or null
+function listCount(list) {
+  return list && { count: list.items.length, isComplete: list.isComplete }
 }
 
 // The value of one settled request, or null when it failed
@@ -69,7 +77,7 @@ export function Dashboard({ onNavigate }) {
 
   // Totals for the metric cards. The backend has no count route, so the
   // lists are read page by page (see readAllPages in newsApi.js).
-  const [totals, setTotals] = useState(null) // { articles, stories, events, comparable }
+  const [totals, setTotals] = useState(null) // { articles, stories, events, comparable, comparisons, reports }
   const [totalsError, setTotalsError] = useState('')
   const [totalsReloadCount, setTotalsReloadCount] = useState(0)
 
@@ -79,11 +87,12 @@ export function Dashboard({ onNavigate }) {
       countArticles(),
       STORIES_AVAILABLE ? fetchAllStories() : Promise.resolve(null),
       STORIES_AVAILABLE ? countEvents() : Promise.resolve(null),
-    ]).then(([articleResult, storyResult, eventResult]) => {
+      COMPARISONS_AVAILABLE ? fetchAllComparisons() : Promise.resolve(null),
+      COMPARISONS_AVAILABLE ? fetchAllReports() : Promise.resolve(null),
+    ]).then((results) => {
       if (!isCurrentRequest) return
-      const failed = [articleResult, storyResult, eventResult].find(
-        (result) => result.status === 'rejected'
-      )
+      const [articleResult, storyResult, eventResult, comparisonResult, reportResult] = results
+      const failed = results.find((result) => result.status === 'rejected')
       setTotalsError(failed ? failed.reason.message : '')
       const stories = settledValue(storyResult)
       setTotals({
@@ -95,6 +104,8 @@ export function Dashboard({ onNavigate }) {
           count: stories.items.filter((story) => story.article_count >= 2).length,
           isComplete: stories.isComplete,
         },
+        comparisons: listCount(settledValue(comparisonResult)),
+        reports: listCount(settledValue(reportResult)),
       })
     })
     return () => {
@@ -320,7 +331,7 @@ export function Dashboard({ onNavigate }) {
         </div>
       )}
 
-      {/* 4 Metric Cards (Total articles, News sources, Stories and events, Comparable stories) */}
+      {/* Metric cards: articles, sources, stories and events, comparable stories, comparisons, reports */}
       {totalsError && (
         <AlertMessage
           type="warning"
@@ -407,6 +418,42 @@ export function Dashboard({ onNavigate }) {
               <path d="m3 21 7-7" />
             </svg>
           }
+        />
+
+        <MetricCard
+          title="Saved comparisons"
+          value={formatCount(totals?.comparisons)}
+          subtitle="Cross-source comparisons"
+          helperText={
+            !COMPARISONS_AVAILABLE
+              ? 'Needs the real backend'
+              : totals?.comparisons
+              ? 'Saved in the backend'
+              : totals
+              ? 'Could not count'
+              : 'Counting...'
+          }
+          isPlaceholder={!totals?.comparisons}
+          actionLabel={onNavigate ? 'Open Comparisons' : undefined}
+          onAction={() => openPage('comparisons')}
+        />
+
+        <MetricCard
+          title="Generated reports"
+          value={formatCount(totals?.reports)}
+          subtitle="Evidence-based reports"
+          helperText={
+            !COMPARISONS_AVAILABLE
+              ? 'Needs the real backend'
+              : totals?.reports
+              ? 'Saved in the backend'
+              : totals
+              ? 'Could not count'
+              : 'Counting...'
+          }
+          isPlaceholder={!totals?.reports}
+          actionLabel={onNavigate ? 'Open Reports' : undefined}
+          onAction={() => openPage('reports')}
         />
       </section>
 

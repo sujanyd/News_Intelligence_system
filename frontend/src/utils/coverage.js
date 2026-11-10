@@ -78,26 +78,27 @@ export function groupFrames(items) {
 }
 
 /**
- * Which articles name each entity (person, organization, place...).
+ * Which articles name each item of a list (entities or topics).
  * Only articles whose insights loaded are counted.
  *
  * @param {Array<{ article, analyses }>} items
+ * @param {'entities' | 'topics'} listName - which insights list to use
  * @returns {{ analysedCount: number,
  *   inAll: Array<{ name, type, articles }>,
  *   inSome: Array<{ name, type, articles }> }}
  *   inAll: named by every analysed article (needs 2 or more)
  *   inSome: named by some, but not all (most named first)
  */
-export function entityCoverage(items) {
+export function nameCoverage(items, listName) {
   const analysed = items.filter(({ analyses }) => analyses?.insights)
   const byName = new Map()
   for (const { article, analyses } of analysed) {
     const seen = new Set()
-    for (const entity of analyses.insights.entities) {
-      const key = nameKey(entity.name)
+    for (const entry of analyses.insights[listName]) {
+      const key = nameKey(entry.name)
       if (seen.has(key)) continue
       seen.add(key)
-      if (!byName.has(key)) byName.set(key, { name: entity.name, type: entity.type, articles: [] })
+      if (!byName.has(key)) byName.set(key, { name: entry.name, type: entry.type || null, articles: [] })
       byName.get(key).articles.push(article)
     }
   }
@@ -108,6 +109,11 @@ export function entityCoverage(items) {
     inAll: all.filter(everyArticle),
     inSome: all.filter((row) => !everyArticle(row)),
   }
+}
+
+// People, organizations, places...
+export function entityCoverage(items) {
+  return nameCoverage(items, 'entities')
 }
 
 /**

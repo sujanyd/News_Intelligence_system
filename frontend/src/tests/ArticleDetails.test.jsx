@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import React from 'react'
 import ArticleDetails from '../components/ArticleDetails'
+import { NavigationContext } from '../navigation'
 import { fetchArticle } from '../api/newsApi'
 import { ApiError } from '../api/client'
 
@@ -21,6 +22,8 @@ vi.mock('../api/newsApi', async (importOriginal) => {
   const realModule = await importOriginal()
   return {
     ...realModule,
+    // The "Open its event" button needs stories (real backend only)
+    STORIES_AVAILABLE: true,
     fetchArticle: vi.fn(),
   }
 })
@@ -277,35 +280,42 @@ describe('ArticleDetails component', () => {
     expect(screen.getByText('Article Information')).toBeDefined()
     expect(screen.getByText('Article Content')).toBeDefined()
     expect(screen.getByText('Source Information')).toBeDefined()
-    expect(screen.getByText('Analysis')).toBeDefined()
+    expect(screen.getByText('AI Detection')).toBeDefined()
   })
 
-  // ── Analysis placeholder ──────────────────────────────────────────────────
-  it('shows the analysis placeholder message and the future feature cards', async () => {
+  // ── AI Detection (replaces the old "Coming soon" placeholder) ─────────────
+  it('shows the AI Detection section and no "Coming soon" placeholder', async () => {
     render(<ArticleDetails {...DEFAULT_PROPS} />)
     await screen.findByText('City council approves new budget for public transport')
 
-    const analysisSection = screen.getByTestId('analysis-section')
-    expect(
-      within(analysisSection).getByText(
-        'Analysis has not been generated for this article yet.'
-      )
-    ).toBeDefined()
-
-    expect(screen.getByTestId('analysis-card-ai-detection')).toBeDefined()
-    // Tone and framing are real now (Tone and Framing section)
-    expect(screen.queryByTestId('analysis-card-tone')).toBeNull()
-    expect(screen.queryByTestId('analysis-card-framing')).toBeNull()
-    // Topics and facts are real now (Article Insights), so they are no longer "coming soon"
-    expect(screen.queryByTestId('analysis-card-topics')).toBeNull()
-    // Cross-source comparison is real now (Comparisons page)
-    expect(screen.queryByTestId('analysis-card-comparison')).toBeNull()
+    const aiSection = screen.getByTestId('ai-detection-section')
+    // Mock mode: AI detection needs the real backend, so it says so
+    expect(within(aiSection).getByText('AI detection needs the real backend.')).toBeDefined()
+    expect(screen.queryByText('Coming soon')).toBeNull()
+    expect(screen.queryByTestId('analysis-section')).toBeNull()
   })
 
-  it('shows "Coming soon" badge in the Analysis section', async () => {
-    render(<ArticleDetails {...DEFAULT_PROPS} />)
-    await screen.findByText('City council approves new budget for public transport')
-    expect(screen.getByText('Coming soon')).toBeDefined()
+  // ── Link to the article's event ──────────────────────────────────────────
+  it("opens the article's event on the Stories page", async () => {
+    fetchArticle.mockResolvedValueOnce({ ...ARTICLE_FULL, event_id: 12 })
+    const navigate = vi.fn()
+    render(
+      <NavigationContext.Provider value={navigate}>
+        <ArticleDetails {...DEFAULT_PROPS} />
+      </NavigationContext.Provider>
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Open its event and story' }))
+    expect(navigate).toHaveBeenCalledWith('stories', { name: 'event', eventId: 12 })
+  })
+
+  it('says when the article is not in a story yet', async () => {
+    fetchArticle.mockResolvedValueOnce({ ...ARTICLE_FULL, event_id: null })
+    render(
+      <NavigationContext.Provider value={vi.fn()}>
+        <ArticleDetails {...DEFAULT_PROPS} />
+      </NavigationContext.Provider>
+    )
+    expect(await screen.findByText(/Not in a story yet/)).toBeDefined()
   })
 
   // ── Source Information section ────────────────────────────────────────────
@@ -334,7 +344,7 @@ describe('ArticleDetails component', () => {
 
     expect(screen.queryByText('Article Information')).toBeNull()
     expect(screen.queryByText('Article Content')).toBeNull()
-    expect(screen.queryByTestId('analysis-section')).toBeNull()
+    expect(screen.queryByTestId('ai-detection-section')).toBeNull()
   })
 
   // ── Sections absent on 404 ────────────────────────────────────────────────
@@ -344,7 +354,7 @@ describe('ArticleDetails component', () => {
     await screen.findByText('Article not found.')
 
     expect(screen.queryByText('Article Information')).toBeNull()
-    expect(screen.queryByTestId('analysis-section')).toBeNull()
+    expect(screen.queryByTestId('ai-detection-section')).toBeNull()
   })
 
   // ── Source fallback from prop ─────────────────────────────────────────────

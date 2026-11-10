@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import LoadingState from './LoadingState'
 import AlertMessage from './AlertMessage'
-import EmptyState from './EmptyState'
 import DataTable from './DataTable'
 import StatusBadge from './StatusBadge'
 import { PrecisionBadge, TimeAgreementBadge } from './EventTimeInfo'
-import { fetchArticleAnalyses, fetchStory } from '../api/newsApi'
+import { fetchArticleAnalyses } from '../api/newsApi'
 import {
   dateRangeOf,
-  entityCoverage,
   groupFrames,
+  nameCoverage,
   publishersOf,
   REPORT_ARTICLE_LIMIT,
 } from '../utils/coverage'
@@ -26,6 +25,10 @@ function articleName(article) {
 
 function sourceList(articles) {
   return [...new Set(articles.map((article) => article.source_name || 'Unknown publisher'))].join(', ')
+}
+
+function plural(count, word) {
+  return `${count} ${count === 1 ? word : `${word}s`}`
 }
 
 /**
@@ -73,13 +76,14 @@ function ArticleEvidence({ article, analyses }) {
         <p className="ai-none">Not loaded: {errors.political}</p>
       )}
 
-      <p className="pol-evidence-label">Facts</p>
+      <p className="pol-evidence-label">Quotes</p>
       {insights ? (
-        insights.facts.length > 0 ? (
+        insights.quotes.length > 0 ? (
           <ul className="rep-evidence-list">
-            {insights.facts.map((fact) => (
-              <li key={fact.id}>
-                <blockquote className="pol-evidence">“{fact.statement}”</blockquote>
+            {insights.quotes.map((quote) => (
+              <li key={quote.id}>
+                <blockquote className="pol-evidence">“{quote.text}”</blockquote>
+                <span className="pol-explanation">— {quote.speaker_name || 'Speaker not identified'}</span>
               </li>
             ))}
           </ul>
@@ -103,106 +107,101 @@ function ArticleEvidence({ article, analyses }) {
 }
 
 /**
- * StoryReport Component
+ * Names in every article, and names in only some of them.
+ */
+function NameCoverageBlock({ title, coverage, describe }) {
+  return (
+    <section className="ad-section">
+      <h4 className="ad-section-title">{title}</h4>
+      {coverage.analysedCount < 2 ? (
+        <p className="ai-none">Needs the insights of at least two articles.</p>
+      ) : (
+        <dl className="details-list details-list-wide">
+          <div>
+            <dt>In every analysed article</dt>
+            <dd>{coverage.inAll.length > 0 ? coverage.inAll.map(describe).join(', ') : 'None'}</dd>
+          </div>
+          <div>
+            <dt>In only some articles</dt>
+            <dd>
+              {coverage.inSome.length > 0 ? (
+                <ul className="rep-gap-list">
+                  {coverage.inSome.slice(0, 15).map((row) => (
+                    <li key={row.name}>
+                      {describe(row)}: {sourceList(row.articles)}
+                    </li>
+                  ))}
+                  {coverage.inSome.length > 15 && <li>and {coverage.inSome.length - 15} more</li>}
+                </ul>
+              ) : (
+                'None'
+              )}
+            </dd>
+          </div>
+        </dl>
+      )}
+    </section>
+  )
+}
+
+/**
+ * CoverageAnalysis Component
  *
- * An evidence-based report about one story, built in the browser from real
- * backend data (the backend has no report route):
- *   GET /stories/{id}, then for each article (up to REPORT_ARTICLE_LIMIT)
- *   GET /extraction, /tone-framing and /political-signals.
+ * Lines up the analyses of several articles about the same news: used inside
+ * a saved comparison and a saved report. For each article (up to
+ * REPORT_ARTICLE_LIMIT) it loads, one after the other,
+ * GET /extraction, /tone-framing and /political-signals.
  *
- * Sections: summary, events, publishers, coverage by article, framing and
- * tone differences, shared and missing coverage, evidence, limitations.
+ * Sections: summary, events, publishers, coverage by article, framing
+ * differences, people/places and topics in every or only some articles,
+ * facts by article, political entities, evidence, limitations.
  * Nothing is added: every number is a count of backend results.
  *
  * @param {Object} props
- * @param {number} props.storyId
- * @param {() => void} props.onBack
+ * @param {Array} props.articles - the articles (from the comparison)
+ * @param {Array} [props.events] - their events, when known
+ * @param {string[]} [props.extraLimitations] - more limitation lines
  */
-export function StoryReport({ storyId, onBack }) {
-  const [story, setStory] = useState(null)
+export function CoverageAnalysis({ articles, events = [], extraLimitations = [] }) {
   const [items, setItems] = useState([]) // [{ article, analyses }]
-  const [builtAt, setBuiltAt] = useState(null) // when the report was put together
-  const [progress, setProgress] = useState(0) // articles analysed so far
+  const [progress, setProgress] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
-  const [errorMessage, setErrorMessage] = useState('')
-  const [reloadCount, setReloadCount] = useState(0)
 
   useEffect(() => {
     let isCurrentRequest = true
     async function load() {
-      const result = await fetchStory(storyId)
-      if (!isCurrentRequest) return
-      setStory(result)
       const loaded = []
-      // One article after the other, so the backend is not flooded
-      for (const article of result.articles.slice(0, REPORT_ARTICLE_LIMIT)) {
+      // One article after the other, so the backend is not flooded.
+      // fetchArticleAnalyses never fails: a failed analysis comes back as null.
+      for (const article of articles.slice(0, REPORT_ARTICLE_LIMIT)) {
         const analyses = await fetchArticleAnalyses(article.id)
         if (!isCurrentRequest) return
         loaded.push({ article, analyses })
         setProgress(loaded.length)
       }
       setItems(loaded)
-      setBuiltAt(new Date().toISOString())
+      setIsLoading(false)
     }
     load()
-      .catch((error) => {
-        if (isCurrentRequest) setErrorMessage(error.message)
-      })
-      .finally(() => {
-        if (isCurrentRequest) setIsLoading(false)
-      })
     return () => {
       isCurrentRequest = false
     }
-  }, [storyId, reloadCount])
+  }, [articles])
 
-  function handleRetry() {
-    setIsLoading(true)
-    setErrorMessage('')
-    setStory(null)
-    setItems([])
-    setProgress(0)
-    setReloadCount(reloadCount + 1)
-  }
-
-  const backButton = (
-    <button type="button" className="btn btn-secondary story-back" onClick={onBack}>
-      ← All reports
-    </button>
-  )
-
-  if (errorMessage) {
-    return (
-      <>
-        {backButton}
-        <AlertMessage type="error" title="Could not build the report." message={errorMessage} onRetry={handleRetry} />
-      </>
-    )
-  }
   if (isLoading) {
-    const total = story ? Math.min(story.articles.length, REPORT_ARTICLE_LIMIT) : null
-    return (
-      <>
-        {backButton}
-        <LoadingState
-          message={
-            story
-              ? `Analysing article ${Math.min(progress + 1, total)} of ${total}...`
-              : 'Loading the story...'
-          }
-        />
-      </>
-    )
+    const total = Math.min(articles.length, REPORT_ARTICLE_LIMIT)
+    return <LoadingState message={`Analysing article ${Math.min(progress + 1, total)} of ${total}...`} />
   }
 
-  const publishers = publishersOf(story.articles)
-  const dateRange = dateRangeOf(story.articles)
+  const publishers = publishersOf(articles)
+  const dateRange = dateRangeOf(articles)
   const frames = groupFrames(items)
-  const coverage = entityCoverage(items)
-  const events = sortEventsByTime(story.events)
-  const notAnalysed = story.articles.length - items.length
+  const entities = nameCoverage(items, 'entities')
+  const topics = nameCoverage(items, 'topics')
+  const sortedEvents = sortEventsByTime(events)
+  const notAnalysed = articles.length - items.length
   const failed = items.filter(({ analyses }) => Object.keys(analyses.errors).length > 0)
-  const headlineOnly = story.articles.filter((article) => article.content_availability === 'headline_only')
+  const headlineOnly = articles.filter((article) => article.content_availability === 'headline_only')
 
   const coverageColumns = [
     { key: 'source', label: 'Publisher', render: ({ article }) => article.source_name || 'Unknown' },
@@ -236,14 +235,6 @@ export function StoryReport({ storyId, onBack }) {
       render: ({ analyses }) => (analyses.tone ? analyses.tone.signals.length : 'Not loaded'),
     },
     {
-      key: 'political',
-      label: 'Political entities',
-      render: ({ analyses }) =>
-        analyses.political
-          ? analyses.political.entities.map((entity) => entity.name).join(', ') || 'None'
-          : 'Not loaded',
-    },
-    {
       key: 'facts',
       label: 'Facts',
       render: ({ analyses }) => (analyses.insights ? analyses.insights.facts.length : 'Not loaded'),
@@ -251,27 +242,21 @@ export function StoryReport({ storyId, onBack }) {
   ]
 
   return (
-    <article className="rep-report" data-testid="story-report">
-      {backButton}
-      <h3 className="rep-title">{story.title}</h3>
-      <p className="ai-chip-extra">
-        Report built on {formatDate(builtAt)} from the backend&apos;s current data.
-      </p>
-
+    <div className="rep-report" data-testid="coverage-analysis">
       <section className="ad-section" aria-labelledby="rep-summary">
         <h4 className="ad-section-title" id="rep-summary">Summary</h4>
         <dl className="details-list">
           <div>
-            <dt>Events</dt>
-            <dd>{story.events.length}</dd>
-          </div>
-          <div>
             <dt>Articles</dt>
-            <dd>{story.articles.length}</dd>
+            <dd>{articles.length}</dd>
           </div>
           <div>
             <dt>Publishers</dt>
             <dd>{publishers.length}</dd>
+          </div>
+          <div>
+            <dt>Events</dt>
+            <dd>{events.length > 0 ? events.length : 'Not linked to an event'}</dd>
           </div>
           <div>
             <dt>Published between</dt>
@@ -282,25 +267,23 @@ export function StoryReport({ storyId, onBack }) {
         </dl>
       </section>
 
-      <section className="ad-section" aria-labelledby="rep-events">
-        <h4 className="ad-section-title" id="rep-events">Events</h4>
-        {events.length === 0 ? (
-          <p className="ai-none">This story has no events.</p>
-        ) : (
+      {sortedEvents.length > 0 && (
+        <section className="ad-section" aria-labelledby="rep-events">
+          <h4 className="ad-section-title" id="rep-events">Events</h4>
           <ul className="rep-event-list">
-            {events.map((event) => (
+            {sortedEvents.map((event) => (
               <li key={event.id}>
-                <strong>Event #{event.id}: {formatEventTime(event)}</strong>
+                <strong>
+                  Event #{event.id}: {formatEventTime(event)}
+                </strong>
                 <PrecisionBadge precision={event.event_time_precision} />
                 <TimeAgreementBadge disagreement={event.event_time_disagreement} />
-                <span className="pol-technique">
-                  {event.article_count} {event.article_count === 1 ? 'article' : 'articles'}
-                </span>
+                <span className="pol-technique">{plural(event.article_count, 'article')}</span>
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
 
       <section className="ad-section" aria-labelledby="rep-publishers">
         <h4 className="ad-section-title" id="rep-publishers">Participating publishers</h4>
@@ -308,23 +291,19 @@ export function StoryReport({ storyId, onBack }) {
           {publishers.map((publisher) => (
             <li key={publisher.name} className="ai-chip">
               {publisher.name}
-              <span className="ai-chip-extra"> · {publisher.count} {publisher.count === 1 ? 'article' : 'articles'}</span>
+              <span className="ai-chip-extra"> · {plural(publisher.count, 'article')}</span>
             </li>
           ))}
         </ul>
       </section>
 
       <section className="ad-section" aria-labelledby="rep-coverage">
-        <h4 className="ad-section-title" id="rep-coverage">Coverage by article</h4>
-        {items.length === 0 ? (
-          <EmptyState title="No articles to analyse" description="This story has no articles." />
-        ) : (
-          <DataTable
-            columns={coverageColumns}
-            rows={items.map((item) => ({ ...item, id: item.article.id }))}
-            caption="Coverage by article"
-          />
-        )}
+        <h4 className="ad-section-title" id="rep-coverage">Headlines, tone and framing by article</h4>
+        <DataTable
+          columns={coverageColumns}
+          rows={items.map((item) => ({ ...item, id: item.article.id }))}
+          caption="Coverage by article"
+        />
       </section>
 
       <section className="ad-section" aria-labelledby="rep-framing">
@@ -333,11 +312,11 @@ export function StoryReport({ storyId, onBack }) {
           <p className="ai-none">No framing cue was found in any analysed article.</p>
         ) : (
           <ul className="rep-frame-list" aria-label="Framing types used">
-            {frames.map(({ frame, articles }) => (
+            {frames.map(({ frame, articles: framed }) => (
               <li key={frame}>
                 <StatusBadge variant="info">{frameInfo(frame).label}</StatusBadge>
                 <span className="pol-technique">
-                  {articles.length} of {items.length} articles ({sourceList(articles)})
+                  {framed.length} of {items.length} articles ({sourceList(framed)})
                 </span>
               </li>
             ))}
@@ -345,39 +324,38 @@ export function StoryReport({ storyId, onBack }) {
         )}
       </section>
 
-      <section className="ad-section" aria-labelledby="rep-gaps">
-        <h4 className="ad-section-title" id="rep-gaps">Shared and missing coverage</h4>
-        {coverage.analysedCount < 2 ? (
-          <p className="ai-none">Needs the insights of at least two articles.</p>
-        ) : (
-          <dl className="details-list details-list-wide">
-            <div>
-              <dt>Named by every analysed article</dt>
-              <dd>
-                {coverage.inAll.length > 0
-                  ? coverage.inAll.map((row) => `${row.name} (${formatEntityType(row.type)})`).join(', ')
-                  : 'None'}
-              </dd>
-            </div>
-            <div>
-              <dt>Named by only some articles</dt>
-              <dd>
-                {coverage.inSome.length > 0 ? (
-                  <ul className="rep-gap-list">
-                    {coverage.inSome.slice(0, 15).map((row) => (
-                      <li key={row.name}>
-                        {row.name} ({formatEntityType(row.type)}): {sourceList(row.articles)}
-                      </li>
-                    ))}
-                    {coverage.inSome.length > 15 && <li>and {coverage.inSome.length - 15} more</li>}
-                  </ul>
-                ) : (
-                  'None'
-                )}
-              </dd>
-            </div>
-          </dl>
-        )}
+      <NameCoverageBlock
+        title="People, organizations and places"
+        coverage={entities}
+        describe={(row) => `${row.name} (${formatEntityType(row.type)})`}
+      />
+      <NameCoverageBlock title="Topics" coverage={topics} describe={(row) => row.name} />
+
+      <section className="ad-section" aria-labelledby="rep-facts">
+        <h4 className="ad-section-title" id="rep-facts">Facts by article</h4>
+        <ul className="rep-evidence-list" aria-label="Facts by article">
+          {items.map(({ article, analyses }) => (
+            <li key={article.id}>
+              <strong>{articleName(article)}</strong>
+              {!analyses.insights ? (
+                <span className="ai-none">Not loaded: {analyses.errors.insights}</span>
+              ) : analyses.insights.facts.length === 0 ? (
+                <span className="ai-none">No factual statements found.</span>
+              ) : (
+                analyses.insights.facts.map((fact) => (
+                  <blockquote key={fact.id} className="pol-evidence">
+                    “{fact.statement}”
+                  </blockquote>
+                ))
+              )}
+            </li>
+          ))}
+        </ul>
+        <p className="ad-section-note">
+          Facts are extracted from each article separately. The system does not check whether two
+          facts say the same thing or contradict each other, so it cannot list &quot;common&quot; or
+          &quot;differing&quot; claims; read them side by side.
+        </p>
       </section>
 
       <section className="ad-section" aria-labelledby="rep-political">
@@ -385,7 +363,7 @@ export function StoryReport({ storyId, onBack }) {
         {items.every(({ analyses }) => !analyses.political || analyses.political.entities.length === 0) ? (
           <p className="ai-none">No political entity was found in the analysed articles.</p>
         ) : (
-          <ul className="rep-frame-list">
+          <ul className="rep-frame-list" aria-label="Political entities by article">
             {items
               .filter(({ analyses }) => analyses.political?.entities.length > 0)
               .map(({ article, analyses }) => (
@@ -416,27 +394,28 @@ export function StoryReport({ storyId, onBack }) {
         <ul className="rep-limit-list">
           <li>
             All results were found automatically, mostly by matching words from fixed lists. They
-            are not checked facts and can be wrong.
+            are estimates, not checked facts, and can be wrong.
           </li>
           <li>
-            Tone is not bias, and one story says nothing about a publisher&apos;s politics in
+            Tone is not bias, and a few articles say nothing about a publisher&apos;s politics in
             general.
           </li>
           <li>
-            &quot;Named by only some articles&quot; does not prove that a publisher left something
-            out on purpose.
+            &quot;In only some articles&quot; does not prove that a publisher left something out on
+            purpose.
           </li>
-          <li>The backend has no report route: this report is put together in the browser and is not saved.</li>
+          {extraLimitations.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
           {publishers.length < 2 && (
             <li>
-              <strong>Only one publisher</strong> covers this story, so publishers cannot be
-              compared.
+              <strong>Only one publisher</strong> is included, so publishers cannot be compared.
             </li>
           )}
           {notAnalysed > 0 && (
             <li>
-              <strong>{notAnalysed} articles were not analysed</strong>: a report analyses at most{' '}
-              {REPORT_ARTICLE_LIMIT}.
+              <strong>{plural(notAnalysed, 'article')} not analysed</strong>: at most{' '}
+              {REPORT_ARTICLE_LIMIT} are analysed here.
             </li>
           )}
           {headlineOnly.length > 0 && (
@@ -452,9 +431,12 @@ export function StoryReport({ storyId, onBack }) {
             </li>
           ))}
         </ul>
+        {failed.length > 0 && (
+          <AlertMessage type="warning" message="Some analyses are missing; see the limitations above." />
+        )}
       </section>
-    </article>
+    </div>
   )
 }
 
-export default StoryReport
+export default CoverageAnalysis

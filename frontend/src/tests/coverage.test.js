@@ -174,9 +174,68 @@ describe('totals and lists (live mode)', () => {
     const api = await loadLiveApi(fakeFetch)
 
     const result = await api.fetchArticleAnalyses(4)
+    // One extraction request for all three analyses
+    expect(fakeFetch.mock.calls.filter((call) => call[0].endsWith('/extraction'))).toHaveLength(1)
     expect(result.insights.topics[0].name).toBe('Elections')
     expect(result.tone).toBeNull()
     expect(result.errors.tone).toContain('Tone failed')
     expect(result.political.entities).toEqual([])
   })
+
+  it('creates a comparison only after each article\'s extraction, with POST /comparisons', async () => {
+    const fakeFetch = vi.fn(async (url) => {
+      if (url.endsWith('/extraction')) return okReply({ id: 1 })
+      return okReply({ id: 4, title: 'Story', status: 'completed', article_count: 2, articles: [], coverages: [], evidences: [] })
+    })
+    const api = await loadLiveApi(fakeFetch)
+
+    const comparison = await api.createComparison({ title: 'Story', articleIds: [1, 3] })
+    const urls = fakeFetch.mock.calls.map((call) => call[0])
+    expect(urls).toEqual([
+      'http://backend.test/api/articles/1/extraction',
+      'http://backend.test/api/articles/3/extraction',
+      'http://backend.test/api/comparisons',
+    ])
+    expect(JSON.parse(fakeFetch.mock.calls[2][1].body)).toEqual({ title: 'Story', description: null, article_ids: [1, 3] })
+    expect(comparison.id).toBe(4)
+  })
+
+  it('generates a report with POST /reports/generate and lists reports with offset', async () => {
+    const report = { id: 7, comparison_id: 4, title: 'R', content: '# R', report_format: 'json' }
+    const fakeFetch = vi.fn(async (url) => okReply(url.includes('/generate') ? report : [report]))
+    const api = await loadLiveApi(fakeFetch)
+
+    expect((await api.generateReport({ comparisonId: 4, format: 'json' })).id).toBe(7)
+    expect(fakeFetch.mock.calls[0][0]).toBe('http://backend.test/api/reports/generate')
+    expect(JSON.parse(fakeFetch.mock.calls[0][1].body)).toEqual({ comparison_id: 4, title: null, report_format: 'json' })
+
+    const all = await api.fetchAllReports()
+    expect(all.items).toHaveLength(1)
+    expect(fakeFetch.mock.calls[1][0]).toBe('http://backend.test/api/reports?limit=100&offset=0')
+  })
+
+  it('loads the AI detection estimate and re-runs it', async () => {
+    const reply = { article_id: 9, ai_likelihood: 0.3, confidence_score: 0.65, model_name: 'm', metrics: null }
+    const fakeFetch = vi.fn(async () => okReply(reply))
+    const api = await loadLiveApi(fakeFetch)
+
+    expect((await api.fetchAiDetection(9)).ai_likelihood).toBe(0.3)
+    expect(fakeFetch.mock.calls[0][0]).toBe('http://backend.test/api/articles/9/ai-detection')
+    await api.rerunAiDetection(9)
+    expect(fakeFetch.mock.calls[1][0]).toBe('http://backend.test/api/articles/9/ai-detection/analyze')
+    expect(JSON.parse(fakeFetch.mock.calls[1][1].body)).toEqual({ force_reanalyze: true })
+  })
+
+  it('loads a comparison with its event, and without it when the event fails', async () => {
+    const comparison = { id: 4, event_id: 12, title: 'Story', articles: [], coverages: [], evidences: [] }
+    const fakeFetch = vi.fn(async (url) => {
+      if (url.endsWith('/events/12')) return { ok: false, status: 404, text: async () => '{"detail":"gone"}' }
+      return okReply(comparison)
+    })
+    const api = await loadLiveApi(fakeFetch)
+    const result = await api.fetchComparisonWithEvent(4)
+    expect(result.comparison.event_id).toBe(12)
+    expect(result.events).toEqual([])
+  })
 })
+

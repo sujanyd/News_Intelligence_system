@@ -28,6 +28,10 @@ import {
   toPoliticalAnalysis,
   toToneFraming,
   toFeed,
+  toAiDetection,
+  toComparison,
+  toComparisonSummary,
+  toReport,
   toSimilarArticlesResponse,
   toSource,
   toStory,
@@ -65,7 +69,24 @@ export const ENDPOINTS = {
   articleToneFraming: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/tone-framing`,
   // RSS feeds the news collection reads (app/api/v1/endpoints/ingestion.py)
   ingestionFeeds: `${API_PREFIX}/ingestion/feeds`,
+  // Comparisons and reports (app/api/v1/endpoints/comparison_report.py)
+  comparisons: `${API_PREFIX}/comparisons`,
+  comparison: (id) => `${API_PREFIX}/comparisons/${encodeURIComponent(id)}`,
+  reports: `${API_PREFIX}/reports`,
+  report: (id) => `${API_PREFIX}/reports/${encodeURIComponent(id)}`,
+  generateReport: `${API_PREFIX}/reports/generate`,
+  // AI detection (app/api/v1/endpoints/ai_detection.py)
+  articleAiDetection: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/ai-detection`,
+  runArticleAiDetection: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/ai-detection/analyze`,
 }
+
+// Comparisons, reports and AI detection only exist in the real backend.
+// There is no mock version on purpose: nothing made up is ever shown.
+export const COMPARISONS_AVAILABLE = !USE_MOCK_DATA
+export const AI_DETECTION_AVAILABLE = !USE_MOCK_DATA
+
+// Creating a comparison analyses every article in it, so allow more time
+export const COMPARISON_TIMEOUT_MS = 120000
 
 // Tone and framing only exist in the real backend. There is no mock version
 // on purpose: no made-up tone labels or framing signals are ever shown.
@@ -573,9 +594,10 @@ export async function fetchIngestionFeeds() {
  *   political: Object | null, errors: { insights?: string, tone?: string, political?: string } }>}
  */
 export async function fetchArticleAnalyses(articleId) {
-  // The extraction first (see extractionFirst), then the other two together
-  const [insights] = await Promise.allSettled([fetchArticleInsights(articleId)])
-  const [tone, political] = await Promise.allSettled([
+  // Started together, so all three share ONE extraction request
+  // (loadExtraction); tone and political still wait for it (extractionFirst).
+  const [insights, tone, political] = await Promise.allSettled([
+    fetchArticleInsights(articleId),
     fetchToneFraming(articleId),
     fetchPoliticalAnalysis(articleId),
   ])
@@ -592,4 +614,151 @@ export async function fetchArticleAnalyses(articleId) {
     political: valueOf(political, 'political'),
     errors,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Comparisons (saved in the backend)
+// ---------------------------------------------------------------------------
+
+function requireComparisonsBackend() {
+  if (!COMPARISONS_AVAILABLE) {
+    throw new ApiError('Comparisons and reports only work with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+}
+
+/**
+ * Every saved comparison, newest first (GET /comparisons, all pages).
+ * @returns {Promise<{ items: Array, isComplete: boolean }>}
+ */
+export async function fetchAllComparisons() {
+  requireComparisonsBackend()
+  return readAllPages(async ({ limit, start }) => {
+    const data = await apiGet(ENDPOINTS.comparisons, { limit, offset: start })
+    return toList(data, 'comparison').items.map(toComparisonSummary)
+  })
+}
+
+/**
+ * One comparison with its articles, coverage and evidence.
+ * Endpoint: GET /comparisons/{id}
+ */
+export async function fetchComparison(comparisonId) {
+  requireComparisonsBackend()
+  return toComparison(await apiGet(ENDPOINTS.comparison(comparisonId)))
+}
+
+/**
+ * A comparison and, when it belongs to an event, that event (for its time).
+ * A missing event is not an error: the comparison is still shown.
+ * Endpoints: GET /comparisons/{id}, then GET /events/{event_id}
+ *
+ * @returns {Promise<{ comparison: Object, events: Array }>}
+ */
+export async function fetchComparisonWithEvent(comparisonId) {
+  const comparison = await fetchComparison(comparisonId)
+  if (comparison.event_id === null) return { comparison, events: [] }
+  try {
+    return { comparison, events: [await fetchEvent(comparison.event_id)] }
+  } catch {
+    return { comparison, events: [] }
+  }
+}
+
+/**
+ * Creates (and runs) a comparison of some articles.
+ * Endpoint: POST /comparisons with { title, description, article_ids }
+ *
+ * The backend runs the political analysis of each article while it compares.
+ * Run the content extraction of each article first, or their topics, facts
+ * and quotes would stay empty (see extractionFirst).
+ *
+ * @param {{ title: string, description?: string, articleIds: number[] }} input
+ * @returns {Promise<Object>} the new comparison (see toComparison)
+ */
+export async function createComparison({ title, description, articleIds }) {
+  requireComparisonsBackend()
+  for (const articleId of articleIds) {
+    await extractionFirst(articleId)
+  }
+  const data = await apiPost(
+    ENDPOINTS.comparisons,
+    { title, description: description || null, article_ids: articleIds },
+    { timeoutMs: COMPARISON_TIMEOUT_MS }
+  )
+  return toComparison(data)
+}
+
+// ---------------------------------------------------------------------------
+// Reports (saved in the backend)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every saved report, newest first (GET /reports, all pages).
+ * @returns {Promise<{ items: Array, isComplete: boolean }>}
+ */
+export async function fetchAllReports() {
+  requireComparisonsBackend()
+  return readAllPages(async ({ limit, start }) => {
+    const data = await apiGet(ENDPOINTS.reports, { limit, offset: start })
+    return toList(data, 'report').items.map(toReport)
+  })
+}
+
+/**
+ * One saved report. Endpoint: GET /reports/{id}
+ */
+export async function fetchReport(reportId) {
+  requireComparisonsBackend()
+  return toReport(await apiGet(ENDPOINTS.report(reportId)))
+}
+
+/**
+ * Generates and saves a report from a comparison.
+ * Endpoint: POST /reports/generate with { comparison_id, title, report_format }
+ *
+ * @param {{ comparisonId: number, title?: string, format?: 'markdown' | 'html' | 'json' }} input
+ */
+export async function generateReport({ comparisonId, title, format = 'markdown' }) {
+  requireComparisonsBackend()
+  const data = await apiPost(
+    ENDPOINTS.generateReport,
+    { comparison_id: comparisonId, title: title || null, report_format: format },
+    { timeoutMs: COMPARISON_TIMEOUT_MS }
+  )
+  return toReport(data)
+}
+
+// ---------------------------------------------------------------------------
+// AI detection
+// ---------------------------------------------------------------------------
+
+/**
+ * The AI-likelihood estimate of one article. The first time, the backend
+ * computes it before it answers.
+ * Endpoint: GET /articles/{id}/ai-detection
+ */
+export async function fetchAiDetection(articleId) {
+  if (!AI_DETECTION_AVAILABLE) {
+    throw new ApiError('AI detection only works with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+  const data = await apiRequest(ENDPOINTS.articleAiDetection(articleId), {
+    timeoutMs: EXTRACTION_TIMEOUT_MS,
+  })
+  return toAiDetection(data)
+}
+
+/**
+ * Computes the estimate again.
+ * Endpoint: POST /articles/{id}/ai-detection/analyze with { force_reanalyze: true }
+ */
+export async function rerunAiDetection(articleId) {
+  if (!AI_DETECTION_AVAILABLE) {
+    throw new ApiError('AI detection only works with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+  const data = await apiPost(
+    ENDPOINTS.runArticleAiDetection(articleId),
+    { force_reanalyze: true },
+    { timeoutMs: EXTRACTION_TIMEOUT_MS }
+  )
+  return toAiDetection(data)
 }
