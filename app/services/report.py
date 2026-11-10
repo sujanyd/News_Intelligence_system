@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session, joinedload
 
+from app.models.ai_detection_result import AIDetectionResult
 from app.models.news_comparison import NewsComparison
 from app.models.report import Report
 from app.schemas.comparison_report import ReportResponse
@@ -56,6 +57,15 @@ class ReportGenerationService:
 
         # 1. Gather publishers & articles
         publishers = sorted(list({a.source_name or "Unknown Source" for a in detail.articles}))
+
+        # 1b. Gather any existing AI-detection results for compared articles
+        art_ids = [a.id for a in detail.articles]
+        ai_results = (
+            db.query(AIDetectionResult)
+            .filter(AIDetectionResult.article_id.in_(art_ids))
+            .all()
+        )
+        ai_by_art_id = {r.article_id: r for r in ai_results}
 
         # 2. Compile executive summary
         summary = (
@@ -103,6 +113,17 @@ class ReportGenerationService:
                         "slant": ps.slant_score,
                     }
                     for ps in detail.political_signals
+                ],
+                "ai_detection_estimates": [
+                    {
+                        "article_id": a.id,
+                        "source": a.source_name,
+                        "ai_likelihood": ai_by_art_id[a.id].ai_likelihood,
+                        "confidence": ai_by_art_id[a.id].confidence_score,
+                        "model": ai_by_art_id[a.id].model_name,
+                        "flagged_for_review": ai_by_art_id[a.id].is_flagged_for_review,
+                    }
+                    for a in detail.articles if a.id in ai_by_art_id
                 ],
                 "methodological_limitations": (
                     "All classifications, tone evaluations, and political signals represent empirical "
@@ -153,6 +174,12 @@ class ReportGenerationService:
                 for ps in detail.political_signals
             ) or "- No overt partisan presentation detected."
 
+            ai_lines = "\n".join(
+                f"- **{a.source_name or 'Outlet'}**: Estimated AI Likelihood `{ai_by_art_id[a.id].ai_likelihood:.0%}` "
+                f"(Confidence: {ai_by_art_id[a.id].confidence_score:.2f}, Flagged for Review: {ai_by_art_id[a.id].is_flagged_for_review})"
+                for a in detail.articles if a.id in ai_by_art_id
+            ) or "- No AI-generated text evaluations recorded for compared articles."
+
             content_str = f"""# {report_title}
 
 ## Executive Summary
@@ -180,9 +207,15 @@ class ReportGenerationService:
 
 ---
 
-## 5. Methodological Notes & Limitations
+## 5. AI-Generated Text Likelihood Estimates
+{ai_lines}
+
+---
+
+## 6. Methodological Notes & Limitations
 - **Observational Nature**: Model predictions and lexicon heuristics represent analytical estimates, not established factual reality.
 - **Contextual Independence**: Negative valence or critical scrutiny does not equate to ideological prejudice.
+- **AI Detection Uncertainty**: Likelihood percentages represent statistical pacing entropy and burstiness, not definitive proof of machine generation.
 - **Corpus Boundaries**: Analysis is strictly bound to the articles evaluated within this comparison session.
 """
 

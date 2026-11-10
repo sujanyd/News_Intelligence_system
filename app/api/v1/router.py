@@ -19,6 +19,7 @@ from app.api.v1.endpoints import (
     tone_framing,
     political_signal,
     comparison_report,
+    ai_detection,
 )
 
 api_v1_router = APIRouter()
@@ -32,6 +33,7 @@ api_v1_router.include_router(content_extraction.router, prefix="/articles", tags
 api_v1_router.include_router(tone_framing.router, prefix="/articles", tags=["Tone and Framing Analysis"])
 api_v1_router.include_router(political_signal.article_router, prefix="/articles", tags=["Political Leaning Signals"])
 api_v1_router.include_router(political_signal.comparison_router, prefix="/comparisons", tags=["Political Leaning Signals"])
+api_v1_router.include_router(ai_detection.router, prefix="/articles", tags=["AI-Generated News Detection"])
 api_v1_router.include_router(comparison_report.comparison_router, prefix="/comparisons", tags=["News Comparisons"])
 api_v1_router.include_router(comparison_report.report_router, prefix="/reports", tags=["Evidence-Based Reports"])
 api_v1_router.include_router(ingestion.router, prefix="/ingestion", tags=["RSS Ingestion"])
