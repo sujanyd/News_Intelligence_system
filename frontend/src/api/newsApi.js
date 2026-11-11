@@ -78,6 +78,7 @@ export const ENDPOINTS = {
   // AI detection (app/api/v1/endpoints/ai_detection.py)
   articleAiDetection: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/ai-detection`,
   runArticleAiDetection: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/ai-detection/analyze`,
+  flaggedAiDetections: `${API_PREFIX}/articles/ai-detection/flagged`,
 }
 
 // Comparisons, reports and AI detection only exist in the real backend.
@@ -761,4 +762,26 @@ export async function rerunAiDetection(articleId) {
     { timeoutMs: EXTRACTION_TIMEOUT_MS }
   )
   return toAiDetection(data)
+}
+
+// The backend flags an article for review when its estimate is 0.75 or more
+// (flag_threshold in app/services/ai_detection.py)
+export const AI_FLAG_THRESHOLD = 0.75
+
+/**
+ * Articles the backend flagged for a human to check, highest estimate first.
+ * Only articles whose AI detection has already run can be in this list (it
+ * runs the first time an article's details are opened).
+ * Endpoint: GET /articles/ai-detection/flagged?limit&offset
+ *
+ * @param {{ limit?: number }} [options]
+ * @returns {Promise<Array>} AI detection results (see toAiDetection); they
+ *   hold the article id but not its title
+ */
+export async function fetchFlaggedAiDetections({ limit = 10 } = {}) {
+  if (!AI_DETECTION_AVAILABLE) {
+    throw new ApiError('AI detection only works with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+  const data = await apiGet(ENDPOINTS.flaggedAiDetections, { limit, offset: 0 })
+  return toList(data, 'flagged article').items.map(toAiDetection)
 }

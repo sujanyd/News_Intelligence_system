@@ -358,7 +358,9 @@ describe('AiDetectionSection', () => {
     render(<AiDetectionSection articleId={50} contentAvailability="summary_only" />)
     expect(await screen.findByText('31%')).toBeDefined()
     expect(screen.getByRole('img', { name: /Estimated AI likelihood 31%/ })).toBeDefined()
-    expect(screen.getByText('Low estimate')).toBeDefined()
+    // No category is made up: only the backend's flag status is shown
+    expect(screen.getByText('Not flagged for review')).toBeDefined()
+    expect(screen.queryByText(/Low estimate|High estimate/)).toBeNull()
     expect(screen.getByText('78% (based only on how much text there was)')).toBeDefined()
     expect(screen.getByText('statistical-burstiness-entropy-v1 (version 1.0.0)')).toBeDefined()
     expect(screen.getByText('Only the summary the feed gave')).toBeDefined()
@@ -378,8 +380,8 @@ describe('AiDetectionSection', () => {
   it('marks an article flagged for review', async () => {
     fetchAiDetection.mockResolvedValue(toAiDetection({ ...AI_REPLY, ai_likelihood: 0.8, is_flagged_for_review: true }))
     render(<AiDetectionSection articleId={50} />)
-    expect(await screen.findByText('Flagged for a human to check')).toBeDefined()
-    expect(screen.getByText('High estimate')).toBeDefined()
+    expect(await screen.findByText('Flagged for editorial review.')).toBeDefined()
+    expect(screen.getByText(/This is not proof that it was written by AI/)).toBeDefined()
   })
 
   it('checks again with the POST route', async () => {

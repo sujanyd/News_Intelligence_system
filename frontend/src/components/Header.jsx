@@ -1,12 +1,14 @@
 import React from 'react'
 import { API_BASE_URL_LABEL } from '../api/config'
 import StatusBadge from './StatusBadge'
+import ThemeToggle from './ThemeToggle'
 
 /**
  * Top Application Header Component
  * 
  * Displays the project title: "News Bias and Framing Analysis System",
- * active page breadcrumb, API status pill, and mobile drawer toggle button.
+ * active page breadcrumb, light/dark theme button, API status pill, and
+ * mobile drawer toggle button.
  * 
  * @param {Object} props
  * @param {string} props.activeTab - Currently active tab
@@ -59,6 +61,7 @@ export function Header({ activeTab, onToggleMobileMenu }) {
       </div>
 
       <div className="header-right">
+        <ThemeToggle />
         <StatusBadge variant="info" className="header-api-badge">
           API: {API_BASE_URL_LABEL}
         </StatusBadge>

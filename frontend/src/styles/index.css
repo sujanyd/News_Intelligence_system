@@ -25,7 +25,23 @@
 
   --color-text-primary: #f9fafb;
   --color-text-secondary: #9ca3af;
-  --color-text-muted: #6b7280;
+  /* #8a93a1 instead of #6b7280: enough contrast (4.5 or more) on dark cards */
+  --color-text-muted: #8a93a1;
+
+  /* Text on tinted badges and alerts, and surfaces as "r, g, b" so a
+     component can choose the transparency: rgba(var(--surface-tint-rgb), 0.35) */
+  --color-danger: #ef4444;
+  --color-text-primary-tint: #93c5fd;
+  --color-text-success-tint: #6ee7b7;
+  --color-text-danger-tint: #fca5a5;
+  --color-text-warning-tint: #fcd34d;
+  --color-text-info-tint: #67e8f9;
+  --color-text-accent-tint: #c4b5fd;
+  --surface-tint-rgb: 31, 41, 55;
+  --surface-deep-rgb: 17, 24, 39;
+  --app-bg-rgb: 11, 15, 25;
+
+  color-scheme: dark;
 
   --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-family-heading: 'Outfit', 'Inter', sans-serif;
@@ -43,6 +59,102 @@
   --transition-normal: 250ms ease;
 
   --max-content-width: 1240px;
+}
+
+/* Light theme: follows the computer's setting, unless the user picked a
+   theme with the header button (data-theme on <html>, see ThemeToggle) */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --color-bg-app: #f3f4f6;
+    --color-bg-surface: #ffffff;
+    --color-bg-surface-elevated: #f9fafb;
+    --color-bg-surface-hover: #e5e7eb;
+
+    --color-border: #e5e7eb;
+    --color-border-subtle: #d1d5db;
+    --color-border-focus: #2563eb;
+
+    --color-primary: #2563eb;
+    --color-primary-hover: #1d4ed8;
+    --color-primary-light: rgba(37, 99, 235, 0.1);
+
+    --color-accent: #7c3aed;
+    --color-accent-light: rgba(124, 58, 237, 0.1);
+
+    --color-success: #059669;
+    --color-success-light: rgba(5, 150, 105, 0.1);
+    --color-warning: #d97706;
+    --color-warning-light: rgba(217, 119, 6, 0.1);
+    --color-info: #0891b2;
+    --color-info-light: rgba(8, 145, 178, 0.1);
+
+    --color-text-primary: #111827;
+    --color-text-secondary: #4b5563;
+    --color-text-muted: #6b7280;
+
+    --color-danger: #dc2626;
+    --color-text-primary-tint: #1d4ed8;
+    --color-text-success-tint: #065f46;
+    --color-text-danger-tint: #b91c1c;
+    --color-text-warning-tint: #92400e;
+    --color-text-info-tint: #155e75;
+    --color-text-accent-tint: #6d28d9;
+    --surface-tint-rgb: 229, 231, 235;
+    --surface-deep-rgb: 243, 244, 246;
+    --app-bg-rgb: 243, 244, 246;
+
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+
+    color-scheme: light;
+  }
+}
+
+:root[data-theme='light'] {
+  --color-bg-app: #f3f4f6;
+  --color-bg-surface: #ffffff;
+  --color-bg-surface-elevated: #f9fafb;
+  --color-bg-surface-hover: #e5e7eb;
+
+  --color-border: #e5e7eb;
+  --color-border-subtle: #d1d5db;
+  --color-border-focus: #2563eb;
+
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: rgba(37, 99, 235, 0.1);
+
+  --color-accent: #7c3aed;
+  --color-accent-light: rgba(124, 58, 237, 0.1);
+
+  --color-success: #059669;
+  --color-success-light: rgba(5, 150, 105, 0.1);
+  --color-warning: #d97706;
+  --color-warning-light: rgba(217, 119, 6, 0.1);
+  --color-info: #0891b2;
+  --color-info-light: rgba(8, 145, 178, 0.1);
+
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-muted: #6b7280;
+
+  --color-danger: #dc2626;
+  --color-text-primary-tint: #1d4ed8;
+  --color-text-success-tint: #065f46;
+  --color-text-danger-tint: #b91c1c;
+  --color-text-warning-tint: #92400e;
+  --color-text-info-tint: #155e75;
+  --color-text-accent-tint: #6d28d9;
+  --surface-tint-rgb: 229, 231, 235;
+  --surface-deep-rgb: 243, 244, 246;
+  --app-bg-rgb: 243, 244, 246;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+
+  color-scheme: light;
 }
 
 *, *::before, *::after {

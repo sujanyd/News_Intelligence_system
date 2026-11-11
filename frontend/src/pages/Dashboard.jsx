@@ -11,6 +11,7 @@ import ContentAvailabilityBadge from '../components/ContentAvailabilityBadge'
 import ArticleDetails from '../components/ArticleDetails'
 import IngestionPanel from '../components/IngestionPanel'
 import DataModeBadge from '../components/DataModeBadge'
+import FlaggedArticlesPanel from '../components/FlaggedArticlesPanel'
 import {
   COMPARISONS_AVAILABLE,
   INGESTION_AVAILABLE,
@@ -67,6 +68,8 @@ export function Dashboard({ onNavigate }) {
   const [articlesError, setArticlesError] = useState('')
   const [articlesReloadCount, setArticlesReloadCount] = useState(0)
   const [selectedArticleId, setSelectedArticleId] = useState(null)
+  // Publisher of an article opened from the flagged list (it may not be a recent article)
+  const [selectedSourceName, setSelectedSourceName] = useState(undefined)
   const detailsRef = useRef(null) // the details panel, so we can scroll to it
 
   // Configured news sources
@@ -173,6 +176,12 @@ export function Dashboard({ onNavigate }) {
     reloadArticles()
     reloadSources()
     setTotalsReloadCount(totalsReloadCount + 1)
+  }
+
+  // "View" in the flagged list opens the article in the details panel above
+  function openFlaggedArticle(articleId, sourceName) {
+    setSelectedSourceName(sourceName)
+    setSelectedArticleId(articleId)
   }
 
   function openPage(tab) {
@@ -472,7 +481,7 @@ export function Dashboard({ onNavigate }) {
         <section className="dashboard-section dashboard-details" style={{ marginTop: '2rem' }} ref={detailsRef}>
           <ArticleDetails
             articleId={selectedArticleId}
-            sourceName={selectedArticle ? getSourceName(selectedArticle, sources) : undefined}
+            sourceName={selectedArticle ? getSourceName(selectedArticle, sources) : selectedSourceName}
             onClose={() => setSelectedArticleId(null)}
           />
         </section>
@@ -491,6 +500,11 @@ export function Dashboard({ onNavigate }) {
         >
           {renderRecentArticles()}
         </Card>
+      </section>
+
+      {/* Articles the AI detector flagged for a person to check */}
+      <section className="dashboard-section" style={{ marginTop: '2rem' }}>
+        <FlaggedArticlesPanel onOpenArticle={openFlaggedArticle} />
       </section>
 
       {/* Configured news sources */}

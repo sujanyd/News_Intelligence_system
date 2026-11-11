@@ -7,6 +7,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // One jsdom per worker instead of one per test file (faster; each file
+    // still runs in its own context)
+    pool: 'vmThreads',
     setupFiles: './src/tests/setup.js',
     // Fixed settings for tests, so they never depend on your own .env file.
     // Page tests use the pretend backend (mock mode); API tests switch to live mode.

@@ -2,17 +2,14 @@ import React, { useEffect, useState } from 'react'
 import LoadingState from './LoadingState'
 import AlertMessage from './AlertMessage'
 import StatusBadge from './StatusBadge'
-import { AI_DETECTION_AVAILABLE, fetchAiDetection, rerunAiDetection } from '../api/newsApi'
+import {
+  AI_DETECTION_AVAILABLE,
+  AI_FLAG_THRESHOLD,
+  fetchAiDetection,
+  rerunAiDetection,
+} from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
 import { formatPercent } from '../utils/toneLabels'
-
-// 0.34 -> a plain-words band for the estimate (not a verdict)
-function likelihoodBand(likelihood) {
-  if (likelihood >= 0.75) return { label: 'High estimate', variant: 'warning' }
-  if (likelihood >= 0.5) return { label: 'Medium estimate', variant: 'warning' }
-  if (likelihood >= 0.25) return { label: 'Low estimate', variant: 'neutral' }
-  return { label: 'Very low estimate', variant: 'neutral' }
-}
 
 function formatNumber(value, digits = 2) {
   return value === null || value === undefined ? 'Not given' : value.toFixed(digits)
@@ -90,7 +87,6 @@ export function AiDetectionSection({ articleId, contentAvailability = null }) {
         />
       )
     }
-    const band = likelihoodBand(result.ai_likelihood)
     const percent = Math.round(result.ai_likelihood * 100)
     return (
       <>
@@ -105,12 +101,20 @@ export function AiDetectionSection({ articleId, contentAvailability = null }) {
         >
           <span className="aid-bar-fill" style={{ width: `${percent}%` }} />
         </div>
-        <div className="cmp-badges">
-          <StatusBadge variant={band.variant}>{band.label}</StatusBadge>
-          {result.is_flagged_for_review && (
-            <StatusBadge variant="warning">Flagged for a human to check</StatusBadge>
-          )}
-        </div>
+        {/* is_flagged_for_review comes from the backend; no category is made up here */}
+        {result.is_flagged_for_review ? (
+          <AlertMessage
+            type="warning"
+            title="Flagged for editorial review."
+            message={`The estimate is ${Math.round(
+              AI_FLAG_THRESHOLD * 100
+            )}% or more, so the backend asks for a person to check this article. This is not proof that it was written by AI.`}
+          />
+        ) : (
+          <div className="cmp-badges">
+            <StatusBadge variant="neutral">Not flagged for review</StatusBadge>
+          </div>
+        )}
         {result.interpretation && <p className="pol-explanation">Backend&apos;s reading: {result.interpretation}</p>}
       </>
     )
