@@ -214,11 +214,12 @@ class StoryEventGroupingService:
         if related_target:
             match_rec, anchor_art, existing_story = related_target
 
-            # Related coverage means it belongs to the SAME STORY, but is a DIFFERENT EVENT
+            # Related coverage means it belongs to the SAME STORY, but is a DIFFERENT EVENT.
+            # Never conflate publication time with actual real-world event occurrence time.
             new_event = Event(
                 story_id=existing_story.id,
-                event_time=article.published_at or datetime.now(timezone.utc),
-                event_time_precision="exact" if article.published_at else "unknown",
+                event_time=None,  # Independent of published_at
+                event_time_precision="unknown",
                 event_time_disagreement=False,
             )
             db.add(new_event)
@@ -273,10 +274,11 @@ class StoryEventGroupingService:
                 # If strong entity overlap (>= 3 shared key entities or overlap >= 0.30)
                 if len(shared) >= 3 or overlap_score >= 0.30:
                     # Belongs to this story! Create a new event under it.
+                    # Never conflate publication time with event time.
                     new_event = Event(
                         story_id=cand_story.id,
-                        event_time=article.published_at or datetime.now(timezone.utc),
-                        event_time_precision="exact" if article.published_at else "unknown",
+                        event_time=None,
+                        event_time_precision="unknown",
                         event_time_disagreement=False,
                     )
                     db.add(new_event)
@@ -311,10 +313,12 @@ class StoryEventGroupingService:
         db.add(new_story)
         db.flush()
 
+        # Real-world event time is distinct from publication time (published_at) and retrieval time (retrieved_at).
+        # When unstated in article metadata or body, event_time remains null with precision 'unknown'.
         new_event = Event(
             story_id=new_story.id,
-            event_time=article.published_at or datetime.now(timezone.utc),
-            event_time_precision="exact" if article.published_at else "unknown",
+            event_time=None,
+            event_time_precision="unknown",
             event_time_disagreement=False,
         )
         db.add(new_event)

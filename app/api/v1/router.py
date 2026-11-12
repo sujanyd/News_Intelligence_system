@@ -20,12 +20,14 @@ from app.api.v1.endpoints import (
     political_signal,
     comparison_report,
     ai_detection,
+    dashboard,
 )
 
 api_v1_router = APIRouter()
 
 # Register endpoints under API v1
 api_v1_router.include_router(health.router)
+api_v1_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard Summary"])
 api_v1_router.include_router(sources.router, prefix="/sources", tags=["News Sources"])
 api_v1_router.include_router(articles.router, prefix="/articles", tags=["Articles"])
 api_v1_router.include_router(comparison_report.duplicate_router, prefix="/articles", tags=["Duplicate Detection"])
