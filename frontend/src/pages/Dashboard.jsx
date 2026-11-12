@@ -9,15 +9,19 @@ import ArticleDetails from '../components/ArticleDetails'
 import IngestionPanel from '../components/IngestionPanel'
 import DataModeBadge from '../components/DataModeBadge'
 import FlaggedArticlesPanel from '../components/FlaggedArticlesPanel'
+import MatchActivityPanel from '../components/MatchActivityPanel'
 import FrontPage from '../components/FrontPage'
 import NewsTicker from '../components/NewsTicker'
 import {
+  AI_DETECTION_AVAILABLE,
+  AI_FLAG_THRESHOLD,
   COMPARISONS_AVAILABLE,
   INGESTION_AVAILABLE,
   STORIES_AVAILABLE,
   USE_MOCK_DATA,
   checkBackendHealth,
   countArticles,
+  countFlaggedAiDetections,
   countEvents,
   fetchAllComparisons,
   fetchAllReports,
@@ -70,8 +74,9 @@ function settledValue(result) {
 /**
  * Dashboard Page Component
  *
- * Shows the newest collected articles (GET /articles), the configured news
- * sources (GET /sources), the news collection button, and the pipeline overview.
+ * Shows the totals (articles, sources, stories and events, comparisons,
+ * reports, flagged articles), the news collection button, the newest
+ * articles, the similar-article activity and the articles flagged for review.
  *
  * @param {Object} props
  * @param {(tab: string) => void} [props.onNavigate] - opens another page, e.g. 'articles'
@@ -101,7 +106,7 @@ export function Dashboard({ onNavigate }) {
   // Banner after a news collection that added articles: { count }
   const [stopPresses, setStopPresses] = useState(null)
 
-  const [totals, setTotals] = useState(null) // { articles, stories, events, comparable, comparisons, reports }
+  const [totals, setTotals] = useState(null) // { articles, stories, events, comparable, comparisons, reports, flagged }
   const [totalsError, setTotalsError] = useState('')
   const [totalsReloadCount, setTotalsReloadCount] = useState(0)
 
@@ -113,9 +118,11 @@ export function Dashboard({ onNavigate }) {
       STORIES_AVAILABLE ? countEvents() : Promise.resolve(null),
       COMPARISONS_AVAILABLE ? fetchAllComparisons() : Promise.resolve(null),
       COMPARISONS_AVAILABLE ? fetchAllReports() : Promise.resolve(null),
+      AI_DETECTION_AVAILABLE ? countFlaggedAiDetections() : Promise.resolve(null),
     ]).then((results) => {
       if (!isCurrentRequest) return
-      const [articleResult, storyResult, eventResult, comparisonResult, reportResult] = results
+      const [articleResult, storyResult, eventResult, comparisonResult, reportResult, flaggedResult] =
+        results
       const failed = results.find((result) => result.status === 'rejected')
       setTotalsError(failed ? failed.reason.message : '')
       const stories = settledValue(storyResult)
@@ -130,6 +137,7 @@ export function Dashboard({ onNavigate }) {
         },
         comparisons: listCount(settledValue(comparisonResult)),
         reports: listCount(settledValue(reportResult)),
+        flagged: settledValue(flaggedResult),
       })
     })
     return () => {
@@ -203,7 +211,7 @@ export function Dashboard({ onNavigate }) {
   }
 
   // "View" in the flagged list opens the article in the details panel above
-  function openFlaggedArticle(articleId, sourceName) {
+  function openArticleById(articleId, sourceName) {
     setSelectedSourceName(sourceName)
     setSelectedArticleId(articleId)
   }
@@ -521,6 +529,24 @@ export function Dashboard({ onNavigate }) {
           actionLabel={onNavigate ? 'Open Reports' : undefined}
           onAction={() => openPage('reports')}
         />
+
+        <MetricCard
+          title="Flagged for review"
+          value={formatCount(totals?.flagged)}
+          subtitle={`AI-likelihood estimate of ${Math.round(AI_FLAG_THRESHOLD * 100)}% or more`}
+          helperText={
+            !AI_DETECTION_AVAILABLE
+              ? 'Needs the real backend'
+              : totals?.flagged
+              ? 'An estimate, not proof'
+              : totals
+              ? 'Could not count'
+              : undefined
+          }
+          isPlaceholder={!totals?.flagged}
+          isLoading={!totals}
+          accent="amber"
+        />
       </section>
 
       {/* News collection button and the result of the last run */}
@@ -559,9 +585,14 @@ export function Dashboard({ onNavigate }) {
         </Card>
       </section>
 
+      {/* SAME / RELATED / DIFFERENT pairs of the newest articles */}
+      <section className="dashboard-section" style={{ marginTop: '2rem' }}>
+        <MatchActivityPanel onOpenArticle={openArticleById} />
+      </section>
+
       {/* Articles the AI detector flagged for a person to check */}
       <section className="dashboard-section" style={{ marginTop: '2rem' }}>
-        <FlaggedArticlesPanel onOpenArticle={openFlaggedArticle} />
+        <FlaggedArticlesPanel onOpenArticle={openArticleById} />
       </section>
 
     </div>

@@ -543,6 +543,77 @@ export async function countArticles() {
 }
 
 /**
+ * For one news source: how many articles it has and its newest article.
+ * The backend has no per-source summary route, so this reads
+ * GET /articles?source_id=...&limit=100&offset=... until a short page.
+ * The backend sends the newest article (by publication time) first.
+ *
+ * @param {number | string} sourceId
+ * @returns {Promise<{ count: number, isComplete: boolean, newest: Object | null }>}
+ */
+export async function fetchSourceActivity(sourceId) {
+  const { items, isComplete } = await readAllPages(async ({ limit, start }) => {
+    const result = await fetchArticles({ limit, offset: start, sourceId })
+    return result.articles
+  })
+  return { count: items.length, isComplete, newest: items[0] || null }
+}
+
+/**
+ * The stored SAME / RELATED / DIFFERENT matches of the newest articles.
+ * The backend can only list the matches of ONE article, so this asks for
+ * the newest few articles and then their matches (one request each). A pair
+ * found from both of its articles is counted once.
+ * Endpoints: GET /articles?limit=N, then GET /articles/{id}/matches
+ *
+ * @param {{ articleLimit?: number }} [options]
+ * @returns {Promise<{ articlesChecked: number, articlesWithMatches: number,
+ *   matches: Array, counts: { SAME: number, RELATED: number, DIFFERENT: number },
+ *   failedArticles: number }>}
+ */
+export async function fetchRecentMatchActivity({ articleLimit = 10 } = {}) {
+  const { articles } = await fetchArticles({ limit: articleLimit, offset: 0 })
+  const results = await Promise.allSettled(
+    articles.map((article) => fetchMatches({ articleId: article.id }))
+  )
+  const matchesById = new Map()
+  let articlesWithMatches = 0
+  let failedArticles = 0
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      failedArticles += 1
+      continue
+    }
+    if (result.value.length > 0) articlesWithMatches += 1
+    for (const match of result.value) matchesById.set(String(match.id), match)
+  }
+  const matches = [...matchesById.values()]
+  const counts = { SAME: 0, RELATED: 0, DIFFERENT: 0 }
+  for (const match of matches) counts[match.match_label] += 1
+  // Newest stored match first
+  matches.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+  return { articlesChecked: articles.length, articlesWithMatches, matches, counts, failedArticles }
+}
+
+/**
+ * How many articles the backend flagged for editorial review (estimate of
+ * AI_FLAG_THRESHOLD or more). Reads GET /articles/ai-detection/flagged
+ * page by page; an article checked twice is counted once.
+ *
+ * @returns {Promise<{ count: number, isComplete: boolean }>}
+ */
+export async function countFlaggedAiDetections() {
+  if (!AI_DETECTION_AVAILABLE) {
+    throw new ApiError('AI detection only works with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+  const { items, isComplete } = await readAllPages(async ({ limit, start }) => {
+    const data = await apiGet(ENDPOINTS.flaggedAiDetections, { limit, offset: start })
+    return toList(data, 'flagged article').items.map(toAiDetection)
+  })
+  return { count: new Set(items.map((item) => item.article_id)).size, isComplete }
+}
+
+/**
  * Every story (without its events and articles).
  * Reads GET /stories?limit=100&skip=... until a short page.
  *

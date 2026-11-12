@@ -51,7 +51,13 @@ export function App() {
       case 'dashboard':
         return <Dashboard onNavigate={setActiveTab} />
       case 'articles':
-        return <Articles />
+        return (
+          <Articles
+            key={page.visit}
+            initialSourceId={page.params?.sourceId}
+            initialArticleId={page.params?.articleId}
+          />
+        )
       case 'stories':
         return <Stories key={page.visit} initialView={page.params} />
       case 'sources':

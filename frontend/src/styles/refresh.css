@@ -1601,3 +1601,148 @@ a.table-link,
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Feature completion (12 Nov): match activity, source activity, timelines
+   --------------------------------------------------------------------------- */
+
+/* SAME / RELATED / DIFFERENT distribution bar (Dashboard) */
+.match-dist {
+  margin: 0.75rem 0 1rem;
+}
+
+.match-dist-bar {
+  display: flex;
+  height: 0.75rem;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.match-dist-part {
+  display: block;
+  min-width: 4px;
+}
+
+.match-dist-same {
+  background: rgba(var(--success-rgb), 0.75);
+}
+
+.match-dist-related {
+  background: rgba(var(--warning-rgb), 0.75);
+}
+
+.match-dist-different {
+  background: rgba(var(--accent-rgb), 0.75);
+}
+
+.match-dist-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+}
+
+.match-dist-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.match-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.match-activity-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  align-items: start;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.match-activity-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.match-activity-pair .sac-title-btn {
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.match-activity-scores {
+  grid-column: 2;
+}
+
+/* Classifier confidence next to the SAME / RELATED / DIFFERENT badge */
+.sac-confidence {
+  margin-left: 0.5rem;
+  font-family: var(--font-family-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+/* Publication timeline (stories and events) */
+.coverage-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1rem;
+  border-left: 2px solid var(--color-border);
+}
+
+.coverage-timeline-item {
+  position: relative;
+  padding: 0 0 1rem 0.75rem;
+}
+
+.coverage-timeline-item::before {
+  content: '';
+  position: absolute;
+  left: calc(-1rem - 6px);
+  top: 0.35rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.coverage-timeline-time {
+  display: block;
+  font-family: var(--font-family-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.publisher-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Sort and filter row on the Articles page */
+.filter-bar-extra {
+  margin-top: 0.75rem;
+}
+
+/* "Choose articles to save" on the Comparisons page */
+.cmp-choose {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+}
+
+.cmp-choose-item {
+  display: block;
+  padding: 0.2rem 0;
+  overflow-wrap: anywhere;
+}

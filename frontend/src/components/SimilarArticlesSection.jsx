@@ -20,6 +20,18 @@ function labelsByOtherArticle(matchList, articleId) {
   return labels
 }
 
+// { [otherArticleId]: confidence 0..1 } from the stored matches (only when the backend sent one)
+function confidenceByOtherArticle(matchList, articleId) {
+  const confidences = {}
+  for (const match of matchList) {
+    if (match.confidence_score === null) continue
+    const otherId =
+      String(match.article_id_1) === String(articleId) ? match.article_id_2 : match.article_id_1
+    confidences[String(otherId)] = match.confidence_score
+  }
+  return confidences
+}
+
 /**
  * Checks whether an error is due to missing embeddings (HTTP 404 from backend)
  */
@@ -68,6 +80,7 @@ export function SimilarArticlesSection({ articleId, onSelectArticle }) {
 
   // Stored classification labels for the similar articles
   const [matchLabels, setMatchLabels] = useState({})
+  const [matchConfidences, setMatchConfidences] = useState({})
   const [matchesError, setMatchesError] = useState('')
   const [matchesReloadCount, setMatchesReloadCount] = useState(0)
   const [isClassifying, setIsClassifying] = useState(false)
@@ -80,6 +93,7 @@ export function SimilarArticlesSection({ articleId, onSelectArticle }) {
     setError(null)
     setSimilarityData(null)
     setMatchLabels({})
+    setMatchConfidences({})
     setMatchesError('')
     setClassifyError('')
   }
@@ -93,6 +107,7 @@ export function SimilarArticlesSection({ articleId, onSelectArticle }) {
       .then((matchList) => {
         if (isCurrentRequest) {
           setMatchLabels(labelsByOtherArticle(matchList, articleId))
+          setMatchConfidences(confidenceByOtherArticle(matchList, articleId))
           setMatchesError('')
         }
       })
@@ -255,6 +270,7 @@ export function SimilarArticlesSection({ articleId, onSelectArticle }) {
               key={match.article_id}
               article={match}
               matchLabel={matchLabels[String(match.article_id)] || null}
+              matchConfidence={matchConfidences[String(match.article_id)] ?? null}
               showMatchLabel={!matchesError}
               onSelect={onSelectArticle}
             />

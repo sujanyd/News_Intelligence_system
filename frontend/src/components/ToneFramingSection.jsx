@@ -173,6 +173,7 @@ export function ToneFramingSection({ articleId, contentAvailability = null }) {
                 <dd>{formatPercent(framing.confidence)}</dd>
               </div>
             </dl>
+            {framing.explanation && <p className="pol-explanation">Why: {framing.explanation}</p>}
           </>
         )}
       </div>

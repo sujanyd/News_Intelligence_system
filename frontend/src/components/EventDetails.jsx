@@ -6,6 +6,7 @@ import AlertMessage from './AlertMessage'
 import EmptyState from './EmptyState'
 import ArticleDetails from './ArticleDetails'
 import ContentAvailabilityBadge from './ContentAvailabilityBadge'
+import { CoverageTimeline, PublisherList } from './CoverageTimeline'
 import { PrecisionBadge, TimeAgreementBadge } from './EventTimeInfo'
 import { fetchEvent } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
@@ -17,7 +18,9 @@ import { formatEventTime } from '../utils/formatEventTime'
  * Loads one event from GET /events/{id} and shows:
  *   1. When it happened, how precise that time is, and whether sources disagree
  *   2. The story it belongs to (with a button back to that story)
- *   3. The articles that report it. "View" opens the full article above.
+ *   3. The publishers that covered it and a publication timeline (kept
+ *      apart from the event time)
+ *   4. The articles that report it. "View" opens the full article above.
  *
  * Events have no title in the backend, so the page calls it "Event 12"
  * and the article headlines say what happened.
@@ -178,6 +181,18 @@ export function EventDetails({ eventId, onOpenStory, onBackToStories }) {
           describe what happened.
         </p>
       </Card>
+
+      <div className="stories-section">
+        <Card title="Publishers covering this event">
+          <PublisherList articles={event.articles} />
+        </Card>
+      </div>
+
+      <div className="stories-section">
+        <Card title="Publication timeline" subtitle="When each publisher published, earliest first">
+          <CoverageTimeline articles={event.articles} onViewArticle={handleViewArticle} />
+        </Card>
+      </div>
 
       <div className="stories-section">
         <Card title="Articles reporting this event" subtitle="Press View to read one">

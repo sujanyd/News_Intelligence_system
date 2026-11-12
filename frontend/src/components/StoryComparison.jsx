@@ -157,6 +157,8 @@ export function StoryComparison({ onSaved = null }) {
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  // Articles the user un-ticked in "Choose articles to save" (all are ticked at first)
+  const [excludedIds, setExcludedIds] = useState([])
 
   // 1. The stories that have 2 or more articles
   useEffect(() => {
@@ -223,6 +225,15 @@ export function StoryComparison({ onSaved = null }) {
     setStoryError('')
     setComparison(null)
     setPairIds(['', ''])
+    setExcludedIds([])
+  }
+
+  function toggleArticle(articleId) {
+    setExcludedIds(
+      excludedIds.includes(articleId)
+        ? excludedIds.filter((id) => id !== articleId)
+        : [...excludedIds, articleId]
+    )
   }
 
   async function handleSave(articleIds) {
@@ -328,6 +339,9 @@ export function StoryComparison({ onSaved = null }) {
     }
 
     const samePublisher = articleA.source_name === articleB.source_name
+    const chosenIds = story.articles
+      .map((article) => article.id)
+      .filter((id) => !excludedIds.includes(id))
     let body
     if (idA === idB) {
       body = <AlertMessage type="info" message="Choose two different articles." />
@@ -411,14 +425,31 @@ export function StoryComparison({ onSaved = null }) {
               <button
                 type="button"
                 className="btn btn-secondary"
-                disabled={isSaving}
-                onClick={() => handleSave(story.articles.map((article) => article.id))}
+                disabled={isSaving || chosenIds.length < 2}
+                onClick={() => handleSave(chosenIds)}
               >
-                Save all {story.articles.length} articles as a comparison
+                {chosenIds.length === story.articles.length
+                  ? `Save all ${story.articles.length} articles as a comparison`
+                  : `Save the ${chosenIds.length} chosen articles as a comparison`}
               </button>
             )}
             <span className="pol-technique">Saved comparisons can be opened again and turned into reports.</span>
           </div>
+        )}
+        {COMPARISONS_AVAILABLE && story.articles.length > 2 && (
+          <fieldset className="cmp-choose">
+            <legend className="form-label">Choose articles to save (at least 2)</legend>
+            {story.articles.map((article) => (
+              <label key={article.id} className="cmp-choose-item">
+                <input
+                  type="checkbox"
+                  checked={!excludedIds.includes(article.id)}
+                  onChange={() => toggleArticle(article.id)}
+                />{' '}
+                {article.source_name || 'Unknown publisher'}: {article.title}
+              </label>
+            ))}
+          </fieldset>
         )}
         {saveError && <AlertMessage type="error" title="Could not save the comparison." message={saveError} />}
         {body}

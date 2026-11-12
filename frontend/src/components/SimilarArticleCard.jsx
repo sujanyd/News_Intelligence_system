@@ -27,10 +27,18 @@ import StatusBadge from './StatusBadge'
  * @param {number} props.article.similarity_score - Cosine similarity score (0.0 - 1.0)
  * @param {string} [props.article.url] - External article URL
  * @param {'SAME' | 'RELATED' | 'DIFFERENT' | null} [props.matchLabel] - Stored classification
+ * @param {number | null} [props.matchConfidence] - The classifier's confidence in matchLabel (0-1).
+ *   Shown apart from the similarity score: they measure different things.
  * @param {boolean} [props.showMatchLabel=false] - false hides the badge (e.g. matches could not load)
  * @param {(articleId: number) => void} [props.onSelect] - Called when user clicks "View article"
  */
-export function SimilarArticleCard({ article, matchLabel = null, showMatchLabel = false, onSelect }) {
+export function SimilarArticleCard({
+  article,
+  matchLabel = null,
+  matchConfidence = null,
+  showMatchLabel = false,
+  onSelect,
+}) {
   if (!article) return null
 
   const similarityPercentage = formatSimilarityPercentage(article.similarity_score)
@@ -74,7 +82,14 @@ export function SimilarArticleCard({ article, matchLabel = null, showMatchLabel 
         {showMatchLabel && (
           <div className="sac-classification" data-testid="similar-classification">
             {matchLabel ? (
-              <ClassificationBadge label={matchLabel} size="sm" />
+              <>
+                <ClassificationBadge label={matchLabel} size="sm" />
+                {matchConfidence !== null && (
+                  <span className="sac-confidence" data-testid="match-confidence">
+                    Match confidence: {formatSimilarityPercentage(matchConfidence)}
+                  </span>
+                )}
+              </>
             ) : (
               <StatusBadge variant="pending">Not classified yet</StatusBadge>
             )}

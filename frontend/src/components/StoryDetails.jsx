@@ -4,6 +4,8 @@ import DataTable from './DataTable'
 import LoadingState from './LoadingState'
 import AlertMessage from './AlertMessage'
 import EmptyState from './EmptyState'
+import ArticleDetails from './ArticleDetails'
+import { CoverageTimeline, PublisherList } from './CoverageTimeline'
 import { PrecisionBadge, TimeAgreementBadge } from './EventTimeInfo'
 import { fetchStory } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
@@ -26,6 +28,7 @@ import { formatEventTime, getUniqueSourceNames, sortEventsByTime } from '../util
  * @param {(eventId: number) => void} props.onOpenEvent - Open one event
  */
 export function StoryDetails({ storyId, onBack, onOpenEvent }) {
+  const [selectedArticleId, setSelectedArticleId] = useState(null)
   const [story, setStory] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -166,6 +169,7 @@ export function StoryDetails({ storyId, onBack, onOpenEvent }) {
             <dd>{sourceNames.length > 0 ? sourceNames.join(', ') : 'No sources yet'}</dd>
           </div>
         </dl>
+        <PublisherList articles={story.articles} />
         <p className="ingestion-note">The backend does not store a description for stories.</p>
       </Card>
 
@@ -176,6 +180,22 @@ export function StoryDetails({ storyId, onBack, onOpenEvent }) {
           ) : (
             <EmptyState title="No events yet" description="This story has no events." />
           )}
+        </Card>
+      </div>
+
+      {selectedArticleId !== null && (
+        <div className="stories-section">
+          <ArticleDetails
+            articleId={selectedArticleId}
+            sourceName={story.articles.find((article) => article.id === selectedArticleId)?.source_name || undefined}
+            onClose={() => setSelectedArticleId(null)}
+          />
+        </div>
+      )}
+
+      <div className="stories-section">
+        <Card title="Publication timeline" subtitle="When each publisher published, earliest first">
+          <CoverageTimeline articles={story.articles} onViewArticle={(article) => setSelectedArticleId(article.id)} />
         </Card>
       </div>
 
