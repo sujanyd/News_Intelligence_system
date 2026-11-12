@@ -324,7 +324,7 @@ export function Articles() {
     <div className="page-articles">
       <PageHeader
         title="Articles"
-        description="Browse collected news articles, search them by title and filter them by source."
+        description="Search collected articles by title, or filter them by publisher."
         badge={<DataModeBadge />}
       />
 

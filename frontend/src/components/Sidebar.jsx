@@ -1,6 +1,4 @@
 import React from 'react'
-import { API_BASE_URL_LABEL } from '../api/config'
-import StatusBadge from './StatusBadge'
 
 /**
  * Sidebar Navigation Component
@@ -164,14 +162,6 @@ export function Sidebar({ activeTab, onSelectTab, isMobileOpen = false, onCloseM
           })}
         </nav>
 
-        {/* Sidebar Footer Info */}
-        <div className="sidebar-footer">
-          <div className="sidebar-api-card">
-            <span className="api-card-label">Backend Target</span>
-            <div className="api-card-val code-pill">{API_BASE_URL_LABEL}</div>
-            <StatusBadge variant="info">FastAPI Ready</StatusBadge>
-          </div>
-        </div>
       </aside>
     </>
   )

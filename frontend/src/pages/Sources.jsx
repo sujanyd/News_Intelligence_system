@@ -93,7 +93,7 @@ export function Sources() {
     <div className="page-sources">
       <PageHeader
         title="News Sources"
-        description="See the news outlets the system collects from, and add new ones."
+        description="The publishers news is collected from."
         badge={<DataModeBadge />}
       />
 

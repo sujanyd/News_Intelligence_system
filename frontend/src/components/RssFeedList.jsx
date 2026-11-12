@@ -95,10 +95,6 @@ export function RssFeedList() {
           rows={feeds.map((feed, index) => ({ ...feed, id: `${feed.source_name}-${index}` }))}
           caption="RSS feeds read by News Collection"
         />
-        <p className="ingestion-note">
-          Start a collection with &quot;Run News Collection&quot; on the Dashboard. The backend
-          does not record when the last collection ran.
-        </p>
       </>
     )
   }

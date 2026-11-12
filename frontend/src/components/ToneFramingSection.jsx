@@ -121,7 +121,7 @@ export function ToneFramingSection({ articleId, contentAvailability = null }) {
           </div>
           <div>
             <dt>Headline tone</dt>
-            <dd>Not measured on its own: the backend gives one tone for the headline and text together</dd>
+            <dd>Not measured separately</dd>
           </div>
         </dl>
         {tone.explanation && <p className="pol-explanation">Why: {tone.explanation}</p>}
@@ -235,11 +235,8 @@ export function ToneFramingSection({ articleId, contentAvailability = null }) {
         {renderHeadlineFraming()}
         {renderSignals()}
         <p className="ad-section-note">
-          Found automatically by the backend, by matching words from fixed lists (for example
-          &quot;blame&quot; or &quot;clash&quot;). It can be wrong: a word may be in a quote or
-          mean something else (a bear &quot;attack&quot; is not a conflict frame). Tone is not
-          bias: news about a disaster is naturally negative. The confidence numbers come from
-          the same fixed rules; they are not a measured accuracy.
+          Found by matching words from fixed lists, so it can be wrong. Tone is not bias: news
+          about a disaster is naturally negative.
         </p>
       </>
     )

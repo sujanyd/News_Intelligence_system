@@ -33,11 +33,13 @@ export function MetricCard({
   actionLabel,
   onAction,
 }) {
+  // Live backend data needs no label; only say so when it is loading or missing
   function renderBadge() {
     if (isLoading) return <StatusBadge variant="neutral">Loading</StatusBadge>
     if (isPlaceholder) return <StatusBadge variant="info">Not available</StatusBadge>
-    return <StatusBadge variant="success">Live</StatusBadge>
+    return null
   }
+  const badge = renderBadge()
 
   return (
     <div className={`card metric-card metric-accent-${accent}`} aria-busy={isLoading || undefined}>
@@ -57,10 +59,12 @@ export function MetricCard({
         {subtitle && <div className="metric-subtitle">{subtitle}</div>}
       </div>
 
-      <div className="metric-card-footer">
-        {renderBadge()}
-        {helperText && <span className="metric-helper-text">{helperText}</span>}
-      </div>
+      {(badge || helperText) && (
+        <div className="metric-card-footer">
+          {badge}
+          {helperText && <span className="metric-helper-text">{helperText}</span>}
+        </div>
+      )}
       {actionLabel && onAction && (
         <button type="button" className="btn btn-secondary metric-card-action" onClick={onAction}>
           {actionLabel} <span aria-hidden="true">→</span>

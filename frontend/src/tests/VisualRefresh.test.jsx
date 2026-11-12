@@ -27,9 +27,9 @@ describe('MetricCard', () => {
     expect(screen.getByText('Loading', { selector: '.status-badge' })).toBeDefined()
   })
 
-  it('says "Live" for backend data and "Not available" otherwise', () => {
+  it('needs no label for live data, and says "Not available" otherwise', () => {
     const { rerender } = render(<MetricCard title="Reports" value="3" isPlaceholder={false} />)
-    expect(screen.getByText('Live')).toBeDefined()
+    expect(screen.queryByText('Live')).toBeNull()
     rerender(<MetricCard title="Reports" value="--" isPlaceholder />)
     expect(screen.getByText('Not available')).toBeDefined()
   })

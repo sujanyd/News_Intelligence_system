@@ -246,9 +246,8 @@ export function ArticleInsightsSection({ articleId, contentAvailability }) {
           <p className="ad-section-note">
             Found automatically by the backend
             {insights.pipeline_version ? ` (${insights.pipeline_version})` : ''}
-            {insights.created_at ? ` on ${formatDate(insights.created_at)}` : ''}. Automatic
-            extraction can make mistakes. Facts are what the article says; &quot;Not
-            checked&quot; means nobody has verified them.
+            {insights.created_at ? ` on ${formatDate(insights.created_at)}` : ''} and may contain
+            mistakes. &quot;Not checked&quot; means nobody has verified a fact.
           </p>
           <button
             type="button"

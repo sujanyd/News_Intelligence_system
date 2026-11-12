@@ -131,12 +131,9 @@ export function PoliticalAnalysisSection({ articleId }) {
 
         <p className="ad-section-note">
           Found automatically by the backend
-          {analysis.analyzed_at ? ` on ${formatDate(analysis.analyzed_at)}` : ''}, by matching
-          words from fixed lists (for example &quot;praised&quot; or &quot;criticized&quot;) in
-          sentences that mention a name. It can be wrong: the word may be about someone else.
-          Critical wording is not proof of bias, and one article says nothing about a
-          publisher&apos;s politics. The backend&apos;s confidence numbers are not shown because
-          they are the same for every result.
+          {analysis.analyzed_at ? ` on ${formatDate(analysis.analyzed_at)}` : ''} by matching words
+          near a name, so it can be wrong. It is not proof of bias, and one article says nothing
+          about a publisher&apos;s politics.
         </p>
       </>
     )

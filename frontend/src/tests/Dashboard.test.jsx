@@ -58,13 +58,13 @@ describe('Dashboard', () => {
     expect(await within(details).findByText(/The city council voted on Monday/)).toBeDefined()
   })
 
-  it('calls onNavigate for "View all articles" and "Manage sources"', async () => {
+  it('calls onNavigate for "View all articles" and "Open Sources"', async () => {
     const onNavigate = vi.fn()
     render(<Dashboard onNavigate={onNavigate} />)
     await screen.findByRole('list', { name: 'Most recent articles' })
 
     fireEvent.click(screen.getByRole('button', { name: 'View all articles' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Manage sources' }))
+    fireEvent.click(screen.getByRole('button', { name: /Open Sources/ }))
 
     expect(onNavigate).toHaveBeenNthCalledWith(1, 'articles')
     expect(onNavigate).toHaveBeenNthCalledWith(2, 'sources')
@@ -107,16 +107,13 @@ describe('Dashboard', () => {
     expect(within(stories[0]).getByRole('heading', { level: 3 }).textContent).toBe(NEWEST_TITLE)
   })
 
-  it('lists the sources from the API with their base URL, and counts them', async () => {
+  it('counts the sources from the API (the list itself is on the Sources page)', async () => {
     render(<Dashboard />)
 
-    const table = await screen.findByRole('table', { name: 'Configured news sources' })
-    expect(within(table).getByText('Daily Ledger')).toBeDefined()
-    expect(within(table).getByRole('link', { name: 'https://dailyledger.example' })).toBeDefined()
     // The count is shown twice: the counting-up copy and the screen-reader copy
-    expect(screen.getByText('5', { selector: '.sr-only' })).toBeDefined()
+    expect(await screen.findByText('5', { selector: '.sr-only' })).toBeDefined()
+    expect(screen.queryByRole('table', { name: 'Configured news sources' })).toBeNull()
     // No "connected" claim, because the backend does not report it
-    expect(screen.getByText(/does not report whether each source/)).toBeDefined()
     expect(screen.queryByText(/Connected/)).toBeNull()
   })
 
@@ -124,8 +121,7 @@ describe('Dashboard', () => {
     fetchSources.mockRejectedValueOnce(new Error('Sources route missing'))
     render(<Dashboard />)
 
-    expect(await screen.findByText('Could not load sources.')).toBeDefined()
-    expect(screen.getByText('Could not load sources')).toBeDefined()
+    expect(await screen.findByText('Could not load sources')).toBeDefined()
   })
 
   it('disables the button while collecting, then shows the result and reloads the lists', async () => {
@@ -133,7 +129,7 @@ describe('Dashboard', () => {
     runNewsCollection.mockReturnValueOnce(pendingRun.promise)
     render(<Dashboard />)
     await screen.findByRole('list', { name: 'Most recent articles' })
-    await screen.findByRole('table', { name: 'Configured news sources' })
+    await vi.waitFor(() => expect(fetchSources).toHaveBeenCalledTimes(1))
     expect(fetchArticles).toHaveBeenCalledTimes(1)
     expect(fetchSources).toHaveBeenCalledTimes(1)
 
@@ -173,7 +169,7 @@ describe('Dashboard', () => {
 
     // Both lists are loaded again (a run can add articles and sources)
     await screen.findByRole('list', { name: 'Most recent articles' })
-    await screen.findByRole('table', { name: 'Configured news sources' })
+    await vi.waitFor(() => expect(fetchSources).toHaveBeenCalledTimes(2))
     expect(fetchArticles).toHaveBeenCalledTimes(2)
     expect(fetchSources).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('button', { name: 'Run News Collection' }).disabled).toBe(false)

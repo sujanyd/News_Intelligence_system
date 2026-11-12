@@ -208,7 +208,7 @@ export function StoryList({ onOpenStory }) {
     <>
       <Card
         title="Group articles into stories"
-        subtitle="News collection does not do this by itself"
+        subtitle="Puts new articles into stories and events, up to 200 at a time"
       >
         <button
           type="button"
@@ -225,10 +225,6 @@ export function StoryList({ onOpenStory }) {
             'Group articles'
           )}
         </button>
-        <p className="ingestion-note">
-          Puts every article that is not in a story yet into a story and an event (up to 200
-          articles each time). This saves the result in the backend.
-        </p>
         {groupingMessage && <AlertMessage type="success" message={groupingMessage} />}
         {groupingError && (
           <AlertMessage type="error" title="Grouping failed." message={groupingError} />

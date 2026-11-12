@@ -1574,3 +1574,30 @@ a.table-link,
     animation: none;
   }
 }
+
+/* Stat cells: number right under the label; any button sits at the bottom */
+.grid-metrics > .metric-card {
+  justify-content: flex-start;
+}
+
+.grid-metrics > .metric-card .metric-card-action {
+  margin-top: auto;
+}
+
+.grid-metrics > .metric-card .metric-card-body {
+  margin-bottom: 0.75rem;
+}
+
+/* Header buttons keep to one line; on narrower screens they drop their words */
+.palette-trigger,
+.theme-toggle {
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .palette-trigger-text,
+  .palette-trigger .palette-kbd,
+  .theme-toggle-text {
+    display: none;
+  }
+}

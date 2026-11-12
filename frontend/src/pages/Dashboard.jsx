@@ -5,7 +5,6 @@ import MetricCard from '../components/MetricCard'
 import EmptyState from '../components/EmptyState'
 import LoadingState from '../components/LoadingState'
 import AlertMessage from '../components/AlertMessage'
-import DataTable from '../components/DataTable'
 import ArticleDetails from '../components/ArticleDetails'
 import IngestionPanel from '../components/IngestionPanel'
 import DataModeBadge from '../components/DataModeBadge'
@@ -27,7 +26,6 @@ import {
   fetchSources,
   runNewsCollection,
 } from '../api/newsApi'
-import { formatDate } from '../utils/formatDate'
 import { getSourceName } from '../utils/getSourceName'
 
 // How many of the newest articles the dashboard shows
@@ -231,22 +229,6 @@ export function Dashboard({ onNavigate }) {
   const selectedArticle = articles.find((article) => article.id === selectedArticleId)
 
 
-  const sourceColumns = [
-    { key: 'name', label: 'Name', render: (source) => <strong>{source.name}</strong> },
-    {
-      key: 'base_url',
-      label: 'Base URL',
-      render: (source) =>
-        source.base_url ? (
-          <a href={source.base_url} target="_blank" rel="noreferrer" className="table-link">
-            {source.base_url}
-          </a>
-        ) : (
-          'Not available'
-        ),
-    },
-    { key: 'created_at', label: 'Added', render: (source) => formatDate(source.created_at) },
-  ]
 
   function renderRecentArticles() {
     if (isLoadingArticles) {
@@ -279,38 +261,6 @@ export function Dashboard({ onNavigate }) {
     )
   }
 
-  function renderSources() {
-    if (isLoadingSources) {
-      return <LoadingState message="Loading sources..." />
-    }
-    if (sourcesError) {
-      return (
-        <AlertMessage
-          type="error"
-          title="Could not load sources."
-          message={sourcesError}
-          onRetry={reloadSources}
-        />
-      )
-    }
-    if (sources.length === 0) {
-      return (
-        <EmptyState
-          title="No news sources configured yet"
-          description="Add a source on the Sources page."
-        />
-      )
-    }
-    return (
-      <>
-        <DataTable columns={sourceColumns} rows={sources} caption="Configured news sources" />
-        <p className="ingestion-note">
-          The backend does not report whether each source&apos;s feed is working, so no
-          connection status is shown.
-        </p>
-      </>
-    )
-  }
 
   return (
     <div className="page-dashboard">
@@ -396,8 +346,7 @@ export function Dashboard({ onNavigate }) {
         </p>
         <p className="hero-sub drop-cap">
           Collect news from several publishers, group it into stories, and compare tone, framing,
-          political signals and evidence side by side. Every number on this page comes from the
-          backend.
+          political signals and evidence side by side.
         </p>
         <div className="hero-actions">
           <button type="button" className="btn btn-primary btn-lg" onClick={() => openPage('comparisons')}>
@@ -452,8 +401,7 @@ export function Dashboard({ onNavigate }) {
         <MetricCard
           title="Total articles"
           value={formatCount(totals?.articles)}
-          subtitle="Collected news articles"
-          helperText={totals?.articles ? 'Counted from the article list' : totals ? 'Could not count' : 'Counting...'}
+          helperText={totals && !totals.articles ? 'Could not count' : undefined}
           isPlaceholder={USE_MOCK_DATA || !totals?.articles}
           isLoading={!totals}
           accent="blue"
@@ -470,8 +418,9 @@ export function Dashboard({ onNavigate }) {
         <MetricCard
           title="News sources"
           value={isLoadingSources || sourcesError ? '--' : String(sources.length)}
-          subtitle="Monitored publishers"
-          helperText={sourcesError ? 'Could not load sources' : 'From the backend'}
+          helperText={sourcesError ? 'Could not load sources' : undefined}
+          actionLabel={onNavigate ? 'Open Sources' : undefined}
+          onAction={() => openPage('sources')}
           isPlaceholder={USE_MOCK_DATA || isLoadingSources || Boolean(sourcesError)}
           isLoading={isLoadingSources}
           accent="cyan"
@@ -492,10 +441,10 @@ export function Dashboard({ onNavigate }) {
             !STORIES_AVAILABLE
               ? 'Needs the real backend'
               : totals?.stories && totals?.events
-              ? 'Grouped by the backend'
+              ? undefined
               : totals
               ? 'Could not count'
-              : 'Counting...'
+              : undefined
           }
           isPlaceholder={!totals?.stories || !totals?.events}
           isLoading={!totals}
@@ -517,10 +466,10 @@ export function Dashboard({ onNavigate }) {
             !STORIES_AVAILABLE
               ? 'Needs the real backend'
               : totals?.comparable
-              ? 'Open them in Comparisons or Reports'
+              ? undefined
               : totals
               ? 'Could not count'
-              : 'Counting...'
+              : undefined
           }
           isPlaceholder={!totals?.comparable}
           isLoading={!totals}
@@ -538,15 +487,14 @@ export function Dashboard({ onNavigate }) {
         <MetricCard
           title="Saved comparisons"
           value={formatCount(totals?.comparisons)}
-          subtitle="Cross-source comparisons"
           helperText={
             !COMPARISONS_AVAILABLE
               ? 'Needs the real backend'
               : totals?.comparisons
-              ? 'Saved in the backend'
+              ? undefined
               : totals
               ? 'Could not count'
-              : 'Counting...'
+              : undefined
           }
           isPlaceholder={!totals?.comparisons}
           isLoading={!totals}
@@ -558,15 +506,14 @@ export function Dashboard({ onNavigate }) {
         <MetricCard
           title="Generated reports"
           value={formatCount(totals?.reports)}
-          subtitle="Evidence-based reports"
           helperText={
             !COMPARISONS_AVAILABLE
               ? 'Needs the real backend'
               : totals?.reports
-              ? 'Saved in the backend'
+              ? undefined
               : totals
               ? 'Could not count'
-              : 'Counting...'
+              : undefined
           }
           isPlaceholder={!totals?.reports}
           isLoading={!totals}
@@ -601,7 +548,7 @@ export function Dashboard({ onNavigate }) {
       <section className="dashboard-section" style={{ marginTop: '2rem' }}>
         <Card
           title="Front Page"
-          subtitle="The newest articles stored in the backend, newest first"
+          subtitle="Newest first"
           badge={
             <button type="button" className="btn btn-secondary" onClick={() => openPage('articles')}>
               View all articles
@@ -617,64 +564,6 @@ export function Dashboard({ onNavigate }) {
         <FlaggedArticlesPanel onOpenArticle={openFlaggedArticle} />
       </section>
 
-      {/* Configured news sources */}
-      <section className="dashboard-section" style={{ marginTop: '2rem' }}>
-        <Card
-          title="News Sources"
-          subtitle="Publishers configured in the backend"
-          badge={
-            <button type="button" className="btn btn-secondary" onClick={() => openPage('sources')}>
-              Manage sources
-            </button>
-          }
-        >
-          {renderSources()}
-        </Card>
-      </section>
-
-      {/* Analysis Pipeline & Architecture Preparation */}
-      <section className="dashboard-section" style={{ marginTop: '2rem' }}>
-        <Card
-          title="System Pipeline & Analysis Architecture"
-          subtitle="Overview of automated news intelligence stages"
-          badge={<StatusBadge variant="primary">Architecture</StatusBadge>}
-        >
-          <div className="pipeline-steps">
-            <div className="pipeline-step-item">
-              <div className="step-number">1</div>
-              <div className="step-details">
-                <h4 className="step-title">Ingestion & Preprocessing</h4>
-                <p className="step-desc">
-                  Automated harvesting from RSS feeds and news APIs, text cleaning, and author/date normalization.
-                </p>
-                <StatusBadge variant="warning">Awaiting Ingestion Service</StatusBadge>
-              </div>
-            </div>
-
-            <div className="pipeline-step-item">
-              <div className="step-number">2</div>
-              <div className="step-details">
-                <h4 className="step-title">Semantic Clustering & Deduplication</h4>
-                <p className="step-desc">
-                  Vector embeddings cluster parallel coverage of identical breaking events into unified story groups.
-                </p>
-                <StatusBadge variant="info">Embeddings Layer</StatusBadge>
-              </div>
-            </div>
-
-            <div className="pipeline-step-item">
-              <div className="step-number">3</div>
-              <div className="step-details">
-                <h4 className="step-title">Bias & Framing Classification</h4>
-                <p className="step-desc">
-                  NLP algorithms and LLM evaluations score political leanings, narrative focal points, and tone divergence.
-                </p>
-                <StatusBadge variant="primary">Analysis Layer</StatusBadge>
-              </div>
-            </div>
-          </div>
-        </Card>
-      </section>
     </div>
   )
 }

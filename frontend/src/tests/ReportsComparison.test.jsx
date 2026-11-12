@@ -162,7 +162,9 @@ describe('Reports page', () => {
     render(<Reports />)
     const table = await screen.findByRole('table', { name: 'Saved reports' })
     expect(within(table).getByText(REPORT.title)).toBeDefined()
-    expect(within(table).getByText('#4')).toBeDefined()
+    // Only what is needed to choose: title, date, Open (format and comparison are inside the report)
+    expect(within(table).queryByText('#4')).toBeNull()
+    expect(within(table).getByRole('button', { name: `Open report 7: ${REPORT.title}` })).toBeDefined()
   })
 
   it('opens a report: backend summary, download, plain text, and the analysis with evidence and limitations', async () => {

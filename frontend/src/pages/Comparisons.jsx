@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import PageHeader from '../components/PageHeader'
-import StatusBadge from '../components/StatusBadge'
 import Card from '../components/Card'
 import LoadingState from '../components/LoadingState'
 import AlertMessage from '../components/AlertMessage'
@@ -122,8 +121,7 @@ export function Comparisons({ initialComparisonId = null }) {
     <div className="page-comparisons" data-testid="page-comparisons">
       <PageHeader
         title="Comparisons"
-        description="Open saved comparisons, compare how articles cover the same story, review pairwise semantic matches, and inspect SAME, RELATED, or DIFFERENT event classifications."
-        badge={<StatusBadge variant="primary">Cross-source</StatusBadge>}
+        description="See how different publishers cover the same story."
       />
 
       {openComparisonId !== null ? (

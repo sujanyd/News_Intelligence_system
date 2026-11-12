@@ -68,11 +68,8 @@ export function IngestionPanel({ isAvailable, unavailableReason, onRun, onSucces
     { key: 'error', label: 'Error', render: (feed) => feed.error || '-' },
   ]
 
-  const statusBadge = isAvailable ? (
-    <StatusBadge variant="success">Live backend</StatusBadge>
-  ) : (
-    <StatusBadge variant="warning">Not available</StatusBadge>
-  )
+  // Only worth a label when collection cannot run
+  const statusBadge = isAvailable ? null : <StatusBadge variant="warning">Not available</StatusBadge>
 
   return (
     <Card

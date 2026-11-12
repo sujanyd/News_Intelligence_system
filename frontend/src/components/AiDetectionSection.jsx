@@ -232,7 +232,6 @@ export function AiDetectionSection({ articleId, contentAvailability = null }) {
                 <dd>{formatNumber(metrics.repetition_index)}</dd>
               </div>
             </dl>
-            {metrics.methodology && <p className="pol-explanation">Method: {metrics.methodology}</p>}
           </>
         )}
 
@@ -244,11 +243,8 @@ export function AiDetectionSection({ articleId, contentAvailability = null }) {
         </button>
 
         <p className="ad-section-note">
-          This is a statistical <strong>estimate</strong>, not proof. It only looks at sentence
-          lengths and repeated words, so careful human writing (for example news-agency copy) can
-          score high and AI text can score low. It is not a judgement of the article or its
-          publisher.
-          {result.limitations ? ` Backend note: ${result.limitations}` : ''}
+          A statistical <strong>estimate</strong> from sentence lengths and repeated words, not
+          proof. It is not a judgement of the article or its publisher.
         </p>
       </>
     )

@@ -12,7 +12,8 @@ export function DataModeBadge() {
   if (USE_MOCK_DATA) {
     return <StatusBadge variant="warning">Mock data</StatusBadge>
   }
-  return <StatusBadge variant="success">Live API</StatusBadge>
+  // Real data is the normal case and needs no label; only mock data is flagged
+  return null
 }
 
 export default DataModeBadge

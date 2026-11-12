@@ -112,7 +112,7 @@ describe('ArticleDetails component', () => {
     ).toBeDefined()
 
     const panel = screen.getByRole('region', { name: 'Article details' })
-    // 'Daily Ledger' appears in both the Article Information and Source Information sections
+    // The publisher is shown once, as the byline under the headline
     expect(within(panel).getAllByText('Daily Ledger').length).toBeGreaterThanOrEqual(1)
 
     // Both date term cells should be visible
@@ -273,14 +273,16 @@ describe('ArticleDetails component', () => {
   })
 
   // ── Section structure ─────────────────────────────────────────────────────
-  it('renders the four named sections after a successful load', async () => {
+  it('renders the named sections after a successful load, without the old extra ones', async () => {
     render(<ArticleDetails {...DEFAULT_PROPS} />)
     await screen.findByText('City council approves new budget for public transport')
 
     expect(screen.getByText('Article Information')).toBeDefined()
     expect(screen.getByText('Article Content')).toBeDefined()
-    expect(screen.getByText('Source Information')).toBeDefined()
     expect(screen.getByText('AI Detection')).toBeDefined()
+    // Removed as extra: a source box repeating the byline, and the old pipeline panel
+    expect(screen.queryByText('Source Information')).toBeNull()
+    expect(screen.queryByTestId('processing-status-section')).toBeNull()
   })
 
   // ── AI Detection (replaces the old "Coming soon" placeholder) ─────────────
@@ -318,14 +320,14 @@ describe('ArticleDetails component', () => {
     expect(await screen.findByText(/Not in a story yet/)).toBeDefined()
   })
 
-  // ── Source Information section ────────────────────────────────────────────
-  it('shows the source name in the Source Information section', async () => {
+  // ── Publisher shown once, as the byline ───────────────────────────────────
+  it('shows the publisher as the byline under the headline', async () => {
     render(<ArticleDetails {...DEFAULT_PROPS} />)
     await screen.findByText('City council approves new budget for public transport')
 
     const panel = screen.getByRole('region', { name: 'Article details' })
-    expect(within(panel).getAllByText('Daily Ledger').length).toBeGreaterThanOrEqual(1)
-    expect(within(panel).getByText('News source')).toBeDefined()
+    expect(within(panel).getByText('Daily Ledger', { selector: '.card-subtitle' })).toBeDefined()
+    expect(within(panel).queryByText('News source')).toBeNull()
   })
 
   // ── Content availability badge in Content section ─────────────────────────

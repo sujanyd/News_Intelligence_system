@@ -96,7 +96,7 @@ export function SavedComparisonList({ onOpen }) {
   return (
     <Card
       title="Saved comparisons"
-      subtitle={isLoading || errorMessage || !COMPARISONS_AVAILABLE ? undefined : `${comparisons.length} saved in the backend`}
+      subtitle={isLoading || errorMessage || !COMPARISONS_AVAILABLE ? undefined : `${comparisons.length} saved`}
     >
       {renderBody()}
     </Card>

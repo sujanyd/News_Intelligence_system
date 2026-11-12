@@ -4,14 +4,13 @@ import StatusBadge from './StatusBadge'
 import ContentAvailabilityBadge from './ContentAvailabilityBadge'
 import LoadingState from './LoadingState'
 import AlertMessage from './AlertMessage'
-import ProcessingStatusPanel from './ProcessingStatusPanel'
 import SimilarArticlesSection from './SimilarArticlesSection'
 import ArticleInsightsSection from './ArticleInsightsSection'
 import PoliticalAnalysisSection from './PoliticalAnalysisSection'
 import ToneFramingSection from './ToneFramingSection'
 import AiDetectionSection from './AiDetectionSection'
 import { NavigationContext } from '../navigation'
-import { fetchArticle, fetchArticleEmbeddings, STORIES_AVAILABLE } from '../api/newsApi'
+import { fetchArticle, STORIES_AVAILABLE } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
 
 /**
@@ -25,10 +24,8 @@ import { formatDate } from '../utils/formatDate'
  *   3. Article Insights      – extracted topics, entities, facts and quotes
  *   4. Political Analysis    – political entities and how they are worded
  *   5. Tone and Framing      – tone, headline framing, framing signals
- *   6. Processing Status     – lifecycle status from collection to embeddings
- *   7. Similar Articles      – semantically similar articles via vector search
- *   8. Source Information    – source name from the backend
- *   9. AI Detection          – estimated likelihood of machine-generated text
+ *   6. Similar Articles      – semantically similar articles via vector search
+ *   7. AI Detection          – estimated likelihood of machine-generated text
  *
  * States handled: loading, API error, article-not-found (HTTP 404),
  * missing content (null / empty string), summary-only, headline-only.
@@ -56,10 +53,6 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
   const [isNotFound, setIsNotFound] = useState(false)
   const [reloadCount, setReloadCount] = useState(0)
 
-  const [embeddings, setEmbeddings] = useState([])
-  const [isLoadingEmbeddings, setIsLoadingEmbeddings] = useState(true)
-  const [embeddingsError, setEmbeddingsError] = useState('')
-  const [embeddingsReloadCount, setEmbeddingsReloadCount] = useState(0)
 
   // Reset if external articleId prop changes
   const [prevPropArticleId, setPrevPropArticleId] = useState(articleId)
@@ -77,9 +70,6 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
     setErrorMessage('')
     setIsNotFound(false)
     setArticle(null)
-    setEmbeddings([])
-    setIsLoadingEmbeddings(true)
-    setEmbeddingsError('')
   }
 
   useEffect(() => {
@@ -106,40 +96,11 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
     }
   }, [activeArticleId, reloadCount])
 
-  useEffect(() => {
-    let isCurrentRequest = true
-
-    fetchArticleEmbeddings(activeArticleId)
-      .then((result) => {
-        if (isCurrentRequest) setEmbeddings(result)
-      })
-      .catch((error) => {
-        if (!isCurrentRequest) return
-        setEmbeddingsError(error.message || 'Could not load embedding status')
-      })
-      .finally(() => {
-        if (isCurrentRequest) setIsLoadingEmbeddings(false)
-      })
-
-    return () => {
-      isCurrentRequest = false
-    }
-  }, [activeArticleId, embeddingsReloadCount])
-
   function handleRetry() {
     setIsLoading(true)
     setErrorMessage('')
     setIsNotFound(false)
     setReloadCount((c) => c + 1)
-    setIsLoadingEmbeddings(true)
-    setEmbeddingsError('')
-    setEmbeddingsReloadCount((c) => c + 1)
-  }
-
-  function handleRetryEmbeddings() {
-    setIsLoadingEmbeddings(true)
-    setEmbeddingsError('')
-    setEmbeddingsReloadCount((c) => c + 1)
   }
 
   // ── Navigation between similar articles ───────────────────────────────────
@@ -227,7 +188,6 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
       <div className="ad-content-body" data-testid="content-body">
         {avail === 'summary_only' && (
           <div className="ad-summary-notice">
-            <StatusBadge variant="info">Summary only</StatusBadge>
             <span className="ad-summary-note">
               This is a summary, not the full article text.
             </span>
@@ -267,9 +227,6 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
 
     if (!article) return null
 
-    const effectiveSourceName =
-      article.source_name || sourceName || (article.source_id ? `Source #${article.source_id}` : 'Unknown source')
-
     return (
       <>
         {/* Navigation Breadcrumb Trail if navigating history */}
@@ -294,10 +251,6 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
           </h4>
 
           <dl className="details-list">
-            <div>
-              <dt>Source</dt>
-              <dd>{effectiveSourceName}</dd>
-            </div>
             <div>
               <dt>Published</dt>
               <dd>{formatDate(article.published_at)}</dd>
@@ -369,51 +322,13 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
           contentAvailability={article.content_availability}
         />
 
-        {/* ── Section 6: Processing Status ──────────────────────────────── */}
-        <section
-          className="ad-section"
-          aria-labelledby="ad-section-processing"
-          data-testid="processing-status-section"
-        >
-          <ProcessingStatusPanel
-            article={article}
-            embeddings={embeddings}
-            isLoadingEmbeddings={isLoadingEmbeddings}
-            embeddingsError={embeddingsError}
-            onRetryEmbeddings={handleRetryEmbeddings}
-          />
-        </section>
-
-        {/* ── Section 7: Similar Articles ────────────────────────────────── */}
+        {/* ── Section 6: Similar Articles ────────────────────────────────── */}
         <SimilarArticlesSection
           articleId={activeArticleId}
           onSelectArticle={handleSelectSimilar}
         />
 
-        {/* ── Section 8: Source Information ─────────────────────────────── */}
-        <section className="ad-section" aria-labelledby="ad-section-source">
-          <h4 className="ad-section-title" id="ad-section-source">
-            Source Information
-          </h4>
-          <dl className="details-list ad-source-list">
-            <div>
-              <dt>News source</dt>
-              <dd>{effectiveSourceName}</dd>
-            </div>
-            {article.source_id && (
-              <div>
-                <dt>Source ID</dt>
-                <dd>#{article.source_id}</dd>
-              </div>
-            )}
-          </dl>
-          <p className="ad-section-note">
-            Bias profile, credibility rating and full source history will appear here in a future
-            release.
-          </p>
-        </section>
-
-        {/* ── Section 9: AI Detection ──────────────────────────────────── */}
+        {/* ── Section 7: AI Detection ──────────────────────────────────── */}
         <AiDetectionSection
           key={`ai-${activeArticleId}`}
           articleId={activeArticleId}

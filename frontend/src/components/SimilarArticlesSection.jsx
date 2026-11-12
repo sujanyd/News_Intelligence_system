@@ -221,7 +221,7 @@ export function SimilarArticlesSection({ articleId, onSelectArticle }) {
     return (
       <div className="similar-articles-list" data-testid="similar-articles-list">
         <p className="similar-articles-disclaimer">
-          Discovered via vector embeddings nearest-neighbor search. Semantic similarity reflects shared terminology and theme; it does not confirm identical event identity. The SAME / RELATED / DIFFERENT label comes from the separate matching classifier.
+          Similarity measures shared wording and theme, not whether it is the same event; the SAME / RELATED / DIFFERENT label does that.
         </p>
 
         <div className="similar-classify-bar">

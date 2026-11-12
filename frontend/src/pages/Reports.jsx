@@ -1,7 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react'
 import PageHeader from '../components/PageHeader'
 import Card from '../components/Card'
-import StatusBadge from '../components/StatusBadge'
 import EmptyState from '../components/EmptyState'
 import LoadingState from '../components/LoadingState'
 import AlertMessage from '../components/AlertMessage'
@@ -15,8 +14,6 @@ import {
 } from '../api/newsApi'
 import { NavigationContext } from '../navigation'
 import { formatDate } from '../utils/formatDate'
-
-const FORMAT_NAMES = { markdown: 'Markdown', html: 'HTML', json: 'JSON' }
 
 /**
  * Reports Page
@@ -87,12 +84,10 @@ export function Reports({ initialReportId = null }) {
 
   const columns = [
     { key: 'title', label: 'Report', render: (report) => <strong>{report.title}</strong> },
-    { key: 'comparison', label: 'Comparison', render: (report) => `#${report.comparison_id}` },
-    { key: 'format', label: 'Format', render: (report) => FORMAT_NAMES[report.report_format] },
     { key: 'created', label: 'Generated', render: (report) => formatDate(report.created_at) },
     {
       key: 'open',
-      label: 'Open',
+      label: '',
       render: (report) => (
         <button
           type="button"
@@ -137,7 +132,8 @@ export function Reports({ initialReportId = null }) {
           <option value="">Choose a comparison...</option>
           {comparisons.map((comparison) => (
             <option key={comparison.id} value={String(comparison.id)}>
-              #{comparison.id} {comparison.title} ({comparison.article_count} articles)
+              #{comparison.id} {comparison.title} ({comparison.article_count}{' '}
+              {comparison.article_count === 1 ? 'article' : 'articles'})
             </option>
           ))}
         </select>
@@ -190,8 +186,7 @@ export function Reports({ initialReportId = null }) {
     <div className="page-reports" data-testid="page-reports">
       <PageHeader
         title="Reports"
-        description="Evidence-based reports saved in the backend: publishers, articles, tone and framing differences, facts, topics, political signals, evidence and limitations."
-        badge={<StatusBadge variant="info">Backend reports</StatusBadge>}
+        description="Saved reports from your comparisons, with their evidence and limitations."
       />
 
       {openReportId !== null ? (

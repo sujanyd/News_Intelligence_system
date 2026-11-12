@@ -154,7 +154,7 @@ export function FlaggedArticlesPanel({ onOpenArticle }) {
   return (
     <Card
       title="Flagged for Editorial Review"
-      subtitle="AI-generated text check: articles a person should look at"
+      subtitle={`AI-likelihood estimate of ${Math.round(AI_FLAG_THRESHOLD * 100)}% or more`}
       badge={
         AI_DETECTION_AVAILABLE && !isLoading && !errorMessage ? (
           <StatusBadge variant={rows.length > 0 ? 'warning' : 'neutral'}>
@@ -166,11 +166,8 @@ export function FlaggedArticlesPanel({ onOpenArticle }) {
       <div data-testid="flagged-articles-panel">
         {renderBody()}
         <p className="ad-section-note">
-          The backend flags an article when its statistical estimate is{' '}
-          {Math.round(AI_FLAG_THRESHOLD * 100)}% or more. The estimate only looks at sentence lengths
-          and repeated words, so a flag is a reason for a person to check the article,{' '}
-          <strong>not proof</strong> that it was written by AI. Articles are checked the first time
-          their details are opened.
+          A flag means a person should check the article; it is <strong>not proof</strong> that it
+          was written by AI.
         </p>
       </div>
     </Card>

@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import PageHeader from '../components/PageHeader'
-import StatusBadge from '../components/StatusBadge'
 import AlertMessage from '../components/AlertMessage'
 import StoryList from '../components/StoryList'
 import StoryDetails from '../components/StoryDetails'
@@ -76,8 +75,7 @@ export function Stories({ initialView = null }) {
     <div className="page-stories" data-testid="page-stories">
       <PageHeader
         title="Stories"
-        description="Explore news topics (stories), the events inside them, and the articles that report each event."
-        badge={<StatusBadge variant="primary">Stories & Events</StatusBadge>}
+        description="News topics, the events inside them, and the articles that report each event."
       />
       {renderView()}
     </div>
