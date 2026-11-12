@@ -147,6 +147,7 @@ export function EventDetails({ eventId, onOpenStory, onBackToStories }) {
       )}
 
       <Card
+        className="headline-card"
         title={`Event ${event.id}`}
         subtitle={event.story_title ? `Part of the story "${event.story_title}"` : 'Story not provided'}
       >

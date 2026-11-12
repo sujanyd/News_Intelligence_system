@@ -32,8 +32,8 @@ describe('News Bias and Framing Analysis System - Dashboard & Navigation Tests',
 
   it('renders the recent articles section with articles from the API', async () => {
     render(<App />)
-    expect(screen.getByText('Recent Articles')).toBeDefined()
-    expect(await screen.findByRole('table', { name: 'Most recent articles' })).toBeDefined()
+    expect(screen.getByText('Front Page')).toBeDefined()
+    expect(await screen.findByRole('list', { name: 'Most recent articles' })).toBeDefined()
   })
 
   it('opens the Articles page from the dashboard "View all articles" button', async () => {

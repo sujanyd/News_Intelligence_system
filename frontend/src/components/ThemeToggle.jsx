@@ -39,7 +39,18 @@ export function ThemeToggle() {
 
   function handleClick() {
     const nextTheme = theme === 'dark' ? 'light' : 'dark'
-    setStoredTheme(nextTheme)
+    // Where the browser supports it, the new edition rolls over the old one
+    // like a press roller (see ::view-transition in refresh.css)
+    const reduceMotion =
+      typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (typeof document.startViewTransition === 'function' && !reduceMotion) {
+      document.startViewTransition(() => {
+        document.documentElement.dataset.theme = nextTheme
+        setStoredTheme(nextTheme)
+      })
+    } else {
+      setStoredTheme(nextTheme)
+    }
     try {
       window.localStorage.setItem(STORAGE_KEY, nextTheme)
     } catch {
@@ -57,7 +68,7 @@ export function ThemeToggle() {
       title={`Switch to ${nextLabel} mode`}
     >
       <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
-      <span className="theme-toggle-text">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+      <span className="theme-toggle-text">{theme === 'dark' ? 'Day edition' : 'Night edition'}</span>
     </button>
   )
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import LoadingState from './LoadingState'
 import AlertMessage from './AlertMessage'
 import StatusBadge from './StatusBadge'
+import Stamp from './Stamp'
 import { ComparisonBody } from './ComparisonView'
 import { fetchComparisonWithEvent, fetchReport } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
@@ -93,7 +94,11 @@ export function ReportView({ reportId, onBack }) {
   return (
     <article data-testid="report-view">
       {backButton}
-      <h3 className="rep-title">{report.title}</h3>
+      <div className="rep-head">
+        <h3 className="rep-title">{report.title}</h3>
+        {/* The backend saved this report on this date */}
+        <Stamp label="Filed" detail={formatDate(report.created_at)} />
+      </div>
       <p className="ai-chip-extra">
         Report #{report.id} · generated {formatDate(report.created_at)} · from comparison #
         {report.comparison_id}

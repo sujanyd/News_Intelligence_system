@@ -1,59 +1,73 @@
-/* Global Design System & Variables */
+/* Global Design System & Variables
+   Editorial look: paper and ink, one red accent, serif headlines. */
 :root {
-  --color-bg-app: #0b0f19;
-  --color-bg-surface: #111827;
-  --color-bg-surface-elevated: #1f2937;
-  --color-bg-surface-hover: #374151;
+  --color-bg-app: #111110;
+  --color-bg-surface: #181817;
+  --color-bg-surface-elevated: #201f1d;
+  --color-bg-surface-hover: #2a2926;
   
-  --color-border: #1f2937;
-  --color-border-subtle: #374151;
-  --color-border-focus: #3b82f6;
+  --color-border: #2c2b28;
+  --color-border-subtle: #3b3a36;
+  --color-border-focus: #e0584f;
 
-  --color-primary: #3b82f6;
-  --color-primary-hover: #2563eb;
-  --color-primary-light: rgba(59, 130, 246, 0.12);
+  --color-primary: #e0584f;
+  --color-primary-hover: #c9443c;
+  --color-primary-light: rgba(224, 88, 79, 0.12);
 
-  --color-accent: #8b5cf6;
-  --color-accent-light: rgba(139, 92, 246, 0.12);
+  --color-accent: #c9a24a;
+  --color-accent-light: rgba(201, 162, 74, 0.12);
 
-  --color-success: #10b981;
-  --color-success-light: rgba(16, 185, 129, 0.12);
-  --color-warning: #f59e0b;
-  --color-warning-light: rgba(245, 158, 11, 0.12);
-  --color-info: #06b6d4;
-  --color-info-light: rgba(6, 182, 212, 0.12);
+  --color-success: #6aa77e;
+  --color-success-light: rgba(106, 167, 126, 0.13);
+  --color-warning: #d6a23a;
+  --color-warning-light: rgba(214, 162, 58, 0.13);
+  --color-info: #6f9cc4;
+  --color-info-light: rgba(111, 156, 196, 0.13);
 
-  --color-text-primary: #f9fafb;
-  --color-text-secondary: #9ca3af;
-  /* #8a93a1 instead of #6b7280: enough contrast (4.5 or more) on dark cards */
-  --color-text-muted: #8a93a1;
+  --color-text-primary: #ece8df;
+  --color-text-secondary: #b8b2a6;
+  --color-text-muted: #948e83;
 
   /* Text on tinted badges and alerts, and surfaces as "r, g, b" so a
      component can choose the transparency: rgba(var(--surface-tint-rgb), 0.35) */
-  --color-danger: #ef4444;
-  --color-text-primary-tint: #93c5fd;
-  --color-text-success-tint: #6ee7b7;
-  --color-text-danger-tint: #fca5a5;
-  --color-text-warning-tint: #fcd34d;
-  --color-text-info-tint: #67e8f9;
-  --color-text-accent-tint: #c4b5fd;
-  --surface-tint-rgb: 31, 41, 55;
-  --surface-deep-rgb: 17, 24, 39;
-  --app-bg-rgb: 11, 15, 25;
+  --color-danger: #e0584f;
+  --color-text-primary-tint: #f2a39c;
+  --color-text-success-tint: #9fd3ae;
+  --color-text-danger-tint: #f2a39c;
+  --color-text-warning-tint: #ebc77c;
+  --color-text-info-tint: #a9c9e6;
+  --color-text-accent-tint: #dcc68e;
+  --surface-tint-rgb: 42, 41, 38;
+  --surface-deep-rgb: 24, 24, 23;
+  --app-bg-rgb: 17, 17, 16;
+  --surface-rgb: 24, 24, 23;
+  --grain-opacity: 0.07;
+  --color-on-primary: #111110;
+  --primary-rgb: 224, 88, 79;
+  --accent-rgb: 201, 162, 74;
+  --info-rgb: 111, 156, 196;
+  --success-rgb: 106, 167, 126;
+  --warning-rgb: 214, 162, 58;
+  --danger-rgb: 224, 88, 79;
+  --glow-1: transparent;
+  --glow-2: transparent;
+  --glow-3: transparent;
+  --grid-line: transparent;
 
   color-scheme: dark;
 
-  --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-family-heading: 'Outfit', 'Inter', sans-serif;
+  --font-family-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-family-heading: 'Newsreader', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
   --radius-full: 9999px;
 
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+  --shadow-sm: none;
+  --shadow-md: 0 1px 0 rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
 
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
@@ -65,94 +79,120 @@
    theme with the header button (data-theme on <html>, see ThemeToggle) */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme='dark']) {
-    --color-bg-app: #f3f4f6;
-    --color-bg-surface: #ffffff;
-    --color-bg-surface-elevated: #f9fafb;
-    --color-bg-surface-hover: #e5e7eb;
+    --color-bg-app: #f4f1ea;
+    --color-bg-surface: #fbfaf6;
+    --color-bg-surface-elevated: #f1ede4;
+    --color-bg-surface-hover: #e8e3d8;
 
-    --color-border: #e5e7eb;
-    --color-border-subtle: #d1d5db;
-    --color-border-focus: #2563eb;
+    --color-border: #e2dccf;
+    --color-border-subtle: #cfc7b7;
+    --color-border-focus: #a8231b;
 
-    --color-primary: #2563eb;
-    --color-primary-hover: #1d4ed8;
-    --color-primary-light: rgba(37, 99, 235, 0.1);
+    --color-primary: #a8231b;
+    --color-primary-hover: #8c1c15;
+    --color-primary-light: rgba(168, 35, 27, 0.08);
 
-    --color-accent: #7c3aed;
-    --color-accent-light: rgba(124, 58, 237, 0.1);
+    --color-accent: #8a6d1a;
+    --color-accent-light: rgba(138, 109, 26, 0.09);
 
-    --color-success: #059669;
-    --color-success-light: rgba(5, 150, 105, 0.1);
-    --color-warning: #d97706;
-    --color-warning-light: rgba(217, 119, 6, 0.1);
-    --color-info: #0891b2;
-    --color-info-light: rgba(8, 145, 178, 0.1);
+    --color-success: #2f6b45;
+    --color-success-light: rgba(47, 107, 69, 0.09);
+    --color-warning: #8a5a00;
+    --color-warning-light: rgba(138, 90, 0, 0.09);
+    --color-info: #2b5a85;
+    --color-info-light: rgba(43, 90, 133, 0.09);
 
-    --color-text-primary: #111827;
-    --color-text-secondary: #4b5563;
-    --color-text-muted: #6b7280;
+    --color-text-primary: #1b1a17;
+    --color-text-secondary: #4a463f;
+    --color-text-muted: #6b665c;
 
-    --color-danger: #dc2626;
-    --color-text-primary-tint: #1d4ed8;
-    --color-text-success-tint: #065f46;
-    --color-text-danger-tint: #b91c1c;
-    --color-text-warning-tint: #92400e;
-    --color-text-info-tint: #155e75;
-    --color-text-accent-tint: #6d28d9;
-    --surface-tint-rgb: 229, 231, 235;
-    --surface-deep-rgb: 243, 244, 246;
-    --app-bg-rgb: 243, 244, 246;
+    --color-danger: #a8231b;
+    --color-text-primary-tint: #8c1c15;
+    --color-text-success-tint: #24553a;
+    --color-text-danger-tint: #8c1c15;
+    --color-text-warning-tint: #6e4800;
+    --color-text-info-tint: #234a6d;
+    --color-text-accent-tint: #6b5414;
+    --surface-tint-rgb: 232, 227, 216;
+    --surface-deep-rgb: 241, 237, 228;
+    --app-bg-rgb: 244, 241, 234;
+    --surface-rgb: 251, 250, 246;
+    --grain-opacity: 0.06;
+    --color-on-primary: #ffffff;
+    --primary-rgb: 168, 35, 27;
+    --accent-rgb: 138, 109, 26;
+    --info-rgb: 43, 90, 133;
+    --success-rgb: 47, 107, 69;
+    --warning-rgb: 138, 90, 0;
+    --danger-rgb: 168, 35, 27;
+    --glow-1: transparent;
+    --glow-2: transparent;
+    --glow-3: transparent;
+    --grid-line: transparent;
 
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+    --shadow-sm: none;
+    --shadow-md: 0 1px 0 rgba(27, 26, 23, 0.06);
+    --shadow-lg: 0 12px 32px -14px rgba(27, 26, 23, 0.25);
 
     color-scheme: light;
   }
 }
 
 :root[data-theme='light'] {
-  --color-bg-app: #f3f4f6;
-  --color-bg-surface: #ffffff;
-  --color-bg-surface-elevated: #f9fafb;
-  --color-bg-surface-hover: #e5e7eb;
+  --color-bg-app: #f4f1ea;
+  --color-bg-surface: #fbfaf6;
+  --color-bg-surface-elevated: #f1ede4;
+  --color-bg-surface-hover: #e8e3d8;
 
-  --color-border: #e5e7eb;
-  --color-border-subtle: #d1d5db;
-  --color-border-focus: #2563eb;
+  --color-border: #e2dccf;
+  --color-border-subtle: #cfc7b7;
+  --color-border-focus: #a8231b;
 
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-light: rgba(37, 99, 235, 0.1);
+  --color-primary: #a8231b;
+  --color-primary-hover: #8c1c15;
+  --color-primary-light: rgba(168, 35, 27, 0.08);
 
-  --color-accent: #7c3aed;
-  --color-accent-light: rgba(124, 58, 237, 0.1);
+  --color-accent: #8a6d1a;
+  --color-accent-light: rgba(138, 109, 26, 0.09);
 
-  --color-success: #059669;
-  --color-success-light: rgba(5, 150, 105, 0.1);
-  --color-warning: #d97706;
-  --color-warning-light: rgba(217, 119, 6, 0.1);
-  --color-info: #0891b2;
-  --color-info-light: rgba(8, 145, 178, 0.1);
+  --color-success: #2f6b45;
+  --color-success-light: rgba(47, 107, 69, 0.09);
+  --color-warning: #8a5a00;
+  --color-warning-light: rgba(138, 90, 0, 0.09);
+  --color-info: #2b5a85;
+  --color-info-light: rgba(43, 90, 133, 0.09);
 
-  --color-text-primary: #111827;
-  --color-text-secondary: #4b5563;
-  --color-text-muted: #6b7280;
+  --color-text-primary: #1b1a17;
+  --color-text-secondary: #4a463f;
+  --color-text-muted: #6b665c;
 
-  --color-danger: #dc2626;
-  --color-text-primary-tint: #1d4ed8;
-  --color-text-success-tint: #065f46;
-  --color-text-danger-tint: #b91c1c;
-  --color-text-warning-tint: #92400e;
-  --color-text-info-tint: #155e75;
-  --color-text-accent-tint: #6d28d9;
-  --surface-tint-rgb: 229, 231, 235;
-  --surface-deep-rgb: 243, 244, 246;
-  --app-bg-rgb: 243, 244, 246;
+  --color-danger: #a8231b;
+  --color-text-primary-tint: #8c1c15;
+  --color-text-success-tint: #24553a;
+  --color-text-danger-tint: #8c1c15;
+  --color-text-warning-tint: #6e4800;
+  --color-text-info-tint: #234a6d;
+  --color-text-accent-tint: #6b5414;
+  --surface-tint-rgb: 232, 227, 216;
+  --surface-deep-rgb: 241, 237, 228;
+  --app-bg-rgb: 244, 241, 234;
+  --surface-rgb: 251, 250, 246;
+  --grain-opacity: 0.06;
+  --color-on-primary: #ffffff;
+  --primary-rgb: 168, 35, 27;
+  --accent-rgb: 138, 109, 26;
+  --info-rgb: 43, 90, 133;
+  --success-rgb: 47, 107, 69;
+  --warning-rgb: 138, 90, 0;
+  --danger-rgb: 168, 35, 27;
+  --glow-1: transparent;
+  --glow-2: transparent;
+  --glow-3: transparent;
+  --grid-line: transparent;
 
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+  --shadow-sm: none;
+  --shadow-md: 0 1px 0 rgba(27, 26, 23, 0.06);
+  --shadow-lg: 0 12px 32px -14px rgba(27, 26, 23, 0.25);
 
   color-scheme: light;
 }

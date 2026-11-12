@@ -18,7 +18,8 @@ import DataTable from './DataTable'
  * @param {boolean} props.isAvailable - false when collection cannot run (e.g. mock mode)
  * @param {string} [props.unavailableReason] - shown under the disabled button
  * @param {() => Promise<{ counts: Array, feeds: Array }>} props.onRun - starts one run
- * @param {() => void} [props.onSuccess] - called after a successful run (to reload the lists)
+ * @param {(result) => void} [props.onSuccess] - called with the result after a successful run
+ *   (to reload the lists)
  */
 export function IngestionPanel({ isAvailable, unavailableReason, onRun, onSuccess }) {
   const [isRunning, setIsRunning] = useState(false)
@@ -33,7 +34,7 @@ export function IngestionPanel({ isAvailable, unavailableReason, onRun, onSucces
     try {
       const runResult = await onRun()
       setResult(runResult)
-      if (onSuccess) onSuccess()
+      if (onSuccess) onSuccess(runResult)
     } catch (error) {
       setErrorMessage(error.message)
     } finally {

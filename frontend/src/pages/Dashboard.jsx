@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react'
-import PageHeader from '../components/PageHeader'
 import Card from '../components/Card'
 import StatusBadge from '../components/StatusBadge'
 import MetricCard from '../components/MetricCard'
@@ -7,11 +6,12 @@ import EmptyState from '../components/EmptyState'
 import LoadingState from '../components/LoadingState'
 import AlertMessage from '../components/AlertMessage'
 import DataTable from '../components/DataTable'
-import ContentAvailabilityBadge from '../components/ContentAvailabilityBadge'
 import ArticleDetails from '../components/ArticleDetails'
 import IngestionPanel from '../components/IngestionPanel'
 import DataModeBadge from '../components/DataModeBadge'
 import FlaggedArticlesPanel from '../components/FlaggedArticlesPanel'
+import FrontPage from '../components/FrontPage'
+import NewsTicker from '../components/NewsTicker'
 import {
   COMPARISONS_AVAILABLE,
   INGESTION_AVAILABLE,
@@ -32,6 +32,26 @@ import { getSourceName } from '../utils/getSourceName'
 
 // How many of the newest articles the dashboard shows
 const RECENT_ARTICLES_COUNT = 5
+
+// The masthead headline, word by word, so each word can be "inked" in turn.
+// em: the words the editor emphasises (italic, red)
+const HEADLINE_WORDS = [
+  { text: 'One' },
+  { text: 'story,' },
+  { text: 'told', em: true },
+  { text: 'differently', em: true },
+  { text: 'by' },
+  { text: 'every' },
+  { text: 'publisher.' },
+]
+
+// "Thursday, 12 November 2026", for the date line at the top
+const TODAY_LABEL = new Date().toLocaleDateString(undefined, {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
 
 // 84 -> "84"; when the count stopped early (very large database) -> "2000+"
 function formatCount(result) {
@@ -80,6 +100,9 @@ export function Dashboard({ onNavigate }) {
 
   // Totals for the metric cards. The backend has no count route, so the
   // lists are read page by page (see readAllPages in newsApi.js).
+  // Banner after a news collection that added articles: { count }
+  const [stopPresses, setStopPresses] = useState(null)
+
   const [totals, setTotals] = useState(null) // { articles, stories, events, comparable, comparisons, reports }
   const [totalsError, setTotalsError] = useState('')
   const [totalsReloadCount, setTotalsReloadCount] = useState(0)
@@ -172,7 +195,10 @@ export function Dashboard({ onNavigate }) {
   }
 
   // A collection run can add articles and new sources, so load both lists again
-  function handleCollectionFinished() {
+  function handleCollectionFinished(result) {
+    // "Stop the presses!" when the run really brought in new articles
+    const inserted = result?.counts?.find((count) => count.key === 'articles_inserted')?.value
+    if (inserted > 0) setStopPresses({ count: inserted })
     reloadArticles()
     reloadSources()
     setTotalsReloadCount(totalsReloadCount + 1)
@@ -204,30 +230,6 @@ export function Dashboard({ onNavigate }) {
 
   const selectedArticle = articles.find((article) => article.id === selectedArticleId)
 
-  const articleColumns = [
-    { key: 'title', label: 'Title', render: (article) => <strong>{article.title}</strong> },
-    { key: 'source', label: 'Source', render: (article) => getSourceName(article, sources) },
-    { key: 'published_at', label: 'Published', render: (article) => formatDate(article.published_at) },
-    {
-      key: 'content_availability',
-      label: 'Content',
-      render: (article) => <ContentAvailabilityBadge availability={article.content_availability} />,
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (article) => (
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => setSelectedArticleId(article.id)}
-          aria-label={`View details for ${article.title}`}
-        >
-          View
-        </button>
-      ),
-    },
-  ]
 
   const sourceColumns = [
     { key: 'name', label: 'Name', render: (source) => <strong>{source.name}</strong> },
@@ -269,7 +271,11 @@ export function Dashboard({ onNavigate }) {
       )
     }
     return (
-      <DataTable columns={articleColumns} rows={articles} caption="Most recent articles" />
+      <FrontPage
+        articles={articles}
+        getSource={(article) => getSourceName(article, sources)}
+        onOpen={setSelectedArticleId}
+      />
     )
   }
 
@@ -308,14 +314,101 @@ export function Dashboard({ onNavigate }) {
 
   return (
     <div className="page-dashboard">
-      <PageHeader
-        title="Dashboard"
-        description="Monitor collected news coverage, semantic event clusters, and perspective framing analyses."
-        badge={<DataModeBadge />}
-        action={
+      {stopPresses && (
+        <div className="stop-presses" role="status">
+          <span className="stop-presses-kicker">Stop the presses!</span>
+          <span className="stop-presses-text">
+            {stopPresses.count} new {stopPresses.count === 1 ? 'article' : 'articles'} just came in
+            from the feeds.
+          </span>
+          <button type="button" className="btn btn-secondary" onClick={() => setStopPresses(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Masthead: today's date, what the system does, and the main ways in */}
+      <section className="hero" aria-labelledby="dashboard-title">
+        {/* Nameplate with two "ears", like the top of a printed front page */}
+        <div className="nameplate">
+          <p className="ear ear-left">
+            <span className="ear-label">Live edition</span>
+            <span>{TODAY_LABEL}</span>
+          </p>
+          <p className="nameplate-title" aria-hidden="true">
+            News <span className="nameplate-amp">&amp;</span> Framing
+          </p>
+          <p className="ear ear-right">
+            <span className="ear-label">In this edition</span>
+            <span>
+              {totals?.stories && totals?.events
+                ? `${formatCount(totals.stories)} stories · ${formatCount(totals.events)} events`
+                : totals
+                ? `${formatCount(totals.articles)} articles`
+                : 'Counting…'}
+            </span>
+          </p>
+        </div>
+
+        <div className="hero-dateline">
+          <span>Multi-source news bias &amp; framing analysis</span>
+          <span className="hero-dateline-live">
+            <span className="pulse-dot" aria-hidden="true" />
+            <DataModeBadge />
+          </span>
+          {/* An ink roller runs along the rule while the numbers load */}
+          {(!totals || isLoadingArticles) && <span className="ink-roller" aria-hidden="true" />}
+        </div>
+
+        {articles.length > 0 && (
+          <NewsTicker
+            items={articles.map((article) => ({
+              id: article.id,
+              title: article.title,
+              source: getSourceName(article, sources),
+            }))}
+            onOpen={setSelectedArticleId}
+          />
+        )}
+
+        <div className="hero-eyebrow">
+          <h1 className="hero-kicker" id="dashboard-title">
+            Dashboard
+          </h1>
+        </div>
+        <p className="hero-title" aria-label="One story, told differently by every publisher.">
+          {HEADLINE_WORDS.map((word, index) => {
+            const style = { '--word': index }
+            return (
+              <React.Fragment key={word.text}>
+                {word.em ? (
+                  <em className="ink-word" style={style} aria-hidden="true">
+                    {word.text}
+                  </em>
+                ) : (
+                  <span className="ink-word" style={style} aria-hidden="true">
+                    {word.text}
+                  </span>
+                )}{' '}
+              </React.Fragment>
+            )
+          })}
+        </p>
+        <p className="hero-sub drop-cap">
+          Collect news from several publishers, group it into stories, and compare tone, framing,
+          political signals and evidence side by side. Every number on this page comes from the
+          backend.
+        </p>
+        <div className="hero-actions">
+          <button type="button" className="btn btn-primary btn-lg" onClick={() => openPage('comparisons')}>
+            Compare coverage
+          </button>
+          <button type="button" className="btn btn-secondary btn-lg" onClick={() => openPage('articles')}>
+            Browse articles
+          </button>
           <button
             type="button"
-            className="btn btn-secondary"
+            className="btn btn-ghost btn-lg"
             onClick={handleCheckConnection}
             disabled={isCheckingBackend}
           >
@@ -327,8 +420,8 @@ export function Dashboard({ onNavigate }) {
               'Check Backend Status'
             )}
           </button>
-        }
-      />
+        </div>
+      </section>
 
       {/* Backend connection feedback alert if tested */}
       {checkResult && (
@@ -339,6 +432,11 @@ export function Dashboard({ onNavigate }) {
           <span>{checkResult.message}</span>
         </div>
       )}
+
+      {/* Where a folded newspaper bends: everything above is "above the fold" */}
+      <div className="the-fold" aria-hidden="true">
+        <span>Above the fold</span>
+      </div>
 
       {/* Metric cards: articles, sources, stories and events, comparable stories, comparisons, reports */}
       {totalsError && (
@@ -357,6 +455,8 @@ export function Dashboard({ onNavigate }) {
           subtitle="Collected news articles"
           helperText={totals?.articles ? 'Counted from the article list' : totals ? 'Could not count' : 'Counting...'}
           isPlaceholder={USE_MOCK_DATA || !totals?.articles}
+          isLoading={!totals}
+          accent="blue"
           icon={
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Z" />
@@ -373,6 +473,8 @@ export function Dashboard({ onNavigate }) {
           subtitle="Monitored publishers"
           helperText={sourcesError ? 'Could not load sources' : 'From the backend'}
           isPlaceholder={USE_MOCK_DATA || isLoadingSources || Boolean(sourcesError)}
+          isLoading={isLoadingSources}
+          accent="cyan"
           icon={
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 11a9 9 0 0 1 9 9" />
@@ -396,6 +498,8 @@ export function Dashboard({ onNavigate }) {
               : 'Counting...'
           }
           isPlaceholder={!totals?.stories || !totals?.events}
+          isLoading={!totals}
+          accent="violet"
           icon={
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -419,6 +523,8 @@ export function Dashboard({ onNavigate }) {
               : 'Counting...'
           }
           isPlaceholder={!totals?.comparable}
+          isLoading={!totals}
+          accent="green"
           icon={
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M16 3h5v5" />
@@ -443,6 +549,8 @@ export function Dashboard({ onNavigate }) {
               : 'Counting...'
           }
           isPlaceholder={!totals?.comparisons}
+          isLoading={!totals}
+          accent="amber"
           actionLabel={onNavigate ? 'Open Comparisons' : undefined}
           onAction={() => openPage('comparisons')}
         />
@@ -461,6 +569,8 @@ export function Dashboard({ onNavigate }) {
               : 'Counting...'
           }
           isPlaceholder={!totals?.reports}
+          isLoading={!totals}
+          accent="pink"
           actionLabel={onNavigate ? 'Open Reports' : undefined}
           onAction={() => openPage('reports')}
         />
@@ -490,8 +600,8 @@ export function Dashboard({ onNavigate }) {
       {/* Newest collected articles */}
       <section className="dashboard-section" style={{ marginTop: '2rem' }}>
         <Card
-          title="Recent Articles"
-          subtitle="The newest articles stored in the backend"
+          title="Front Page"
+          subtitle="The newest articles stored in the backend, newest first"
           badge={
             <button type="button" className="btn btn-secondary" onClick={() => openPage('articles')}>
               View all articles

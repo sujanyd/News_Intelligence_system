@@ -11,8 +11,14 @@ import React from 'react'
 export function LoadingState({ message = 'Loading...' }) {
   return (
     <div className="loading-state" role="status">
-      <span className="spinner" aria-hidden="true" />
-      <span>{message}</span>
+      {/* An ink roller running along a rule, instead of a spinning wheel */}
+      <span className="loading-roller" aria-hidden="true">
+        <span className="loading-roller-ink" />
+      </span>
+      {/* Typed out like a wire-service teletype (CSS steps over --chars) */}
+      <span className="loading-message" style={{ '--chars': message.length }}>
+        {message}
+      </span>
     </div>
   )
 }

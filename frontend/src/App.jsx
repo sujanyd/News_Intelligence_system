@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Footer from './components/Footer'
@@ -8,8 +8,11 @@ import Sources from './pages/Sources'
 import Stories from './pages/Stories'
 import Comparisons from './pages/Comparisons'
 import Reports from './pages/Reports'
+import CommandPalette from './components/CommandPalette'
 import { NavigationContext } from './navigation'
+import { usePrintReveal } from './usePrintReveal'
 import './styles/App.css'
+import './styles/refresh.css'
 
 /**
  * Root Application Component
@@ -32,6 +35,15 @@ export function App() {
     window.scrollTo(0, 0)
   }, [])
   const setActiveTab = (tab) => navigate(tab)
+
+  // Cards and sections are "printed" as they scroll into view
+  const mainRef = useRef(null)
+  usePrintReveal(mainRef)
+
+  // Quick jump box (Ctrl+K / ⌘K)
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false)
+  const openPalette = useCallback(() => setIsPaletteOpen(true), [])
+  const closePalette = useCallback(() => setIsPaletteOpen(false), [])
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
 
   const renderActivePage = () => {
@@ -69,15 +81,25 @@ export function App() {
           <Header
             activeTab={activeTab}
             onToggleMobileMenu={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+            onOpenPalette={openPalette}
           />
 
-          <main className="main-content" id="main-content-area">
-            {renderActivePage()}
+          <main className="main-content" id="main-content-area" ref={mainRef}>
+            {/* key: each page (and each visit) fades in on its own */}
+            <div key={`${activeTab}-${page.visit}`} className="page-enter">
+              {renderActivePage()}
+            </div>
           </main>
 
           <Footer />
         </div>
       </div>
+      <CommandPalette
+        isOpen={isPaletteOpen}
+        onOpen={openPalette}
+        onClose={closePalette}
+        onNavigate={navigate}
+      />
     </NavigationContext.Provider>
   )
 }

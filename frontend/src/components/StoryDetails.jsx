@@ -147,7 +147,7 @@ export function StoryDetails({ storyId, onBack, onOpenEvent }) {
     <>
       {backButton}
 
-      <Card title={story.title} subtitle={`Story ${story.id}`}>
+      <Card title={story.title} subtitle={`Story ${story.id}`} className="headline-card">
         <dl className="details-list">
           <div>
             <dt>Created</dt>

@@ -13,8 +13,9 @@ import ThemeToggle from './ThemeToggle'
  * @param {Object} props
  * @param {string} props.activeTab - Currently active tab
  * @param {() => void} props.onToggleMobileMenu - Toggle mobile sidebar drawer
+ * @param {() => void} [props.onOpenPalette] - Open the quick jump box (Ctrl+K)
  */
-export function Header({ activeTab, onToggleMobileMenu }) {
+export function Header({ activeTab, onToggleMobileMenu, onOpenPalette }) {
   const getTabLabel = (id) => {
     switch (id) {
       case 'dashboard':
@@ -61,6 +62,18 @@ export function Header({ activeTab, onToggleMobileMenu }) {
       </div>
 
       <div className="header-right">
+        {onOpenPalette && (
+          <button
+            type="button"
+            className="btn btn-secondary palette-trigger"
+            onClick={onOpenPalette}
+            aria-label="Jump to a page (Ctrl+K)"
+          >
+            <span aria-hidden="true">⌕</span>
+            <span className="palette-trigger-text">Jump to…</span>
+            <kbd className="palette-kbd">Ctrl K</kbd>
+          </button>
+        )}
         <ThemeToggle />
         <StatusBadge variant="info" className="header-api-badge">
           API: {API_BASE_URL_LABEL}

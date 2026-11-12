@@ -5,7 +5,19 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>frontend</title>
+  <meta name="description" content="Compare how different publishers cover the same news: tone, framing, political signals and evidence." />
+  <title>News Intelligence · Bias &amp; Framing</title>
+  <!-- Fonts named in index.css; the app falls back to system fonts when offline -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&display=swap" rel="stylesheet" />
+  <!-- Apply a theme picked earlier before the page draws, so it does not flash -->
+  <script>
+    try {
+      var theme = localStorage.getItem('news-intelligence-theme')
+      if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme
+    } catch (error) {}
+  </script>
 </head>
 
 <body>

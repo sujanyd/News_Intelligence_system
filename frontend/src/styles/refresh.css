@@ -1,0 +1,1576 @@
+/* ==========================================================================
+   Editorial look
+   A newspaper feel for a news tool: paper and ink, thin rules, serif
+   headlines, small monospaced labels, one red accent. No gradients, glows
+   or glass. Loaded after App.css; uses only the tokens from index.css, so
+   the light ("day") and dark ("night") editions both work.
+   ========================================================================== */
+
+/* ---------- Type ---------- */
+body {
+  font-feature-settings: 'kern', 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.page-title,
+.card-title,
+.rep-title {
+  font-family: var(--font-family-heading);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.page-title {
+  font-size: 2.25rem;
+  line-height: 1.1;
+}
+
+.card-title {
+  font-size: 1.3rem;
+  line-height: 1.25;
+}
+
+/* Small labels read like newspaper section heads */
+.ad-section-title,
+.metric-card-title,
+.pol-evidence-label,
+.nav-group-label,
+.api-card-label,
+.data-table th,
+.hero-kicker,
+.palette-footer {
+  font-family: var(--font-family-mono);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+a.table-link,
+.ad-url-link {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+/* ---------- Surfaces: flat paper with hairline rules ---------- */
+.app-layout {
+  background-color: var(--color-bg-app);
+}
+
+.card {
+  background-color: var(--color-bg-surface);
+  box-shadow: none;
+  transition: border-color 160ms ease;
+}
+
+.card:hover {
+  border-color: var(--color-border-subtle);
+}
+
+.card-header {
+  padding-bottom: 0.875rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Page header: a heavy rule under the title, like a section front */
+.page-header {
+  border-bottom: 2px solid var(--color-text-primary);
+}
+
+/* ---------- Sidebar and header ---------- */
+.brand-icon {
+  background: var(--color-text-primary);
+  color: var(--color-bg-app);
+  box-shadow: none;
+  border-radius: var(--radius-sm);
+}
+
+.brand-name {
+  font-family: var(--font-family-heading);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.brand-sub {
+  font-family: var(--font-family-mono);
+  letter-spacing: 0.08em;
+}
+
+.sidebar-nav-item {
+  position: relative;
+  border-radius: var(--radius-sm);
+}
+
+.sidebar-nav-item.active {
+  background-color: var(--color-bg-surface-elevated);
+  border-color: transparent;
+  color: var(--color-text-primary);
+}
+
+/* The open page gets a red bar, like a section marker */
+.sidebar-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  background-color: var(--color-primary);
+}
+
+.nav-item-indicator {
+  display: none;
+}
+
+.header-project-title {
+  font-family: var(--font-family-heading);
+  font-weight: 600;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  border-radius: var(--radius-sm);
+}
+
+/* Solid ink; turns red on hover */
+.btn-primary {
+  background-color: var(--color-text-primary);
+  border: 1px solid var(--color-text-primary);
+  color: var(--color-bg-app);
+  box-shadow: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  border-color: var(--color-border-subtle);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-bg-surface-elevated);
+  border-color: var(--color-text-primary);
+}
+
+.btn-lg {
+  padding: 0.65rem 1.1rem;
+  font-size: 0.9rem;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--color-text-primary);
+}
+
+/* Badges: small square labels instead of glossy pills */
+.status-badge,
+.classification-badge {
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* A clear focus ring for keyboard users everywhere */
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ---------- Page change: the page turns, hinged at the spine ---------- */
+.main-content {
+  perspective: 1800px;
+}
+
+/* The turning page must never make the window scroll sideways */
+.app-main-wrapper {
+  overflow-x: clip;
+  min-width: 0;
+}
+
+.page-enter {
+  transform-origin: 0% 50%;
+  animation: page-turn 640ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* ---------- Newsprint grain on the paper (behind the content) ---------- */
+.app-layout {
+  isolation: isolate;
+}
+
+.app-layout::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: var(--grain-opacity, 0.05);
+}
+
+/* ---------- Dashboard masthead ---------- */
+.hero {
+  margin-bottom: 1.75rem;
+  padding: 0 0 1.5rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* Date line between two rules, like the top of a front page */
+.hero-dateline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+  border-top: 3px double var(--color-text-primary);
+  border-bottom: 1px solid var(--color-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.hero-dateline-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+
+.hero-kicker {
+  font-size: 0.75rem;
+  color: var(--color-primary);
+}
+
+.hero-title {
+  margin: 0.5rem 0 0.75rem;
+  font-family: var(--font-family-heading);
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+  max-width: 20ch;
+}
+
+/* The emphasised words: italic and red, as an editor would mark them */
+.hero-title em {
+  font-style: italic;
+  color: var(--color-primary);
+}
+
+.hero-sub {
+  max-width: 44rem;
+  font-family: var(--font-family-heading);
+  font-size: 1.15rem;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+/* A small red "live" dot */
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  animation: blink 2.4s ease-in-out infinite;
+}
+
+/* ---------- Stat strip (the six numbers) ---------- */
+.grid-metrics {
+  gap: 0;
+  border-top: 2px solid var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.grid-metrics > .metric-card {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 1.1rem 1.25rem 1.25rem;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.grid-metrics > .metric-card:nth-child(3n) {
+  border-right: none;
+}
+
+.grid-metrics > .metric-card:nth-last-child(-n + 3) {
+  border-bottom: none;
+}
+
+.metric-card-icon {
+  color: var(--color-text-muted);
+}
+
+.metric-card-title {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+}
+
+.metric-value {
+  font-family: var(--font-family-heading);
+  font-size: 2.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.metric-card-footer {
+  border-top: 1px dotted var(--color-border-subtle);
+}
+
+/* ---------- Loading placeholders ---------- */
+.skeleton {
+  display: inline-block;
+  border-radius: 2px;
+  background-color: rgba(var(--surface-tint-rgb), 1);
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+.skeleton-value {
+  width: 4.5rem;
+  height: 2.4rem;
+  vertical-align: middle;
+}
+
+/* ---------- Tables ---------- */
+.data-table th {
+  font-size: 0.68rem;
+  color: var(--color-text-secondary);
+}
+
+.data-table tbody tr:hover {
+  background-color: rgba(var(--surface-tint-rgb), 0.45);
+}
+
+/* ---------- Article details ---------- */
+.ad-section-title {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* The article itself is set like print: serif, a comfortable line length */
+.ad-content-body {
+  font-family: var(--font-family-heading);
+  font-size: 1.08rem;
+  line-height: 1.7;
+  max-width: 68ch;
+}
+
+/* Quoted evidence reads like a pull quote */
+.pol-evidence {
+  font-family: var(--font-family-heading);
+  font-size: 1rem;
+  border-left: 3px solid var(--color-primary);
+}
+
+/* ---------- AI detection gauge ---------- */
+.aid-gauge-row {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.aid-gauge {
+  position: relative;
+  width: 108px;
+  height: 108px;
+  flex-shrink: 0;
+}
+
+.aid-gauge svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.aid-gauge-track {
+  fill: none;
+  stroke: rgba(var(--surface-tint-rgb), 1);
+  stroke-width: 7;
+}
+
+.aid-gauge-fill {
+  fill: none;
+  stroke: var(--color-text-primary);
+  stroke-width: 7;
+  transition: stroke-dasharray 700ms ease-out;
+}
+
+.aid-gauge-flagged .aid-gauge-fill {
+  stroke: var(--color-primary);
+}
+
+.aid-gauge-threshold {
+  stroke: var(--color-primary);
+  stroke-width: 2.5;
+}
+
+.aid-gauge .aid-value {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-family-heading);
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.aid-caption {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* ---------- Header: quick jump button ---------- */
+.palette-trigger {
+  gap: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  color: var(--color-text-secondary);
+}
+
+.palette-kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 2px;
+  font-family: var(--font-family-mono);
+  font-size: 0.66rem;
+  color: var(--color-text-secondary);
+}
+
+/* ---------- Command palette ---------- */
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 14vh 1rem 1rem;
+  background-color: rgba(var(--app-bg-rgb), 0.7);
+  animation: page-in 120ms ease-out both;
+}
+
+.palette {
+  width: min(600px, 100%);
+  border: 1px solid var(--color-text-primary);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-surface);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.palette-search {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 1.1rem;
+  color: var(--color-text-muted);
+}
+
+.palette-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-family-heading);
+  font-size: 1.15rem;
+  color: var(--color-text-primary);
+}
+
+.palette-results {
+  list-style: none;
+  margin: 0;
+  padding: 0.375rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.palette-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.6rem 0.75rem;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.palette-item.active {
+  background-color: var(--color-bg-surface-elevated);
+  border-left-color: var(--color-primary);
+}
+
+.palette-item-label {
+  font-family: var(--font-family-heading);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.palette-item-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.palette-empty {
+  padding: 1rem;
+  color: var(--color-text-muted);
+}
+
+.palette-footer {
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.66rem;
+  color: var(--color-text-muted);
+}
+
+/* ---------- Scrollbars ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-subtle) transparent;
+}
+
+/* ---------- Small screens ---------- */
+@media (max-width: 1024px) {
+  .grid-metrics > .metric-card:nth-child(3n) {
+    border-right: 1px solid var(--color-border);
+  }
+
+  .grid-metrics > .metric-card:nth-child(2n) {
+    border-right: none;
+  }
+
+  .grid-metrics > .metric-card:nth-last-child(-n + 3) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .grid-metrics > .metric-card:nth-last-child(-n + 2) {
+    border-bottom: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .palette-trigger-text,
+  .palette-trigger .palette-kbd {
+    display: none;
+  }
+
+  .grid-metrics > .metric-card {
+    border-right: none !important;
+    border-bottom: 1px solid var(--color-border) !important;
+  }
+
+  .grid-metrics > .metric-card:last-child {
+    border-bottom: none !important;
+  }
+
+  .metric-value {
+    font-size: 2.25rem;
+  }
+
+  .page-title {
+    font-size: 1.8rem;
+  }
+}
+
+/* ---------- Nameplate ---------- */
+.nameplate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 1.25rem;
+  padding: 0.25rem 0 0.75rem;
+}
+
+.nameplate-title {
+  font-family: var(--font-family-heading);
+  font-size: clamp(2.4rem, 6vw, 4.6rem);
+  font-weight: 700;
+  font-style: italic;
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  text-align: center;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  animation: nameplate-in 900ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.nameplate-amp {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+/* The two boxes either side of the nameplate */
+.ear {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--color-border-subtle);
+  font-family: var(--font-family-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  max-width: 15rem;
+}
+
+.ear-right {
+  justify-self: end;
+  text-align: right;
+}
+
+.ear-label {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+/* ---------- Ink roller (loading) ---------- */
+.hero-dateline {
+  position: relative;
+}
+
+.ink-roller {
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 3px;
+  width: 22%;
+  background-color: var(--color-primary);
+  animation: roll 1.1s ease-in-out infinite alternate;
+}
+
+/* ---------- "Latest" ticker ---------- */
+.ticker {
+  display: flex;
+  align-items: stretch;
+  margin-top: 0.75rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  overflow: hidden;
+}
+
+.ticker-label {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-family-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ticker-window {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+}
+
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker calc(var(--ticker-items, 5) * 7s) linear infinite;
+}
+
+/* Stop while someone reads or tabs through it */
+.ticker:hover .ticker-track,
+.ticker:focus-within .ticker-track {
+  animation-play-state: paused;
+}
+
+.ticker-list {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ticker-item {
+  display: flex;
+  align-items: center;
+}
+
+.ticker-item::after {
+  content: '■';
+  margin: 0 1rem;
+  font-size: 0.45rem;
+  color: var(--color-primary);
+}
+
+.ticker-link {
+  padding: 0.4rem 0;
+  background: none;
+  border: none;
+  font-family: var(--font-family-heading);
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ticker-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ticker-source {
+  font-family: var(--font-family-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* ---------- Headline inked word by word ---------- */
+.ink-word {
+  display: inline-block;
+  animation: ink-in 620ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: calc(250ms + var(--word, 0) * 85ms);
+}
+
+/* A drop cap on the deck under the headline */
+.drop-cap::first-letter {
+  float: left;
+  margin: 0.06em 0.12em 0 0;
+  font-family: var(--font-family-heading);
+  font-size: 3.4em;
+  font-weight: 700;
+  line-height: 0.8;
+  color: var(--color-primary);
+}
+
+/* ---------- Front page (newest articles) ---------- */
+.fp {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 2px solid var(--color-text-primary);
+}
+
+.fp-story {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 1.1rem 1.1rem;
+  border-right: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border);
+  min-width: 0;
+  animation: press-in 600ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.fp-story:nth-child(2) { animation-delay: 80ms; }
+.fp-story:nth-child(3) { animation-delay: 140ms; }
+.fp-story:nth-child(4) { animation-delay: 200ms; }
+.fp-story:nth-child(5) { animation-delay: 260ms; }
+
+.fp-story:last-child {
+  border-right: none;
+}
+
+/* The lead story spans the whole width */
+.fp-lead {
+  grid-column: 1 / -1;
+  border-right: none;
+  border-top: none;
+  padding: 1.25rem 0 1.5rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.fp-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-family: var(--font-family-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.fp-source {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.fp-headline {
+  margin: 0;
+  font-family: var(--font-family-heading);
+  font-size: 1.12rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.fp-lead .fp-headline {
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  max-width: 28ch;
+}
+
+/* Headlines are buttons; an underline draws in on hover */
+.fp-headline-btn {
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1px;
+  transition: background-size 320ms ease, color 160ms ease;
+}
+
+.fp-headline-btn:hover,
+.fp-headline-btn:focus-visible {
+  color: var(--color-primary);
+  background-size: 100% 1px;
+}
+
+.fp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: auto;
+}
+
+.fp-read {
+  font-family: var(--font-family-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+@media (max-width: 1024px) {
+  .fp {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fp-story:nth-child(odd):not(.fp-lead) {
+    border-right: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .nameplate {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .ear {
+    display: none;
+  }
+
+  .nameplate-title {
+    white-space: normal;
+  }
+
+  .fp {
+    grid-template-columns: 1fr;
+  }
+
+  .fp-story {
+    border-right: none;
+  }
+}
+
+/* ---------- Animations ---------- */
+@keyframes press-in {
+  from { clip-path: inset(0 0 100% 0); opacity: 0.4; }
+  to { clip-path: inset(0 0 0 0); opacity: 1; }
+}
+
+@keyframes nameplate-in {
+  from { opacity: 0; letter-spacing: 0.04em; }
+  to { opacity: 1; letter-spacing: -0.035em; }
+}
+
+@keyframes ink-in {
+  from { opacity: 0; transform: translateY(0.18em); filter: blur(3px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes roll {
+  from { left: 0; }
+  to { left: 78%; }
+}
+
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes page-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ---------- Less motion when the user asks for it ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .ticker-window {
+    overflow-x: auto;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .ticker-track {
+    animation: none !important;
+  }
+
+  .ticker-list[aria-hidden='true'] {
+    display: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Small labels on tinted pills need the stronger grey to stay readable */
+.sac-score-label,
+.step-embedding-chip .emb-type {
+  color: var(--color-text-secondary);
+}
+
+/* ==========================================================================
+   Every page: the same newspaper treatment
+   ========================================================================== */
+
+/* ---------- Section fronts (the top of each page) ---------- */
+.page-header.section-front {
+  gap: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--color-text-primary);
+}
+
+.section-flag-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+  padding: 0.4rem 0;
+  border-top: 3px double var(--color-text-primary);
+  border-bottom: 1px solid var(--color-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.section-flag-label {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.page-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  flex-wrap: wrap;
+}
+
+.section-front .page-title {
+  font-size: clamp(2.25rem, 4.6vw, 3.4rem);
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  animation: nameplate-in 800ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.section-front .page-description {
+  max-width: 46rem;
+  font-family: var(--font-family-heading);
+  font-size: 1.1rem;
+  line-height: 1.5;
+}
+
+/* ---------- Sidebar: page numbers, like a paper's contents (A1, A2...) ---------- */
+.sidebar-nav {
+  counter-reset: page;
+}
+
+.sidebar-nav-item {
+  counter-increment: page;
+}
+
+.sidebar-nav-item::after {
+  content: 'A' counter(page);
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+}
+
+.sidebar-nav-item.active::after {
+  color: var(--color-primary);
+}
+
+/* ---------- Card titles carry a short red rule above them ---------- */
+.card-header .card-title {
+  position: relative;
+  padding-top: 0.6rem;
+}
+
+.card-header .card-title::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2rem;
+  height: 3px;
+  background-color: var(--color-primary);
+}
+
+.card-subtitle {
+  font-family: var(--font-family-heading);
+  font-style: italic;
+  font-size: 0.92rem;
+  color: var(--color-text-secondary);
+}
+
+/* ---------- Loading: an ink roller and an italic line ---------- */
+.loading-state {
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.loading-roller {
+  position: relative;
+  width: min(220px, 60%);
+  height: 2px;
+  overflow: hidden;
+  background-color: var(--color-border-subtle);
+}
+
+.loading-roller-ink {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 35%;
+  background-color: var(--color-primary);
+  animation: roll 1s ease-in-out infinite alternate;
+}
+
+.loading-message {
+  font-family: var(--font-family-heading);
+  font-style: italic;
+  font-size: 1rem;
+}
+
+/* ---------- Empty states read like a printed notice ---------- */
+.empty-state-box {
+  background-color: transparent;
+  border: 1px solid var(--color-border-subtle);
+  border-top: 3px double var(--color-text-primary);
+  border-radius: 0;
+}
+
+.empty-state-icon {
+  background-color: transparent;
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+}
+
+.empty-state-title {
+  font-family: var(--font-family-heading);
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.empty-state-description {
+  font-family: var(--font-family-heading);
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+/* ---------- Notices (errors, warnings, info): a rule on the left ---------- */
+.alert-banner {
+  border-radius: 0;
+  border-left-width: 3px !important;
+}
+
+/* ---------- Tables read like printed listings ---------- */
+.data-table thead th {
+  border-bottom: 1px solid var(--color-text-primary);
+}
+
+.data-table tbody td {
+  border-bottom-style: dotted;
+}
+
+.data-table td strong {
+  font-family: var(--font-family-heading);
+  font-size: 1.04rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* ---------- Article details: set like a news story ---------- */
+.article-details > .card > .card-header .card-title {
+  font-size: clamp(1.6rem, 3vw, 2.35rem);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  max-width: 30ch;
+}
+
+/* The publisher under the headline, as a byline */
+.article-details > .card > .card-header .card-subtitle {
+  margin-top: 0.5rem;
+  font-family: var(--font-family-mono);
+  font-style: normal;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.article-details > .card > .card-header .card-subtitle::before {
+  content: 'By ';
+  color: var(--color-text-secondary);
+}
+
+/* Each analysis section opens with a heavier rule, like a new column */
+.ad-section + .ad-section {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-text-primary);
+}
+
+.ad-section-note {
+  font-family: var(--font-family-heading);
+  font-style: italic;
+  font-size: 0.95rem;
+}
+
+/* ---------- Stories and events ---------- */
+.story-title,
+.event-title {
+  font-family: var(--font-family-heading);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- Comparisons: articles side by side with a column rule ---------- */
+.pol-compare-sides > * + * {
+  padding-left: 1rem;
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.pol-side-label,
+.cmp-article-head strong {
+  font-family: var(--font-family-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.cmp-headline {
+  font-family: var(--font-family-heading);
+  font-size: 1.2rem;
+  line-height: 1.25;
+}
+
+.cmp-article-list > li {
+  border-radius: 0;
+  border-width: 0 0 1px;
+  padding: 0.875rem 0;
+}
+
+.pol-coverage {
+  border-radius: 0;
+  border-top: 3px double var(--color-text-primary);
+}
+
+/* ---------- Reports: a headline, then the report as printed sections ---------- */
+.rep-title {
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  max-width: 32ch;
+}
+
+.rep-evidence {
+  border-radius: 0;
+  border-width: 0 0 1px;
+  padding: 0.75rem 0;
+}
+
+.rep-evidence summary {
+  font-family: var(--font-family-heading);
+  font-size: 1.02rem;
+}
+
+/* The limitations box looks like a "Corrections and clarifications" panel */
+[data-testid='report-limitations'] {
+  padding: 1rem 1.25rem !important;
+  border: 1px solid var(--color-text-primary) !important;
+  background-color: var(--color-bg-surface-elevated);
+}
+
+.rep-limit-list {
+  font-family: var(--font-family-heading);
+  font-size: 1rem;
+}
+
+.rep-raw {
+  border-radius: 0;
+  border-left: 3px solid var(--color-border-subtle);
+}
+
+/* ---------- Sources: publisher names in the serif ---------- */
+.page-sources .data-table td strong {
+  font-size: 1.1rem;
+}
+
+@media (max-width: 720px) {
+  .pol-compare-sides > * + * {
+    padding-left: 0;
+    padding-top: 1rem;
+    border-left: none;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+}
+
+/* A story or event's own card: its title is the page's headline */
+.headline-card > .card-header .card-title {
+  font-size: clamp(1.6rem, 3vw, 2.35rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  max-width: 30ch;
+}
+
+.headline-card > .card-header .card-subtitle {
+  margin-top: 0.5rem;
+  font-family: var(--font-family-mono);
+  font-style: normal;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+/* A drop cap opens the article text */
+.ad-content-body .details-content::first-letter {
+  float: left;
+  margin: 0.06em 0.1em 0 0;
+  font-family: var(--font-family-heading);
+  font-size: 3.3em;
+  font-weight: 700;
+  line-height: 0.8;
+  color: var(--color-primary);
+}
+
+/* Pipeline step numbers: ink on paper, like a numbered list in print */
+.step-number {
+  color: var(--color-text-primary);
+  font-family: var(--font-family-heading);
+}
+
+
+/* ==========================================================================
+   Newspaper effects
+   ========================================================================== */
+
+/* ---------- Printing on scroll: cards are pressed onto the page as they appear ---------- */
+.print-armed :is(.card, .fp-story, .ad-section, .rep-evidence, .cmp-block):not(.is-printed) {
+  opacity: 0;
+  clip-path: inset(0 0 100% 0);
+}
+
+.print-armed :is(.card, .fp-story, .ad-section, .rep-evidence, .cmp-block).is-printed {
+  animation: press-in 620ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* ---------- Rubber stamp ---------- */
+.stamp {
+  --stamp-color: var(--color-primary);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+  padding: 0.35rem 0.8rem;
+  border: 4px double var(--stamp-color);
+  border-radius: 4px;
+  color: var(--stamp-color);
+  font-family: var(--font-family-mono);
+  text-transform: uppercase;
+  transform: rotate(-8deg);
+  /* Worn ink: the noise mask leaves small gaps, like a real rubber stamp */
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.1 1.55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.1 1.55'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");
+  animation: stamp-slam 560ms cubic-bezier(0.3, 1.4, 0.5, 1) 350ms both;
+}
+
+.stamp-ink {
+  --stamp-color: var(--color-text-primary);
+}
+
+.stamp-label {
+  font-size: 1.2rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  line-height: 1;
+}
+
+.stamp-detail {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+}
+
+.rep-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.rep-head .stamp {
+  margin-top: 0.75rem;
+}
+
+/* ---------- "Stop the presses!" banner ---------- */
+.stop-presses {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+  padding: 0.875rem 1.1rem;
+  border: 2px solid var(--color-text-primary);
+  border-left: 10px solid var(--color-primary);
+  background-color: var(--color-bg-surface);
+  animation: presses-drop 700ms cubic-bezier(0.3, 1.35, 0.5, 1) both;
+}
+
+.stop-presses-kicker {
+  font-family: var(--font-family-heading);
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: -0.01em;
+  color: var(--color-primary);
+  text-transform: uppercase;
+}
+
+.stop-presses-text {
+  flex: 1;
+  min-width: 12rem;
+  font-family: var(--font-family-heading);
+  font-size: 1.1rem;
+}
+
+/* ---------- The fold ---------- */
+.the-fold {
+  position: relative;
+  margin: -0.75rem 0 1.75rem;
+  border-top: 1px dashed var(--color-border-subtle);
+  box-shadow: 0 10px 14px -14px rgba(0, 0, 0, 0.45);
+}
+
+.the-fold span {
+  position: absolute;
+  top: -0.55rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 0.6rem;
+  background-color: var(--color-bg-app);
+  font-family: var(--font-family-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* ---------- Front page: stories lift like a clipping, with halftone dots ---------- */
+.fp-story {
+  position: relative;
+  transition: transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 260ms ease, background-color 260ms ease;
+}
+
+.fp-story::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(var(--surface-tint-rgb), 1) 1.1px, transparent 1.4px);
+  background-size: 7px 7px;
+  -webkit-mask-image: linear-gradient(135deg, transparent 35%, #000);
+  mask-image: linear-gradient(135deg, transparent 35%, #000);
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.fp-story:hover {
+  z-index: 1;
+  background-color: var(--color-bg-surface);
+  transform: translateY(-4px) rotate(-0.4deg);
+  box-shadow: var(--shadow-lg);
+}
+
+.fp-story:hover::after {
+  opacity: 0.9;
+}
+
+.fp-story > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Teletype: loading messages type themselves out ---------- */
+.loading-message {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: var(--font-family-mono);
+  font-style: normal;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-right: 2px solid var(--color-primary);
+  width: calc(var(--chars, 20) * 1ch + 0.15em);
+  animation:
+    teletype 1.1s steps(var(--chars, 20), end) both,
+    caret 0.8s step-end infinite;
+}
+
+/* ---------- Pressing a button leaves a little dent ---------- */
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* ---------- Changing edition: the new one rolls down over the old ---------- */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(root) {
+  animation: edition-roll 720ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@keyframes page-turn {
+  from { opacity: 0; transform: rotateY(-12deg) translateX(24px); }
+  60% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes stamp-slam {
+  0% { opacity: 0; transform: scale(2.6) rotate(-22deg); }
+  55% { opacity: 1; transform: scale(0.9) rotate(-6deg); }
+  75% { transform: scale(1.04) rotate(-9deg); }
+  100% { opacity: 1; transform: scale(1) rotate(-8deg); }
+}
+
+@keyframes presses-drop {
+  from { opacity: 0; transform: translateY(-40px) scaleY(0.9); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes teletype {
+  from { width: 0; }
+}
+
+@keyframes caret {
+  50% { border-right-color: transparent; }
+}
+
+@keyframes edition-roll {
+  from { clip-path: inset(0 0 100% 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+/* Reduced motion: stamps sit still, nothing waits to be printed */
+@media (prefers-reduced-motion: reduce) {
+  .stamp {
+    transform: rotate(-8deg);
+  }
+
+  .loading-message {
+    width: auto;
+    border-right: none;
+  }
+
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import LoadingState from './LoadingState'
 import AlertMessage from './AlertMessage'
 import StatusBadge from './StatusBadge'
+import Stamp from './Stamp'
 import {
   AI_DETECTION_AVAILABLE,
   AI_FLAG_THRESHOLD,
@@ -90,16 +91,45 @@ export function AiDetectionSection({ articleId, contentAvailability = null }) {
     const percent = Math.round(result.ai_likelihood * 100)
     return (
       <>
-        <div className="pol-signal-header">
-          <span className="aid-value">{percent}%</span>
-          <span className="pol-technique">estimated likelihood that the text is machine-generated</span>
-        </div>
-        <div
-          className="aid-bar"
-          role="img"
-          aria-label={`Estimated AI likelihood ${percent}% on a scale from 0% to 100%`}
-        >
-          <span className="aid-bar-fill" style={{ width: `${percent}%` }} />
+        <div className="aid-gauge-row">
+          {/* A ring filled to the estimate; the tick marks the backend's review threshold */}
+          <div
+            className={`aid-gauge${result.is_flagged_for_review ? ' aid-gauge-flagged' : ''}`}
+            role="img"
+            aria-label={`Estimated AI likelihood ${percent}% on a scale from 0% to 100%`}
+          >
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              {/* Circles start at 3 o'clock; turn them to start at 12 o'clock */}
+              <circle className="aid-gauge-track" cx="50" cy="50" r="42" pathLength="100" />
+              <circle
+                className="aid-gauge-fill"
+                cx="50"
+                cy="50"
+                r="42"
+                pathLength="100"
+                transform="rotate(-90 50 50)"
+                style={{ strokeDasharray: `${percent} 100` }}
+              />
+              <line
+                className="aid-gauge-threshold"
+                x1="50"
+                y1="3"
+                x2="50"
+                y2="13"
+                transform={`rotate(${AI_FLAG_THRESHOLD * 360} 50 50)`}
+              />
+            </svg>
+            <span className="aid-value">{percent}%</span>
+          </div>
+          {/* Only when the backend itself flagged the article */}
+          {result.is_flagged_for_review && <Stamp label="Review" detail="Flagged by the backend" />}
+          <div>
+            <p className="aid-caption">Estimated likelihood that the text is machine-generated</p>
+            <p className="pol-explanation">
+              The tick on the ring marks {Math.round(AI_FLAG_THRESHOLD * 100)}%, where the backend asks a
+              person to review the article.
+            </p>
+          </div>
         </div>
         {/* is_flagged_for_review comes from the backend; no category is made up here */}
         {result.is_flagged_for_review ? (

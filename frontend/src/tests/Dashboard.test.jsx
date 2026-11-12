@@ -40,7 +40,7 @@ describe('Dashboard', () => {
     render(<Dashboard />)
     expect(screen.getByText('Loading recent articles...')).toBeDefined()
 
-    const table = await screen.findByRole('table', { name: 'Most recent articles' })
+    const table = await screen.findByRole('list', { name: 'Most recent articles' })
     expect(fetchArticles).toHaveBeenCalledWith({ limit: 5, offset: 0 })
     expect(within(table).getByText(NEWEST_TITLE)).toBeDefined()
     expect(within(table).getAllByText('Daily Ledger').length).toBeGreaterThan(0)
@@ -50,7 +50,7 @@ describe('Dashboard', () => {
 
   it('opens the article details from the dashboard', async () => {
     render(<Dashboard />)
-    await screen.findByRole('table', { name: 'Most recent articles' })
+    await screen.findByRole('list', { name: 'Most recent articles' })
 
     fireEvent.click(screen.getByRole('button', { name: `View details for ${NEWEST_TITLE}` }))
 
@@ -61,7 +61,7 @@ describe('Dashboard', () => {
   it('calls onNavigate for "View all articles" and "Manage sources"', async () => {
     const onNavigate = vi.fn()
     render(<Dashboard onNavigate={onNavigate} />)
-    await screen.findByRole('table', { name: 'Most recent articles' })
+    await screen.findByRole('list', { name: 'Most recent articles' })
 
     fireEvent.click(screen.getByRole('button', { name: 'View all articles' }))
     fireEvent.click(screen.getByRole('button', { name: 'Manage sources' }))
@@ -85,7 +85,26 @@ describe('Dashboard', () => {
     expect(screen.getByText(/Could not reach the backend/)).toBeDefined()
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(await screen.findByText(NEWEST_TITLE)).toBeDefined()
+    const frontPage = await screen.findByRole('list', { name: 'Most recent articles' })
+    expect(within(frontPage).getByText(NEWEST_TITLE)).toBeDefined()
+  })
+
+  it('shows the newest headlines in the "Latest" ticker, and opens one', async () => {
+    render(<Dashboard />)
+    const ticker = await screen.findByRole('list', { name: 'Latest headlines' })
+    expect(within(ticker).getAllByRole('button')).toHaveLength(5)
+    fireEvent.click(within(ticker).getByRole('button', { name: new RegExp(NEWEST_TITLE) }))
+    const details = screen.getByRole('region', { name: 'Article details' })
+    expect(await within(details).findByText(/The city council voted on Monday/)).toBeDefined()
+  })
+
+  it('lays the newest articles out as a front page with a lead story', async () => {
+    render(<Dashboard />)
+    const frontPage = await screen.findByRole('list', { name: 'Most recent articles' })
+    const stories = within(frontPage).getAllByRole('listitem')
+    expect(stories).toHaveLength(5)
+    expect(stories[0].className).toContain('fp-lead')
+    expect(within(stories[0]).getByRole('heading', { level: 3 }).textContent).toBe(NEWEST_TITLE)
   })
 
   it('lists the sources from the API with their base URL, and counts them', async () => {
@@ -94,7 +113,8 @@ describe('Dashboard', () => {
     const table = await screen.findByRole('table', { name: 'Configured news sources' })
     expect(within(table).getByText('Daily Ledger')).toBeDefined()
     expect(within(table).getByRole('link', { name: 'https://dailyledger.example' })).toBeDefined()
-    expect(screen.getByText('5')).toBeDefined()
+    // The count is shown twice: the counting-up copy and the screen-reader copy
+    expect(screen.getByText('5', { selector: '.sr-only' })).toBeDefined()
     // No "connected" claim, because the backend does not report it
     expect(screen.getByText(/does not report whether each source/)).toBeDefined()
     expect(screen.queryByText(/Connected/)).toBeNull()
@@ -112,7 +132,7 @@ describe('Dashboard', () => {
     const pendingRun = createPendingPromise()
     runNewsCollection.mockReturnValueOnce(pendingRun.promise)
     render(<Dashboard />)
-    await screen.findByRole('table', { name: 'Most recent articles' })
+    await screen.findByRole('list', { name: 'Most recent articles' })
     await screen.findByRole('table', { name: 'Configured news sources' })
     expect(fetchArticles).toHaveBeenCalledTimes(1)
     expect(fetchSources).toHaveBeenCalledTimes(1)
@@ -152,7 +172,7 @@ describe('Dashboard', () => {
     expect(within(feedTable).getByText('Connection timed out after 10s')).toBeDefined()
 
     // Both lists are loaded again (a run can add articles and sources)
-    await screen.findByRole('table', { name: 'Most recent articles' })
+    await screen.findByRole('list', { name: 'Most recent articles' })
     await screen.findByRole('table', { name: 'Configured news sources' })
     expect(fetchArticles).toHaveBeenCalledTimes(2)
     expect(fetchSources).toHaveBeenCalledTimes(2)
@@ -162,12 +182,49 @@ describe('Dashboard', () => {
   it('shows an error when news collection fails, and does not reload articles', async () => {
     runNewsCollection.mockRejectedValueOnce(new Error('Feed service is down (HTTP 503)'))
     render(<Dashboard />)
-    await screen.findByRole('table', { name: 'Most recent articles' })
+    await screen.findByRole('list', { name: 'Most recent articles' })
 
     fireEvent.click(screen.getByRole('button', { name: 'Run News Collection' }))
 
     expect(await screen.findByText('News collection failed.')).toBeDefined()
     expect(screen.getByText('Feed service is down (HTTP 503)')).toBeDefined()
     expect(fetchArticles).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Dashboard "Stop the presses!" banner', () => {
+  beforeEach(() => {
+    resetMockData()
+    vi.clearAllMocks()
+  })
+
+  function runResult(inserted) {
+    return {
+      counts: [{ key: 'articles_inserted', label: 'New articles inserted', value: inserted }],
+      feeds: [],
+    }
+  }
+
+  it('drops in with the real number of new articles, and can be dismissed', async () => {
+    runNewsCollection.mockResolvedValueOnce(runResult(12))
+    render(<Dashboard />)
+    await screen.findByRole('list', { name: 'Most recent articles' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run News Collection' }))
+    expect(await screen.findByText('Stop the presses!')).toBeDefined()
+    expect(screen.getByText(/12 new articles just came in/)).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(screen.queryByText('Stop the presses!')).toBeNull()
+  })
+
+  it('stays away when the run found nothing new', async () => {
+    runNewsCollection.mockResolvedValueOnce(runResult(0))
+    render(<Dashboard />)
+    await screen.findByRole('list', { name: 'Most recent articles' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run News Collection' }))
+    expect(await screen.findByText('News collection finished.')).toBeDefined()
+    expect(screen.queryByText('Stop the presses!')).toBeNull()
   })
 })
