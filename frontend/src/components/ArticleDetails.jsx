@@ -9,6 +9,7 @@ import ArticleInsightsSection from './ArticleInsightsSection'
 import PoliticalAnalysisSection from './PoliticalAnalysisSection'
 import ToneFramingSection from './ToneFramingSection'
 import AiDetectionSection from './AiDetectionSection'
+import DuplicateCheckSection from './DuplicateCheckSection'
 import { NavigationContext } from '../navigation'
 import { fetchArticle, STORIES_AVAILABLE } from '../api/newsApi'
 import { formatDate } from '../utils/formatDate'
@@ -333,6 +334,14 @@ export function ArticleDetails({ articleId, sourceName, onClose, onSelectArticle
           key={`ai-${activeArticleId}`}
           articleId={activeArticleId}
           contentAvailability={article.content_availability}
+        />
+
+        {/* ── Section 8: Duplicate Check ───────────────────────────────── */}
+        <DuplicateCheckSection
+          key={`dup-${activeArticleId}`}
+          articleId={activeArticleId}
+          duplicateOfArticleId={article.duplicate_of_article_id}
+          onOpenArticle={handleSelectSimilar}
         />
       </>
     )

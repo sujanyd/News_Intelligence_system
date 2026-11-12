@@ -16,6 +16,7 @@ import {
   AI_DETECTION_AVAILABLE,
   AI_FLAG_THRESHOLD,
   COMPARISONS_AVAILABLE,
+  DASHBOARD_SUMMARY_AVAILABLE,
   INGESTION_AVAILABLE,
   STORIES_AVAILABLE,
   USE_MOCK_DATA,
@@ -27,6 +28,7 @@ import {
   fetchAllReports,
   fetchAllStories,
   fetchArticles,
+  fetchDashboardSummary,
   fetchSources,
   runNewsCollection,
 } from '../api/newsApi'
@@ -71,6 +73,90 @@ function settledValue(result) {
   return result.status === 'fulfilled' ? result.value : null
 }
 
+// An exact total from the summary route
+function exactCount(count) {
+  return { count, isComplete: true }
+}
+
+// Stories with 2 or more articles can be compared and reported on
+function comparableCount(stories) {
+  return (
+    stories && {
+      count: stories.items.filter((story) => story.article_count >= 2).length,
+      isComplete: stories.isComplete,
+    }
+  )
+}
+
+/**
+ * Loads the totals for the metric cards.
+ *
+ * 1. Real backend: GET /dashboard/summary gives every exact total in one
+ *    request. The stories are still read to count the comparable ones
+ *    (the summary has no such number).
+ * 2. Mock mode, or a backend without the summary route: the lists are
+ *    read page by page (see readAllPages in newsApi.js).
+ *
+ * @returns {Promise<{ totals: Object, errorMessage: string }>}
+ */
+async function loadTotals() {
+  let summary = null
+  if (DASHBOARD_SUMMARY_AVAILABLE) {
+    try {
+      summary = await fetchDashboardSummary()
+    } catch {
+      summary = null // count page by page below instead
+    }
+  }
+
+  if (summary) {
+    const [storyResult] = await Promise.allSettled([fetchAllStories()])
+    return {
+      errorMessage: storyResult.status === 'rejected' ? storyResult.reason.message : '',
+      totals: {
+        articles: exactCount(summary.total_articles),
+        stories: exactCount(summary.total_stories),
+        events: exactCount(summary.total_events),
+        comparable: comparableCount(settledValue(storyResult)),
+        comparisons: exactCount(summary.total_comparisons),
+        reports: exactCount(summary.total_reports),
+        flagged: exactCount(summary.total_flagged_ai_articles),
+        system: {
+          embeddingProvider: summary.embedding_provider,
+          embeddingDimension: summary.embedding_dimension,
+          qdrantMode: summary.qdrant_mode,
+        },
+      },
+    }
+  }
+
+  const results = await Promise.allSettled([
+    countArticles(),
+    STORIES_AVAILABLE ? fetchAllStories() : Promise.resolve(null),
+    STORIES_AVAILABLE ? countEvents() : Promise.resolve(null),
+    COMPARISONS_AVAILABLE ? fetchAllComparisons() : Promise.resolve(null),
+    COMPARISONS_AVAILABLE ? fetchAllReports() : Promise.resolve(null),
+    AI_DETECTION_AVAILABLE ? countFlaggedAiDetections() : Promise.resolve(null),
+  ])
+  const [articleResult, storyResult, eventResult, comparisonResult, reportResult, flaggedResult] =
+    results
+  const failed = results.find((result) => result.status === 'rejected')
+  const stories = settledValue(storyResult)
+  return {
+    errorMessage: failed ? failed.reason.message : '',
+    totals: {
+      articles: settledValue(articleResult),
+      stories: stories && { count: stories.items.length, isComplete: stories.isComplete },
+      events: settledValue(eventResult),
+      comparable: comparableCount(stories),
+      comparisons: listCount(settledValue(comparisonResult)),
+      reports: listCount(settledValue(reportResult)),
+      flagged: settledValue(flaggedResult),
+      system: null,
+    },
+  }
+}
+
 /**
  * Dashboard Page Component
  *
@@ -101,44 +187,20 @@ export function Dashboard({ onNavigate }) {
   const [sourcesError, setSourcesError] = useState('')
   const [sourcesReloadCount, setSourcesReloadCount] = useState(0)
 
-  // Totals for the metric cards. The backend has no count route, so the
-  // lists are read page by page (see readAllPages in newsApi.js).
   // Banner after a news collection that added articles: { count }
   const [stopPresses, setStopPresses] = useState(null)
 
-  const [totals, setTotals] = useState(null) // { articles, stories, events, comparable, comparisons, reports, flagged }
+  // Totals for the metric cards (see loadTotals above)
+  const [totals, setTotals] = useState(null) // { articles, stories, events, comparable, comparisons, reports, flagged, system }
   const [totalsError, setTotalsError] = useState('')
   const [totalsReloadCount, setTotalsReloadCount] = useState(0)
 
   useEffect(() => {
     let isCurrentRequest = true
-    Promise.allSettled([
-      countArticles(),
-      STORIES_AVAILABLE ? fetchAllStories() : Promise.resolve(null),
-      STORIES_AVAILABLE ? countEvents() : Promise.resolve(null),
-      COMPARISONS_AVAILABLE ? fetchAllComparisons() : Promise.resolve(null),
-      COMPARISONS_AVAILABLE ? fetchAllReports() : Promise.resolve(null),
-      AI_DETECTION_AVAILABLE ? countFlaggedAiDetections() : Promise.resolve(null),
-    ]).then((results) => {
+    loadTotals().then((result) => {
       if (!isCurrentRequest) return
-      const [articleResult, storyResult, eventResult, comparisonResult, reportResult, flaggedResult] =
-        results
-      const failed = results.find((result) => result.status === 'rejected')
-      setTotalsError(failed ? failed.reason.message : '')
-      const stories = settledValue(storyResult)
-      setTotals({
-        articles: settledValue(articleResult),
-        stories: stories && { count: stories.items.length, isComplete: stories.isComplete },
-        events: settledValue(eventResult),
-        // Stories with 2 or more articles can be compared and reported on
-        comparable: stories && {
-          count: stories.items.filter((story) => story.article_count >= 2).length,
-          isComplete: stories.isComplete,
-        },
-        comparisons: listCount(settledValue(comparisonResult)),
-        reports: listCount(settledValue(reportResult)),
-        flagged: settledValue(flaggedResult),
-      })
+      setTotalsError(result.errorMessage)
+      setTotals(result.totals)
     })
     return () => {
       isCurrentRequest = false
@@ -548,6 +610,15 @@ export function Dashboard({ onNavigate }) {
           accent="amber"
         />
       </section>
+
+      {/* How the backend says it runs: only shown when the summary route answered */}
+      {totals?.system && (
+        <p className="ingestion-note" data-testid="semantic-engine">
+          Semantic engine: {totals.system.embeddingProvider || 'provider not given'}
+          {totals.system.embeddingDimension && ` · ${totals.system.embeddingDimension}-dimensional embeddings`}
+          {totals.system.qdrantMode && ` · Qdrant storage: ${totals.system.qdrantMode}`}
+        </p>
+      )}
 
       {/* News collection button and the result of the last run */}
       <section className="dashboard-section" style={{ marginTop: '2rem' }}>

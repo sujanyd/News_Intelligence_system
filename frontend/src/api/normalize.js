@@ -75,6 +75,10 @@ export function toArticle(raw) {
     content_availability:
       typeof raw.content_availability === 'string' ? raw.content_availability : null,
     content: typeof raw.content === 'string' ? raw.content : null,
+    // The earlier article this one copies (null when it is not a known duplicate)
+    duplicate_of_article_id: Number.isInteger(raw.duplicate_of_article_id)
+      ? raw.duplicate_of_article_id
+      : null,
   }
 }
 
@@ -852,5 +856,60 @@ export function toAiDetection(raw) {
       repetition_index: number(metrics.repetition_index),
       methodology: toText(metrics.methodology),
     },
+  }
+}
+
+// The totals GET /dashboard/summary must send (whole numbers, 0 or more)
+const DASHBOARD_TOTALS = [
+  'total_articles',
+  'total_sources',
+  'total_stories',
+  'total_events',
+  'total_comparisons',
+  'total_reports',
+  'total_flagged_ai_articles',
+]
+
+/**
+ * Checks the dashboard summary from GET /dashboard/summary.
+ * Required: every total in DASHBOARD_TOTALS. The three settings
+ * (embedding provider, dimension, Qdrant mode) may be missing.
+ */
+export function toDashboardSummary(raw) {
+  const isValid =
+    isObject(raw) && DASHBOARD_TOTALS.every((key) => Number.isInteger(raw[key]) && raw[key] >= 0)
+  if (!isValid) {
+    throw new ApiError('The backend sent the dashboard summary in an unexpected format.')
+  }
+  const summary = {}
+  for (const key of DASHBOARD_TOTALS) summary[key] = raw[key]
+  summary.embedding_provider = typeof raw.embedding_provider === 'string' ? raw.embedding_provider : null
+  summary.embedding_dimension = Number.isInteger(raw.embedding_dimension) ? raw.embedding_dimension : null
+  summary.qdrant_mode = typeof raw.qdrant_mode === 'string' ? raw.qdrant_mode : null
+  return summary
+}
+
+// The duplicate types POST /articles/{id}/detect-duplicates can send
+const DUPLICATE_TYPES = ['exact', 'near_duplicate', 'none']
+
+/**
+ * Checks the reply of POST /articles/{id}/detect-duplicates.
+ * Required: is_duplicate (true/false) and a known duplicate_type.
+ */
+export function toDuplicateCheck(raw) {
+  if (
+    !isObject(raw) ||
+    typeof raw.is_duplicate !== 'boolean' ||
+    !DUPLICATE_TYPES.includes(raw.duplicate_type)
+  ) {
+    throw new ApiError('The backend sent the duplicate check in an unexpected format.')
+  }
+  return {
+    article_id: raw.article_id ?? null,
+    is_duplicate: raw.is_duplicate,
+    duplicate_type: raw.duplicate_type,
+    canonical_article_id: Number.isInteger(raw.canonical_article_id) ? raw.canonical_article_id : null,
+    similarity_score: typeof raw.similarity_score === 'number' ? raw.similarity_score : null,
+    reason: typeof raw.reason === 'string' ? raw.reason : '',
   }
 }

@@ -31,6 +31,8 @@ import {
   toAiDetection,
   toComparison,
   toComparisonSummary,
+  toDashboardSummary,
+  toDuplicateCheck,
   toReport,
   toSimilarArticlesResponse,
   toSource,
@@ -79,7 +81,17 @@ export const ENDPOINTS = {
   articleAiDetection: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/ai-detection`,
   runArticleAiDetection: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/ai-detection/analyze`,
   flaggedAiDetections: `${API_PREFIX}/articles/ai-detection/flagged`,
+  // Every dashboard total in one request (app/api/v1/endpoints/dashboard.py)
+  dashboardSummary: `${API_PREFIX}/dashboard/summary`,
+  // Exact / near-duplicate check of one article (app/api/v1/endpoints/comparison_report.py)
+  detectDuplicates: (id) => `${API_PREFIX}/articles/${encodeURIComponent(id)}/detect-duplicates`,
 }
+
+// The duplicate check only exists in the real backend
+export const DUPLICATE_CHECK_AVAILABLE = !USE_MOCK_DATA
+
+// The dashboard summary route only exists in the real backend
+export const DASHBOARD_SUMMARY_AVAILABLE = !USE_MOCK_DATA
 
 // Comparisons, reports and AI detection only exist in the real backend.
 // There is no mock version on purpose: nothing made up is ever shown.
@@ -507,6 +519,39 @@ export async function fetchToneFraming(articleId) {
 // a page comes back short. MAX_PAGES stops this on a very large database:
 // then the result says it is not complete ("2000+").
 // ---------------------------------------------------------------------------
+
+/**
+ * Every dashboard total in one request: articles, sources, stories, events,
+ * comparisons, reports and articles flagged for review, plus the embedding
+ * provider, its vector size and how Qdrant is stored.
+ * Endpoint: GET /dashboard/summary (real backend only)
+ *
+ * @returns {Promise<Object>} see toDashboardSummary in normalize.js
+ */
+export async function fetchDashboardSummary() {
+  if (!DASHBOARD_SUMMARY_AVAILABLE) {
+    throw new ApiError('The dashboard summary only works with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+  const data = await apiGet(ENDPOINTS.dashboardSummary)
+  return toDashboardSummary(data)
+}
+
+/**
+ * Asks the backend whether an article is an exact or near-duplicate of an
+ * earlier one. When it is, the backend stores the link
+ * (duplicate_of_article_id), so this is only run when the user asks.
+ * Endpoint: POST /articles/{id}/detect-duplicates (real backend only)
+ *
+ * @param {number | string} articleId
+ * @returns {Promise<Object>} see toDuplicateCheck in normalize.js
+ */
+export async function checkArticleDuplicates(articleId) {
+  if (!DUPLICATE_CHECK_AVAILABLE) {
+    throw new ApiError('The duplicate check only works with the real backend (VITE_USE_MOCK_DATA=false).')
+  }
+  const data = await apiPost(ENDPOINTS.detectDuplicates(articleId), {}, { timeoutMs: EXTRACTION_TIMEOUT_MS })
+  return toDuplicateCheck(data)
+}
 
 const PAGE_SIZE = 100
 const MAX_PAGES = 20
