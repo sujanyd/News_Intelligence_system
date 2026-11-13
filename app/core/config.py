@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     RSS_USER_AGENT: str = "NewsBiasIntelligenceBot/1.0 (+https://github.com/sujanyd/News_Intelligence_system)"
     RSS_MAX_ARTICLES_PER_FEED: int = 30
 
+    # RSS Periodic Background Scheduler Configuration
+    RSS_SCHEDULER_ENABLED: bool = True
+    RSS_SCHEDULER_INTERVAL_MINUTES: int = 60
+    RSS_SCHEDULER_INITIAL_DELAY_SECONDS: int = 10
+
     # Article Embedding Configuration
     # Supported providers: 'sentence-transformers', 'openai', 'gemini', 'mock' (test only)
     EMBEDDING_PROVIDER: str = "sentence-transformers"

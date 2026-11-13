@@ -18,13 +18,15 @@ from app.models.article import Article
 from app.models.article_embedding import ArticleEmbedding
 from app.services.embedding import get_embedding_provider
 from app.services.vector_db import get_vector_db_service
+from app.services.scheduler import get_rss_scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Application lifespan context manager.
-    Warms up in-memory Qdrant with existing database embeddings on startup for local demo reliability.
+    Warms up vector DB with existing database embeddings on startup and
+    starts the background RSS scheduler. Gracefully stops the scheduler on shutdown.
     """
     try:
         db = SessionLocal()
@@ -51,7 +53,15 @@ async def lifespan(app: FastAPI):
         db.close()
     except Exception:
         pass
+
+    # Start the RSS periodic scheduler
+    scheduler = get_rss_scheduler()
+    await scheduler.start()
+
     yield
+
+    # Clean graceful shutdown of background tasks
+    await scheduler.stop()
 
 
 def create_application() -> FastAPI:

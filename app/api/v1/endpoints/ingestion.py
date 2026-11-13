@@ -16,6 +16,7 @@ from app.schemas.ingestion import (
     IngestionSummaryResponse,
 )
 from app.services.rss_ingestion import run_rss_ingestion
+from app.services.scheduler import get_rss_scheduler
 
 router = APIRouter()
 
@@ -64,4 +65,31 @@ def list_configured_feeds() -> List[FeedConfigSchema]:
     Returns the list of monitored RSS news feeds.
     """
     return [FeedConfigSchema(**feed) for feed in DEFAULT_RSS_FEEDS]
+
+
+@router.get(
+    "/scheduler/status",
+    summary="Get background RSS scheduler status",
+    description="Returns current status, interval, total runs, and last execution summary of the RSS scheduler.",
+)
+def get_scheduler_status():
+    """
+    Returns health and status of the periodic RSS scheduler.
+    """
+    scheduler = get_rss_scheduler()
+    return scheduler.status
+
+
+@router.post(
+    "/scheduler/trigger",
+    summary="Trigger an immediate background RSS run",
+    description="Asynchronously triggers a single scheduler execution run.",
+)
+async def trigger_scheduler_run():
+    """
+    Manually triggers one background cycle through the scheduler.
+    """
+    scheduler = get_rss_scheduler()
+    result = await scheduler.run_once()
+    return result
 
