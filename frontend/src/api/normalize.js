@@ -89,6 +89,7 @@ export const INGESTION_COUNT_LABELS = {
   articles_inserted: 'New articles inserted',
   articles_skipped_duplicate: 'Duplicate articles skipped',
   feed_errors: 'Feed errors',
+  feed_retries: 'Feed retries',
 }
 
 /**

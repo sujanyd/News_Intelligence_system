@@ -15,8 +15,8 @@ export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim()
 export const API_BASE_URL_LABEL = API_BASE_URL || 'Not configured'
 
 // Path that comes before /sources and /articles.
-// The plan says "/api"; the backend currently uses "/api/v1" for versioned routes.
-// Change it in .env once Person A confirms the real routes.
+// The backend (app/main.py) serves the same routes under "/api" and "/api/v1",
+// so either works; "/api" is the default.
 export const API_PREFIX = import.meta.env.VITE_API_PREFIX || '/api'
 
 /**

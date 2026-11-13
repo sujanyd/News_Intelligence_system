@@ -616,7 +616,8 @@ export function Dashboard({ onNavigate }) {
         <p className="ingestion-note" data-testid="semantic-engine">
           Semantic engine: {totals.system.embeddingProvider || 'provider not given'}
           {totals.system.embeddingDimension && ` · ${totals.system.embeddingDimension}-dimensional embeddings`}
-          {totals.system.qdrantMode && ` · Qdrant storage: ${totals.system.qdrantMode}`}
+          {/* The backend only reports QDRANT_URL, so file or server storage comes back empty */}
+          {` · Qdrant storage: ${totals.system.qdrantMode || 'not reported by the backend'}`}
         </p>
       )}
 

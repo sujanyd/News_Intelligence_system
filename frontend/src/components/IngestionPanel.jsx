@@ -1,8 +1,10 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Card from './Card'
 import StatusBadge from './StatusBadge'
 import AlertMessage from './AlertMessage'
 import DataTable from './DataTable'
+import { fetchLatestCollectionTime } from '../api/newsApi'
+import { formatDate } from '../utils/formatDate'
 
 /**
  * IngestionPanel Component
@@ -12,7 +14,9 @@ import DataTable from './DataTable'
  * - While a run is going, the button is disabled, so it cannot be started twice.
  * - Only the numbers the backend really sent are shown.
  * - The result is only kept while this page is open: the backend does not
- *   save a history of runs (yet).
+ *   save a history of runs.
+ * - "Last article collected" is the newest retrieved_at of the articles
+ *   (see fetchLatestCollectionTime), loaded on open and after each run.
  *
  * @param {Object} props
  * @param {boolean} props.isAvailable - false when collection cannot run (e.g. mock mode)
@@ -26,6 +30,31 @@ export function IngestionPanel({ isAvailable, unavailableReason, onRun, onSucces
   const [result, setResult] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
 
+  // { latestRetrievedAt, articlesChecked }, null while loading, 'failed' on error
+  const [latest, setLatest] = useState(null)
+  const [latestReloadCount, setLatestReloadCount] = useState(0)
+
+  useEffect(() => {
+    let isCurrentRequest = true
+    fetchLatestCollectionTime()
+      .then((value) => {
+        if (isCurrentRequest) setLatest(value)
+      })
+      .catch(() => {
+        if (isCurrentRequest) setLatest('failed')
+      })
+    return () => {
+      isCurrentRequest = false
+    }
+  }, [latestReloadCount])
+
+  function renderLatest() {
+    if (latest === null) return 'Loading...'
+    if (latest === 'failed') return 'Could not be loaded'
+    if (!latest.latestRetrievedAt) return 'No articles collected yet'
+    return formatDate(latest.latestRetrievedAt)
+  }
+
   async function handleRun() {
     if (isRunning) return // a run is already going
     setIsRunning(true)
@@ -34,6 +63,7 @@ export function IngestionPanel({ isAvailable, unavailableReason, onRun, onSucces
     try {
       const runResult = await onRun()
       setResult(runResult)
+      setLatestReloadCount((count) => count + 1)
       if (onSuccess) onSuccess(runResult)
     } catch (error) {
       setErrorMessage(error.message)
@@ -92,6 +122,13 @@ export function IngestionPanel({ isAvailable, unavailableReason, onRun, onSucces
           'Run News Collection'
         )}
       </button>
+
+      <p className="ingestion-note" data-testid="latest-collection">
+        <strong>Last article collected:</strong> {renderLatest()}
+        <br />
+        The backend keeps no history of collection runs, so this is the newest collection time
+        among the 100 most recently published articles.
+      </p>
 
       {isRunning && (
         <p className="ingestion-note" role="status">

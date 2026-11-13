@@ -537,6 +537,25 @@ export async function fetchDashboardSummary() {
 }
 
 /**
+ * When the newest article was collected (its retrieved_at), as a stand-in
+ * for "last news collection": the backend keeps no history of runs.
+ * The backend sorts articles by publication time, not collection time, so
+ * this looks at the 100 most recently published articles.
+ * Endpoint: GET /articles?limit=100
+ *
+ * @returns {Promise<{ latestRetrievedAt: string | null, articlesChecked: number }>}
+ */
+export async function fetchLatestCollectionTime() {
+  const { articles } = await fetchArticles({ limit: 100, offset: 0 })
+  let latest = null
+  for (const article of articles) {
+    if (!article.retrieved_at) continue
+    if (!latest || new Date(article.retrieved_at) > new Date(latest)) latest = article.retrieved_at
+  }
+  return { latestRetrievedAt: latest, articlesChecked: articles.length }
+}
+
+/**
  * Asks the backend whether an article is an exact or near-duplicate of an
  * earlier one. When it is, the backend stores the link
  * (duplicate_of_article_id), so this is only run when the user asks.

@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Footer from './components/Footer'
@@ -11,6 +11,7 @@ import Reports from './pages/Reports'
 import CommandPalette from './components/CommandPalette'
 import { NavigationContext } from './navigation'
 import { usePrintReveal } from './usePrintReveal'
+import { hashToPage, pageToHash } from './utils/pageUrl'
 import './styles/App.css'
 import './styles/refresh.css'
 
@@ -25,14 +26,28 @@ import './styles/refresh.css'
  */
 export function App() {
   // The open page, what it should show first (params), and a counter that
-  // makes the page start again when the same page is opened with new params
-  const [page, setPage] = useState({ tab: 'dashboard', params: null, visit: 0 })
+  // makes the page start again when the same page is opened with new params.
+  // The first page comes from the URL (e.g. #/articles?sourceId=3).
+  const [page, setPage] = useState(() => ({ ...hashToPage(window.location.hash), visit: 0 }))
   const activeTab = page.tab
 
-  // Opens a page, e.g. navigate('stories', { name: 'event', eventId: 12 })
+  // Opens a page, e.g. navigate('stories', { name: 'event', eventId: 12 }),
+  // and adds it to the browser history so Back / Forward work
   const navigate = useCallback((tab, params = null) => {
+    const hash = pageToHash(tab, params)
+    if (window.location.hash !== hash) window.history.pushState(null, '', hash)
     setPage((current) => ({ tab, params, visit: current.visit + 1 }))
     window.scrollTo(0, 0)
+  }, [])
+
+  // Back / Forward (or editing the URL): open the page the URL now points to
+  useEffect(() => {
+    function handleUrlChange() {
+      setPage((current) => ({ ...hashToPage(window.location.hash), visit: current.visit + 1 }))
+      window.scrollTo(0, 0)
+    }
+    window.addEventListener('popstate', handleUrlChange)
+    return () => window.removeEventListener('popstate', handleUrlChange)
   }, [])
   const setActiveTab = (tab) => navigate(tab)
 
