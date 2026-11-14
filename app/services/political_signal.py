@@ -482,8 +482,11 @@ class PoliticalSignalService:
             # Update bias fields in existing analysis
             analysis.bias_score = metrics["slant_score"]
             analysis.bias_label = metrics["political_leaning"]
-            if metrics["confidence_score"]:
-                analysis.confidence_score = round((analysis.confidence_score + metrics["confidence_score"]) / 2.0, 2)
+            if metrics["confidence_score"] is not None:
+                if analysis.confidence_score is not None:
+                    analysis.confidence_score = round((analysis.confidence_score + metrics["confidence_score"]) / 2.0, 2)
+                else:
+                    analysis.confidence_score = round(metrics["confidence_score"], 2)
             db.flush()
 
         # Connect entities to analysis

@@ -314,11 +314,12 @@ class StoryEventGroupingService:
         db.flush()
 
         # Real-world event time is distinct from publication time (published_at) and retrieval time (retrieved_at).
-        # When unstated in article metadata or body, event_time remains null with precision 'unknown'.
+        # When an explicit article publication timestamp is provided, initialize initial event_time from published_at
+        # with date precision unless overridden later by deeper temporal extraction.
         new_event = Event(
             story_id=new_story.id,
-            event_time=None,
-            event_time_precision="unknown",
+            event_time=article.published_at if article.published_at else None,
+            event_time_precision="date" if article.published_at else "unknown",
             event_time_disagreement=False,
         )
         db.add(new_event)
